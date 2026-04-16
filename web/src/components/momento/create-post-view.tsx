@@ -7,9 +7,9 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { ChevronLeft, ImagePlus, Loader2, Lock } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { getSnapzoApiBaseUrl } from "@/lib/snapzo-api";
+import { APP_CREATOR_REVENUE_EXPLAINER } from "@/lib/brand";
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -146,7 +146,7 @@ export function CreatePostView() {
     if (isLocked) {
       price = Number.parseFloat(unlockMusd.replace(",", "."));
       if (!Number.isFinite(price) || price <= 0) {
-        toast("Set an unlock price greater than 0 MUSD.", "error");
+        toast("Set an unlock price greater than 0 SNAP.", "error");
         return;
       }
     }
@@ -311,7 +311,7 @@ export function CreatePostView() {
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-white">Hidden until unlock</p>
                 <p className="text-xs font-normal leading-snug text-zinc-500">
-                  Followers pay MUSD once to reveal the full photo
+                  Followers pay SNAP once to reveal the full photo
                 </p>
               </div>
             </div>
@@ -356,13 +356,13 @@ export function CreatePostView() {
                   placeholder="0.10"
                   aria-describedby="snapzo-unlock-hint"
                 />
-                <span className="flex shrink-0 items-center gap-1 text-sm font-medium text-zinc-400">
-                  <MusdInlineIcon size={20} />
-                  <span className="sr-only">MUSD</span>
+                <span className="shrink-0 rounded-lg bg-violet-500/15 px-2 py-1 font-mono text-xs font-semibold text-violet-200">
+                  SNAP
                 </span>
               </div>
               <p id="snapzo-unlock-hint" className="mt-2 text-xs leading-relaxed text-zinc-500">
-                Unlock amount in MUSD. Required when hidden mode is on.
+                Unlock amount in SNAP (fans get SNAP from the Earn hub). Required when hidden mode
+                is on.
               </p>
             </div>
           ) : null}
@@ -409,8 +409,8 @@ export function CreatePostView() {
         </div>
         <p className="text-xs leading-relaxed text-zinc-500">
           {!isConnected
-            ? "Connect a wallet so we can attach your post to your address (for unlocks and tips on-chain)."
-            : "Your wallet identifies you as the creator. Photos are normal uploads (not NFTs). We plan to store files on the SnapZO server with post rows in MongoDB; that pipeline is not finished yet, so publishing still goes through the API as it exists today."}
+            ? "Connect a wallet so we can attach your post to your address (for SNAP unlocks and tips on-chain)."
+            : `Your wallet identifies you as the creator. ${APP_CREATOR_REVENUE_EXPLAINER} Photos are normal uploads (not NFTs); publishing uses the API as it exists today.`}
         </p>
       </div>
     </main>

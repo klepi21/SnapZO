@@ -27,13 +27,14 @@ import {
   useWriteContract,
 } from "wagmi";
 import { parseUnits, UserRejectedRequestError } from "viem";
+import { APP_CREATOR_REVENUE_ONE_LINER } from "@/lib/brand";
 import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar, picsumPost } from "@/lib/dummy/social";
+import { erc20TransferAbi } from "@/lib/constants/musd";
 import {
-  erc20TransferAbi,
-  MUSD_ADDRESS_MEZO_TESTNET,
-  MUSD_DECIMALS,
-} from "@/lib/constants/musd";
+  SNAP_DECIMALS,
+  SNAPZO_SNAP_TOKEN_ADDRESS,
+} from "@/lib/constants/snapzo-hub";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import {
   appendCommentForPost,
@@ -43,14 +44,13 @@ import {
   type StoredComment,
 } from "@/lib/snapzo-local";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 
 interface PostCardProps {
   post: FeedPost;
 }
 
-const TIP_AMOUNT = parseUnits("0.01", MUSD_DECIMALS);
-const UNLOCK_AMOUNT = parseUnits("0.1", MUSD_DECIMALS);
+const TIP_AMOUNT = parseUnits("0.01", SNAP_DECIMALS);
+const UNLOCK_AMOUNT = parseUnits("0.1", SNAP_DECIMALS);
 
 function formatTxError(e: unknown): string {
   if (e instanceof UserRejectedRequestError) {
@@ -147,10 +147,10 @@ export function PostCard({ post }: PostCardProps) {
     /* eslint-disable react-hooks/set-state-in-effect -- sync UI after wagmi receipt + localStorage */
     if (pendingKind === "unlock") {
       setSessionUnlocked(true);
-      toast("Unlocked · 0.1 MUSD sent");
+      toast("Unlocked · 0.1 SNAP sent");
     } else if (pendingKind === "like") {
       persistPostLiked(post.id);
-      toast("Sent 0.01 MUSD tip.");
+      toast("Sent 0.01 SNAP tip.");
     } else if (pendingKind === "comment" && pendingCommentText) {
       const trimmed = pendingCommentText.trim();
       if (trimmed) {
@@ -162,7 +162,7 @@ export function PostCard({ post }: PostCardProps) {
         };
         appendCommentForPost(post.id, row);
         setCommentDraft("");
-        toast("Comment posted · 0.01 MUSD sent");
+        toast("Comment posted · 0.01 SNAP sent");
       }
       setPendingCommentText(null);
     }
@@ -232,9 +232,9 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     try {
-      toast("Confirm 0.1 MUSD unlock in your wallet…");
+      toast("Confirm 0.1 SNAP unlock in your wallet…");
       const hash = await writeContractAsync({
-        address: MUSD_ADDRESS_MEZO_TESTNET,
+        address: SNAPZO_SNAP_TOKEN_ADDRESS,
         abi: erc20TransferAbi,
         functionName: "transfer",
         args: [post.tipRecipient, UNLOCK_AMOUNT],
@@ -257,9 +257,9 @@ export function PostCard({ post }: PostCardProps) {
     }
     setLikePressed(true);
     try {
-      toast("Confirm 0.01 MUSD tip in your wallet…");
+      toast("Confirm 0.01 SNAP tip in your wallet…");
       const hash = await writeContractAsync({
-        address: MUSD_ADDRESS_MEZO_TESTNET,
+        address: SNAPZO_SNAP_TOKEN_ADDRESS,
         abi: erc20TransferAbi,
         functionName: "transfer",
         args: [post.tipRecipient, TIP_AMOUNT],
@@ -311,9 +311,9 @@ export function PostCard({ post }: PostCardProps) {
     }
     try {
       setPendingCommentText(text);
-      toast("Confirm 0.01 MUSD in your wallet…");
+      toast("Confirm 0.01 SNAP in your wallet…");
       const hash = await writeContractAsync({
-        address: MUSD_ADDRESS_MEZO_TESTNET,
+        address: SNAPZO_SNAP_TOKEN_ADDRESS,
         abi: erc20TransferAbi,
         functionName: "transfer",
         args: [post.tipRecipient, TIP_AMOUNT],
@@ -382,11 +382,9 @@ export function PostCard({ post }: PostCardProps) {
               <p className="text-sm font-semibold text-white">Hidden content</p>
               <p className="mt-2 max-w-[280px] text-xs leading-relaxed text-zinc-400">
                 Pay{" "}
-                <span className="inline-flex items-center gap-1 font-semibold text-zinc-200">
-                  0.1 <MusdInlineIcon size={14} />
-                </span>{" "}
-                to unlock. Gas is sponsored by a relayer — you only sign this
-                transfer.
+                <span className="font-semibold text-violet-200">0.1 SNAP</span> to unlock the
+                full photo. SNAP is the in-app creator economy token; deposit MUSD on Earn to
+                mint SNAP.
               </p>
             </div>
             <button
@@ -395,8 +393,7 @@ export function PostCard({ post }: PostCardProps) {
               onClick={handleUnlock}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/30 to-sky-500/20 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.2)] transition hover:border-indigo-300/60 hover:from-indigo-500/40 disabled:opacity-50"
             >
-              <span>Unlock · 0.1</span>
-              <MusdInlineIcon size={18} />
+              <span>Unlock · 0.1 SNAP</span>
             </button>
           </div>
         ) : null}
@@ -408,7 +405,7 @@ export function PostCard({ post }: PostCardProps) {
             <button
               type="button"
               className={`flex items-center gap-2 border-0 bg-transparent p-0 transition hover:opacity-90 active:opacity-75 disabled:pointer-events-none disabled:opacity-35 ${likedUi ? "text-red-500" : "text-white"}`}
-              aria-label={hasTipped ? "Already tipped" : "Like — tip 0.01 MUSD"}
+              aria-label={hasTipped ? "Already tipped" : "Like — tip 0.01 SNAP"}
               disabled={isBusy || hasTipped || likePressed}
               onClick={() => void handleLikeTip()}
             >
@@ -435,16 +432,15 @@ export function PostCard({ post }: PostCardProps) {
           </div>
           <div className="max-w-[46%] pt-0.5 text-right text-[10px] font-normal leading-snug tracking-wide text-zinc-500">
             <span className="text-zinc-400">Like</span>{" "}
-            <span className="font-medium text-zinc-300">0.01</span>
+            <span className="font-medium text-violet-200">0.01 SNAP</span>
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Reply</span>{" "}
-            <span className="font-medium text-zinc-300">0.01</span>
+            <span className="font-medium text-violet-200">0.01 SNAP</span>
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Unlock</span>{" "}
-            <span className="font-medium text-zinc-300">0.1</span>
-            <div className="mt-0.5 flex items-center justify-end gap-1 text-[9px] font-normal normal-case tracking-normal text-zinc-600">
-              <MusdInlineIcon size={12} />
-              <span>· demo</span>
+            <span className="font-medium text-violet-200">0.1 SNAP</span>
+            <div className="mt-0.5 max-w-[220px] text-right text-[9px] font-normal normal-case leading-snug tracking-normal text-zinc-600">
+              Earn: MUSD → hub → SNAP. {APP_CREATOR_REVENUE_ONE_LINER}
             </div>
           </div>
         </div>
@@ -609,9 +605,7 @@ export function PostCard({ post }: PostCardProps) {
                 <div className="shrink-0 border-t border-white/[0.08] bg-[#0b0f18] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
                   <p className="mb-2 flex items-center justify-center gap-1 text-center text-[10px] font-medium tracking-wide text-zinc-500">
                     <span>Posting sends</span>
-                    <span className="inline-flex items-center gap-0.5 text-zinc-400">
-                      0.01 <MusdInlineIcon size={12} />
-                    </span>
+                    <span className="text-violet-200/90">0.01 SNAP</span>
                     <span>on-chain</span>
                   </p>
                   <div className="flex items-end gap-2">

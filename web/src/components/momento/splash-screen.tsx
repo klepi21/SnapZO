@@ -3,8 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, APP_SPLASH_TAGLINE } from "@/lib/brand";
 import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
 const orbitAvatars = [
@@ -84,12 +83,8 @@ export function SplashScreen() {
           <h1 className="text-[2.75rem] font-bold leading-none tracking-tight text-white">
             {APP_NAME}
           </h1>
-          <p className="mx-auto mt-4 max-w-[20rem] text-pretty text-sm leading-relaxed text-zinc-400 sm:text-base">
-            Unlock premium posts, tip creators, and pay for replies — all with{" "}
-            <span className="inline-flex translate-y-[3px] items-center align-middle">
-              <MusdInlineIcon size={17} />
-            </span>{" "}
-            on Mezo.
+          <p className="mx-auto mt-4 max-w-[22rem] text-pretty text-sm leading-relaxed text-zinc-400 sm:text-base">
+            {APP_SPLASH_TAGLINE}
           </p>
           <Link
             href={startedHref}

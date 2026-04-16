@@ -10,8 +10,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { APP_NAME } from "@/lib/brand";
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { APP_CREATOR_REVENUE_EXPLAINER, APP_NAME } from "@/lib/brand";
 import { markOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
 const steps = [
@@ -20,26 +19,27 @@ const steps = [
     title: `Welcome to ${APP_NAME}`,
     icon: Sparkles,
     body: [
-      "SnapZo is a social feed built for Mezo testnet: share photos, set optional paid unlocks, and let fans support you with small stablecoin actions.",
-      "Every meaningful interaction is designed to feel intentional — less noise, clearer value between you and your audience.",
+      "SnapZo is a social feed on Mezo testnet: share photos, optional paid unlocks, and creator support — powered by a SNAP economy on the feed and MUSD in the Earn hub.",
+      "Fans use SNAP for likes, replies, and unlocks. SNAP comes from depositing MUSD into the SnapZo hub, where principal tracks Mezo yield strategies.",
     ],
   },
   {
-    key: "musd",
-    title: "What is MUSD for here?",
+    key: "tokens",
+    title: "SNAP on the feed, MUSD in the hub",
     icon: Wallet,
     body: [
-      "MUSD is the Mezo ecosystem stablecoin. In SnapZo it pays for on-app actions: unlocking hidden media, sending a like tip, posting a paid comment, and other flows as we wire them up.",
-      "You sign transfers in your wallet (same pattern as tipping a creator). Gas may still use test BTC on testnet unless a relayer is configured.",
+      "SNAP is your in-app share token: transfer it to tip, comment, or unlock just like any ERC-20 — creators receive SNAP directly.",
+      "MUSD is Mezo’s Bitcoin-backed stablecoin. Deposit MUSD on Earn to mint SNAP; withdraw later for MUSD. You always sign transfers in your own wallet.",
     ],
   },
   {
     key: "earn",
-    title: "How you can earn",
+    title: "How creators earn",
     icon: Coins,
     body: [
-      "Creators earn MUSD when others pay to unlock a post, tip a like, or pay to comment — amounts route to the recipient set for that post.",
-      "Stronger posts and a consistent audience translate into more unlocks and tips over time. You keep the economic story transparent: fans see the price before they pay.",
+      "Fans pay you in SNAP on the feed — tips, unlocks, and paid replies all land as SNAP in your wallet.",
+      APP_CREATOR_REVENUE_EXPLAINER,
+      "If you keep SNAP instead of redeeming to MUSD right away, your balance stays in the same yield-bearing pool — more upside over time versus immediately cashing out.",
     ],
   },
   {
@@ -48,7 +48,7 @@ const steps = [
     icon: Sparkles,
     body: [
       "Connect your wallet from the feed when you are ready. Explore the demo feed, try create post, and tune your profile.",
-      "Nothing here mints NFTs for your photos by default — it is normal uploads plus MUSD rules you control.",
+      "Nothing here mints NFTs for your photos by default — normal uploads plus transparent SNAP prices you control.",
     ],
   },
 ] as const;
@@ -115,12 +115,8 @@ export function OnboardingFlow() {
           ))}
         </div>
 
-        <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-500/25 to-sky-600/15 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
-          {index === 1 ? (
-            <MusdInlineIcon size={52} />
-          ) : (
-            <Icon className="h-11 w-11 text-indigo-200/95" strokeWidth={1.35} />
-          )}
+        <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-500/25 to-violet-600/20 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
+          <Icon className="h-11 w-11 text-indigo-200/95" strokeWidth={1.35} />
         </div>
 
         <h1 className="text-center text-2xl font-bold leading-tight tracking-tight text-white sm:text-[1.65rem]">
@@ -153,7 +149,7 @@ export function OnboardingFlow() {
             </button>
           )}
           <p className="text-center text-[11px] font-normal text-zinc-600">
-            Mezo testnet · MUSD transfers · Demo product
+            Mezo testnet · SNAP + MUSD · Demo product
           </p>
         </div>
       </div>

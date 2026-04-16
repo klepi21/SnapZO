@@ -17,9 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SnapZo · MUSD on Mezo",
+  title: "SnapZo · SNAP & MUSD on Mezo",
   description:
-    "SnapZo — pay-to-unlock posts, MUSD tips, and paid replies on Mezo. Social without spam.",
+    "SnapZo — SNAP tips & unlocks on the feed; creators hold hub-backed MUSD yield until they redeem. Earn on Mezo testnet.",
 };
 
 export const viewport: Viewport = {

@@ -21,7 +21,7 @@ export interface FeedPost {
   caption: string;
   /** When true, media stays blurred until user confirms an on-chain unlock tx. */
   contentLocked?: boolean;
-  /** MUSD tip / paid-comment recipient (dummy address per post). */
+  /** SNAP tip / unlock / paid-comment recipient (dummy address per post). */
   tipRecipient: Address;
 }
 

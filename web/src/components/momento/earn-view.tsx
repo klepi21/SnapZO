@@ -7,6 +7,7 @@ import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { EarnVaultStats } from "@/components/momento/earn-vault-stats";
 import { SnapZoHubEarnPanel } from "@/components/momento/snapzo-hub-earn-panel";
 import { isSnapZoHubConfigured } from "@/lib/constants/snapzo-hub";
+import { APP_CREATOR_REVENUE_ONE_LINER } from "@/lib/brand";
 
 export function EarnView() {
   const hubUi = isSnapZoHubConfigured();
@@ -31,6 +32,10 @@ export function EarnView() {
             into the pooled strategy and receive{" "}
             <span className="font-medium text-zinc-300">SNAP</span>. You approve once, sign a
             message, and a relayer pays gas to complete the tx.
+          </p>
+          <p className="mt-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2.5 text-xs leading-relaxed text-zinc-400">
+            <span className="font-medium text-violet-200/95">Creators:</span>{" "}
+            {APP_CREATOR_REVENUE_ONE_LINER} Redeem SNAP here when you want MUSD in your wallet.
           </p>
         </div>
       </div>
