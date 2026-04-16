@@ -18,6 +18,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   useAccount,
   useChainId,
@@ -83,6 +84,7 @@ function formatShortTime(at: number): string {
 
 export function PostCard({ post }: PostCardProps) {
   const labelId = useId();
+  const commentSheetContextId = useId();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { openConnectModal } = useConnectModal();
@@ -477,137 +479,182 @@ export function PostCard({ post }: PostCardProps) {
         </p>
       </div>
 
-      {commentOpen ? (
-        <div
-          className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-[2px]"
-          role="presentation"
-          onClick={() => !isBusy && setCommentOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={labelId}
-            className="flex h-[min(88dvh,640px)] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[22px] border border-white/10 border-b-0 bg-[#0b0f18] shadow-[0_-16px_56px_rgba(0,0,0,0.55)]"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && !isBusy) {
-                setCommentOpen(false);
-              }
-            }}
-          >
-            <div className="shrink-0 px-4 pb-2 pt-3">
-              <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-white/25" />
-              <div className="flex items-center justify-between gap-3">
-                <h2
-                  id={labelId}
-                  className="text-base font-semibold tracking-tight text-white"
-                >
-                  Comments{" "}
-                  <span className="text-sm font-normal tabular-nums text-zinc-500">
-                    ({post.comments + comments.length})
-                  </span>
-                </h2>
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
-                  aria-label="Close"
-                  onClick={() => setCommentOpen(false)}
-                >
-                  <X className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                </button>
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
-              {comments.length === 0 ? (
-                <p className="py-10 text-center text-sm font-normal leading-relaxed text-zinc-500">
-                  No comments yet.
-                  <br />
-                  <span className="text-xs text-zinc-600">
-                    Be the first to say something.
-                  </span>
-                </p>
-              ) : (
-                <ul className="space-y-1 pb-3">
-                  {comments.map((c) => (
-                    <li key={c.id} className="flex gap-3 py-2.5">
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/90 to-violet-600/80 text-[10px] font-bold text-white ring-1 ring-white/15">
-                        You
+      {commentOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-[2px]"
+              role="presentation"
+              onClick={() => !isBusy && setCommentOpen(false)}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={labelId}
+                aria-describedby={commentSheetContextId}
+                className="mx-auto flex h-[min(88dvh,640px)] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[22px] border border-white/10 border-b-0 bg-[#0b0f18] shadow-[0_-16px_56px_rgba(0,0,0,0.55)]"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && !isBusy) {
+                    setCommentOpen(false);
+                  }
+                }}
+              >
+                <div className="shrink-0 px-4 pb-3 pt-3">
+                  <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-white/25" />
+                  <div
+                    id={commentSheetContextId}
+                    className="flex gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3"
+                  >
+                    {showLockOverlay ? (
+                      <div
+                        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-zinc-900/90 ring-1 ring-white/10"
+                        aria-hidden
+                      >
+                        <Lock
+                          className="h-6 w-6 text-zinc-500"
+                          strokeWidth={1.5}
+                        />
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm leading-snug text-zinc-100">
-                          <span className="font-semibold text-white">You</span>{" "}
-                          <span className="font-normal text-zinc-200">
-                            {c.text}
-                          </span>
-                        </p>
-                        <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
-                          <span>{formatShortTime(c.at)}</span>
-                          <span aria-hidden>·</span>
-                          <a
-                            className="font-medium text-zinc-400 transition hover:text-white"
-                            href={`${mezoTestnet.blockExplorers.default.url}/tx/${c.txHash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            View transaction
-                          </a>
-                        </div>
+                    ) : (
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10">
+                        <Image
+                          src={src}
+                          alt=""
+                          width={56}
+                          height={56}
+                          className="h-14 w-14 object-cover"
+                          sizes="56px"
+                        />
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                        Post
+                      </p>
+                      <p className="truncate text-sm font-semibold text-white">
+                        {post.userName}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500">
+                        @{post.userHandle} · {post.timeAgo}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-snug text-zinc-400">
+                        {post.caption}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <h2
+                      id={labelId}
+                      className="text-base font-semibold tracking-tight text-white"
+                    >
+                      Comments{" "}
+                      <span className="text-sm font-normal tabular-nums text-zinc-500">
+                        ({post.comments + comments.length})
+                      </span>
+                    </h2>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
+                      aria-label="Close comments"
+                      onClick={() => setCommentOpen(false)}
+                    >
+                      <X className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                    </button>
+                  </div>
+                </div>
 
-            <div className="shrink-0 border-t border-white/[0.08] bg-[#0b0f18] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
-              <p className="mb-2 flex items-center justify-center gap-1 text-center text-[10px] font-medium tracking-wide text-zinc-500">
-                <span>Posting sends</span>
-                <span className="inline-flex items-center gap-0.5 text-zinc-400">
-                  0.01 <MusdInlineIcon size={12} />
-                </span>
-                <span>on-chain</span>
-              </p>
-              <div className="flex items-end gap-2">
-                <div
-                  className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-800/90 ring-1 ring-white/10"
-                  aria-hidden
-                >
-                  {address ? (
-                    <span className="font-mono text-[10px] font-semibold uppercase tracking-tighter text-zinc-300">
-                      {address.slice(2, 4)}
-                    </span>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+                  {comments.length === 0 ? (
+                    <p className="py-10 text-center text-sm font-normal leading-relaxed text-zinc-500">
+                      No comments yet.
+                      <br />
+                      <span className="text-xs text-zinc-600">
+                        Be the first to say something.
+                      </span>
+                    </p>
                   ) : (
-                    <UserRound className="h-4 w-4 text-zinc-500" strokeWidth={1.5} />
+                    <ul className="space-y-1 pb-3">
+                      {comments.map((c) => (
+                        <li key={c.id} className="flex gap-3 py-2.5">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/90 to-violet-600/80 text-[10px] font-bold text-white ring-1 ring-white/15">
+                            You
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm leading-snug text-zinc-100">
+                              <span className="font-semibold text-white">You</span>{" "}
+                              <span className="font-normal text-zinc-200">
+                                {c.text}
+                              </span>
+                            </p>
+                            <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
+                              <span>{formatShortTime(c.at)}</span>
+                              <span aria-hidden>·</span>
+                              <a
+                                className="font-medium text-zinc-400 transition hover:text-white"
+                                href={`${mezoTestnet.blockExplorers.default.url}/tx/${c.txHash}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                View transaction
+                              </a>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-                <label className="sr-only" htmlFor={`snapzo-comment-${post.id}`}>
-                  Add a comment
-                </label>
-                <textarea
-                  id={`snapzo-comment-${post.id}`}
-                  value={commentDraft}
-                  onChange={(e) => setCommentDraft(e.target.value)}
-                  rows={1}
-                  maxLength={500}
-                  placeholder="Add a comment…"
-                  disabled={isBusy}
-                  className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[22px] border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-sm leading-snug text-white placeholder:text-zinc-500 outline-none transition focus:border-white/20 focus:ring-1 focus:ring-white/15 disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  disabled={isBusy || !commentDraft.trim()}
-                  onClick={handleSubmitComment}
-                  className="mb-1 shrink-0 px-2 py-1.5 text-sm font-semibold text-[#0095f6] transition enabled:hover:text-[#47b8ff] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  Post
-                </button>
+
+                <div className="shrink-0 border-t border-white/[0.08] bg-[#0b0f18] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
+                  <p className="mb-2 flex items-center justify-center gap-1 text-center text-[10px] font-medium tracking-wide text-zinc-500">
+                    <span>Posting sends</span>
+                    <span className="inline-flex items-center gap-0.5 text-zinc-400">
+                      0.01 <MusdInlineIcon size={12} />
+                    </span>
+                    <span>on-chain</span>
+                  </p>
+                  <div className="flex items-end gap-2">
+                    <div
+                      className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-800/90 ring-1 ring-white/10"
+                      aria-hidden
+                    >
+                      {address ? (
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-tighter text-zinc-300">
+                          {address.slice(2, 4)}
+                        </span>
+                      ) : (
+                        <UserRound className="h-4 w-4 text-zinc-500" strokeWidth={1.5} />
+                      )}
+                    </div>
+                    <label className="sr-only" htmlFor={`snapzo-comment-${post.id}`}>
+                      Add a comment
+                    </label>
+                    <textarea
+                      id={`snapzo-comment-${post.id}`}
+                      value={commentDraft}
+                      onChange={(e) => setCommentDraft(e.target.value)}
+                      rows={1}
+                      maxLength={500}
+                      placeholder="Add a comment…"
+                      disabled={isBusy}
+                      className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[22px] border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-sm leading-snug text-white placeholder:text-zinc-500 outline-none transition focus:border-white/20 focus:ring-1 focus:ring-white/15 disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      disabled={isBusy || !commentDraft.trim()}
+                      onClick={handleSubmitComment}
+                      className="mb-1 shrink-0 px-2 py-1.5 text-sm font-semibold text-[#0095f6] transition enabled:hover:text-[#47b8ff] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      Post
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </article>
   );
 }
