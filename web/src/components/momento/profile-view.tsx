@@ -2,16 +2,288 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { BarChart3, ChevronLeft, Settings, Share2, UserPen } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, Settings, Share2, UserPen, X } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { DUMMY_PROFILE, picsumAvatar, picsumPost } from "@/lib/dummy/social";
+import {
+  defaultSnapzoProfile,
+  persistSnapzoProfile,
+  readSnapzoProfile,
+  type SnapzoProfileLocal,
+} from "@/lib/snapzo-profile-local";
+
+async function fileToAvatarDataUrl(file: File): Promise<string | null> {
+  if (!file.type.startsWith("image/")) {
+    return null;
+  }
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+  const img = document.createElement("img");
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("bad image"));
+    img.src = dataUrl;
+  });
+  const max = 256;
+  let w = img.naturalWidth;
+  let h = img.naturalHeight;
+  if (w < 1 || h < 1) {
+    return null;
+  }
+  if (w > max || h > max) {
+    const scale = Math.min(max / w, max / h);
+    w = Math.max(1, Math.round(w * scale));
+    h = Math.max(1, Math.round(h * scale));
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return null;
+  }
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
 
 export function ProfileView() {
-  const [activeTab, setActiveTab] = useState(0);
   const p = DUMMY_PROFILE;
+  const labelId = useId();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [profile, setProfile] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [draft, setDraft] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- hydrate profile from localStorage after mount (SSR-safe default) */
+  useEffect(() => {
+    setProfile(readSnapzoProfile());
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const openEdit = useCallback(() => {
+    setDraft(readSnapzoProfile());
+    setEditOpen(true);
+  }, []);
+
+  const saveEdit = useCallback(() => {
+    persistSnapzoProfile(draft);
+    setProfile(readSnapzoProfile());
+    setEditOpen(false);
+  }, [draft]);
+
+  const handleAvatarPick = useCallback(
+    async (file: File | null) => {
+      if (!file) {
+        return;
+      }
+      if (file.size > 6 * 1024 * 1024) {
+        return;
+      }
+      const url = await fileToAvatarDataUrl(file);
+      if (url) {
+        setDraft((d) => ({ ...d, avatarDataUrl: url }));
+      }
+    },
+    [],
+  );
+
+  const editModal =
+    editOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/65 backdrop-blur-[2px]"
+            role="presentation"
+            onClick={() => setEditOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={labelId}
+              className="mx-auto max-h-[min(92dvh,720px)] w-full max-w-[430px] overflow-hidden rounded-t-[22px] border border-white/10 border-b-0 bg-[#0b0f18] shadow-[0_-16px_56px_rgba(0,0,0,0.55)]"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setEditOpen(false);
+                }
+              }}
+            >
+              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
+                <h2
+                  id={labelId}
+                  className="text-base font-semibold tracking-tight text-white"
+                >
+                  Edit profile
+                </h2>
+                <button
+                  type="button"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
+                  aria-label="Close"
+                  onClick={() => setEditOpen(false)}
+                >
+                  <X className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                </button>
+              </div>
+
+              <div className="max-h-[calc(min(92dvh,720px)-8rem)] overflow-y-auto overscroll-contain px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                  Profile photo
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    void handleAvatarPick(f);
+                    e.target.value = "";
+                  }}
+                />
+                <div className="mt-3 flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full ring-2 ring-indigo-500/40 ring-offset-2 ring-offset-[#0b0f18]"
+                  >
+                    {draft.avatarDataUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- data URL from user
+                      <img
+                        src={draft.avatarDataUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        src={picsumAvatar(p.avatarSeed, 160)}
+                        alt=""
+                        width={80}
+                        height={80}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="text-sm font-semibold text-[#0095f6] transition hover:text-[#47b8ff]"
+                    >
+                      Change photo
+                    </button>
+                    <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                      JPG or PNG. We resize on device before saving locally.
+                    </p>
+                    {draft.avatarDataUrl ? (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+                        onClick={() =>
+                          setDraft((d) => ({ ...d, avatarDataUrl: null }))
+                        }
+                      >
+                        Remove custom photo
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <label
+                  htmlFor="snapzo-edit-name"
+                  className="mt-6 block text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500"
+                >
+                  Name
+                </label>
+                <input
+                  id="snapzo-edit-name"
+                  type="text"
+                  value={draft.displayName}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, displayName: e.target.value }))
+                  }
+                  maxLength={64}
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-400/40 focus:ring-1 focus:ring-indigo-500/25"
+                  placeholder="Your name"
+                  autoComplete="name"
+                />
+
+                <label
+                  htmlFor="snapzo-edit-username"
+                  className="mt-4 block text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500"
+                >
+                  Username
+                </label>
+                <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-zinc-950/80 px-3">
+                  <span className="shrink-0 text-sm text-zinc-500">@</span>
+                  <input
+                    id="snapzo-edit-username"
+                    type="text"
+                    value={draft.username}
+                    onChange={(e) =>
+                      setDraft((d) => ({
+                        ...d,
+                        username: e.target.value
+                          .replace(/^@+/, "")
+                          .replace(/[^A-Za-z0-9_]/g, "")
+                          .toLowerCase()
+                          .slice(0, 30),
+                      }))
+                    }
+                    maxLength={30}
+                    className="min-w-0 flex-1 border-0 bg-transparent py-3 pl-0.5 text-sm text-white outline-none ring-0"
+                    placeholder="username"
+                    autoComplete="username"
+                  />
+                </div>
+
+                <label
+                  htmlFor="snapzo-edit-bio"
+                  className="mt-4 block text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500"
+                >
+                  Bio
+                </label>
+                <textarea
+                  id="snapzo-edit-bio"
+                  value={draft.bio}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, bio: e.target.value }))
+                  }
+                  rows={4}
+                  maxLength={280}
+                  placeholder="Tell people about you…"
+                  className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3 text-sm leading-relaxed text-white outline-none transition focus:border-indigo-400/40 focus:ring-1 focus:ring-indigo-500/25"
+                />
+                <p className="mt-1 text-right text-[11px] tabular-nums text-zinc-600">
+                  {draft.bio.length} / 280
+                </p>
+              </div>
+
+              <div className="border-t border-white/[0.08] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+                <button
+                  type="button"
+                  onClick={saveEdit}
+                  className="w-full rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/35 to-sky-500/25 py-3.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.18)] transition hover:border-indigo-300/55 hover:from-indigo-500/45"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <div className="pb-28">
+      {editModal}
+
       <div className="relative h-44 w-full overflow-hidden">
         <Image
           src={picsumPost(p.coverSeed, 800, 400)}
@@ -50,83 +322,85 @@ export function ProfileView() {
       <div className="relative -mt-14 flex flex-col items-center px-4">
         <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-full bg-[#060814] p-[3px] shadow-[0_0_0_3px_rgba(59,130,246,0.35),0_0_40px_rgba(59,130,246,0.25)]">
           <div className="relative h-full w-full overflow-hidden rounded-full">
-            <Image
-              src={picsumAvatar(p.avatarSeed, 256)}
-              alt=""
-              width={104}
-              height={104}
-              className="h-full w-full object-cover"
-            />
+            {profile.avatarDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL from user
+              <img
+                src={profile.avatarDataUrl}
+                alt=""
+                width={104}
+                height={104}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <Image
+                src={picsumAvatar(p.avatarSeed, 256)}
+                alt=""
+                width={104}
+                height={104}
+                className="h-full w-full object-cover"
+              />
+            )}
           </div>
         </div>
         <h1 className="mt-4 text-center text-xl font-bold text-white">
-          {p.displayName}
+          {profile.displayName}
         </h1>
-        <p className="text-sm text-zinc-500">{p.handle}</p>
+        <p className="text-sm text-zinc-500">@{profile.username}</p>
+        {profile.bio ? (
+          <p className="mt-3 max-w-sm text-center text-sm leading-relaxed text-zinc-400">
+            {profile.bio}
+          </p>
+        ) : null}
 
         <div className="mt-6 grid w-full max-w-sm grid-cols-3 gap-2 rounded-2xl border border-white/[0.06] bg-[#0c1018] px-2 py-4">
           <div className="text-center">
             <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              Rating
+              Likes
             </p>
-            <p className="mt-1 font-mono text-sm font-semibold text-white">
-              {p.rating.toLocaleString()}
+            <p className="mt-1 text-sm font-semibold tabular-nums text-white">
+              {p.likesLabel}
             </p>
           </div>
           <div className="border-x border-white/[0.06] text-center">
             <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              Followers
+              Replies
             </p>
-            <p className="mt-1 text-sm font-semibold text-white">
-              {p.followersLabel}
+            <p className="mt-1 text-sm font-semibold tabular-nums text-white">
+              {p.repliesLabel}
             </p>
           </div>
           <div className="text-center">
             <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              Following
+              Earnings
             </p>
-            <p className="mt-1 text-sm font-semibold text-white">{p.following}</p>
+            <p className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold tabular-nums text-white">
+              <span>{p.earningsLabel}</span>
+              <MusdInlineIcon size={16} />
+              <span className="sr-only">MUSD</span>
+            </p>
           </div>
         </div>
 
-        <div className="mt-5 flex w-full max-w-sm gap-3">
+        <div className="mt-5 w-full max-w-sm">
           <button
             type="button"
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#3b82f6] to-[#2563eb] py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20"
+            onClick={openEdit}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#3b82f6] to-[#2563eb] py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20"
           >
             <UserPen className="h-4 w-4" />
-            Edit Profile
-          </button>
-          <button
-            type="button"
-            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-[#3b82f6]/40 bg-white/[0.04] py-3.5 text-sm font-semibold text-white"
-          >
-            <BarChart3 className="h-4 w-4 text-[#60a5fa]" />
-            Insights
+            Edit profile
           </button>
         </div>
       </div>
 
-      <div className="mt-8 border-b border-white/[0.06] px-4">
-        <div className="-mb-px flex gap-6 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {p.tabs.map((tab, i) => (
-            <button
-              key={tab.label}
-              type="button"
-              onClick={() => setActiveTab(i)}
-              className={`shrink-0 whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition ${
-                activeTab === i
-                  ? "border-white text-white"
-                  : "border-transparent text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              {tab.label} {String(tab.count).padStart(2, "0")}
-            </button>
-          ))}
-        </div>
+      <div className="mt-8 px-4">
+        <h2 className="text-sm font-semibold tracking-tight text-white">Posts</h2>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          {p.gallery.length} on this profile
+        </p>
       </div>
 
-      <div className="columns-2 gap-2 px-4 pt-4">
+      <div className="columns-2 gap-2 px-4 pt-3">
         {p.gallery.map((g) => (
           <div
             key={g.id}

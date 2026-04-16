@@ -82,15 +82,10 @@ export const DUMMY_PROFILE = {
   handle: "@nazmul009878",
   avatarSeed: 64,
   coverSeed: 1003,
-  rating: 1274839,
-  followersLabel: "13.7K",
-  following: 20,
-  tabs: [
-    { label: "Post", count: 30 },
-    { label: "Video", count: 8 },
-    { label: "Saved", count: 8 },
-    { label: "Tagged", count: 3 },
-  ] as const,
+  /** Demo stats shown on profile (not tied to on-chain totals yet). */
+  likesLabel: "12.4K",
+  repliesLabel: "892",
+  earningsLabel: "218",
   gallery: [
     { id: 21, h: 220 },
     { id: 29, h: 280 },

@@ -1,7 +1,11 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { APP_NAME } from "@/lib/brand";
+import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
 const orbitAvatars = [
   { id: 44, size: 56, top: "6%", left: "12%", opacity: 0.95 },
@@ -16,6 +20,16 @@ const orbitAvatars = [
 ] as const;
 
 export function SplashScreen() {
+  const [startedHref, setStartedHref] = useState("/onboarding");
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- CTA href from localStorage after mount (server defaults to onboarding) */
+    if (isOnboardingComplete()) {
+      setStartedHref("/feed");
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
   return (
     <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col bg-black">
       <div
@@ -78,7 +92,7 @@ export function SplashScreen() {
             on Mezo.
           </p>
           <Link
-            href="/feed"
+            href={startedHref}
             className="mt-10 inline-flex w-full max-w-xs items-center justify-center rounded-full bg-gradient-to-r from-[#3b82f6] via-[#2563eb] to-[#1d4ed8] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(37,99,235,0.45)] transition hover:brightness-110 active:scale-[0.98]"
           >
             Get Started

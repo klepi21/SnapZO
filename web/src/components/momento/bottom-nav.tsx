@@ -7,10 +7,10 @@ import { Home, Plus, UserRound } from "lucide-react";
 const items = [
   { href: "/feed", icon: Home, label: "Home", disabled: false as const, highlight: false as const },
   {
-    href: "#",
+    href: "/create",
     icon: Plus,
     label: "New post",
-    disabled: true as const,
+    disabled: false as const,
     highlight: true as const,
   },
   { href: "/profile", icon: UserRound, label: "Profile", disabled: false as const, highlight: false as const },
@@ -50,7 +50,7 @@ export function BottomNav() {
               <span
                 key={label}
                 className="flex shrink-0"
-                title="Upload — coming soon"
+                title="New post"
               >
                 {inner}
               </span>
