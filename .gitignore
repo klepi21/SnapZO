@@ -1,0 +1,30 @@
+# Dependencies & builds
+web/node_modules/
+web/.next/
+web/out/
+web/.vercel/
+
+# Env & secrets (commit web/.env.example only)
+.env
+.env.*
+!.env.example
+web/.env
+web/.env.*
+!web/.env.example
+
+# Logs & OS
+*.log
+npm-debug.log*
+.DS_Store
+
+# TypeScript
+web/next-env.d.ts
+*.tsbuildinfo
+
+# Tooling / local
+.cursor/
+
+# Solidity (when added)
+contracts/cache/
+contracts/out/
+contracts/broadcast/
