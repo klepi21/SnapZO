@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, LogOut, PiggyBank, Shield } from "lucide-react";
 import { useChainId, useDisconnect } from "wagmi";
 import { useMezoBalancesReadout } from "@/hooks/use-mezo-balances-readout";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { MUSD_ADDRESS_MEZO_TESTNET } from "@/lib/constants/musd";
+import { isSnapZoHubConfigured } from "@/lib/constants/snapzo-hub";
 
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -22,6 +24,7 @@ export function WalletHeaderMenu() {
     useMezoBalancesReadout();
 
   const unsupported = chainId !== mezoTestnet.id;
+  const hubAdmin = isSnapZoHubConfigured();
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -140,6 +143,34 @@ export function WalletHeaderMenu() {
                     >
                       {MUSD_ADDRESS_MEZO_TESTNET}
                     </p>
+                    <div className="mt-2 grid grid-cols-1 gap-2">
+                      <Link
+                        href="/swap"
+                        onClick={close}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white transition hover:bg-white/[0.08]"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
+                        Swap BTC ↔ MUSD
+                      </Link>
+                      <Link
+                        href="/earn"
+                        onClick={close}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white transition hover:bg-white/[0.08]"
+                      >
+                        <PiggyBank className="h-3.5 w-3.5" aria-hidden />
+                        Earn (MUSD vault)
+                      </Link>
+                      {hubAdmin ? (
+                        <Link
+                          href="/admin/snapzo"
+                          onClick={close}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white transition hover:bg-white/[0.08]"
+                        >
+                          <Shield className="h-3.5 w-3.5" aria-hidden />
+                          SnapZo hub admin
+                        </Link>
+                      ) : null}
+                    </div>
                   </div>
                 )}
 

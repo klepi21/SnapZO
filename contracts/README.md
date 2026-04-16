@@ -1,0 +1,111 @@
+# SnapZo pooled hub (Solidity)
+
+UUPS-upgradeable **`SnapZoHub`** plus immutable **`SnapToken` (`SNAP`)** minted on first `initialize`. Relayers submit **EIP-712** `deposit` / `withdraw`; **owner or relayer** may **harvest** and **restake**. See `../docs/SC_PLAN.md` Part D for product rules.
+
+## Requirements
+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge`, `cast`)
+
+### `forge: command not found`
+
+Foundry installs binaries under **`~/.foundry/bin`**. Your shell does not have that directory on **`PATH`** yet.
+
+**Option A — one session:**
+
+```bash
+export PATH="$HOME/.foundry/bin:$PATH"
+forge --version
+```
+
+**Option B — persist for bash** (add to `~/.bash_profile` or `~/.bashrc`, then open a new terminal or `source` the file):
+
+```bash
+export PATH="$HOME/.foundry/bin:$PATH"
+```
+
+If `~/.foundry/bin/forge` does not exist, install Foundry: `curl -L https://foundry.paradigm.xyz | bash` then run `foundryup`, then use Option A again.
+
+## Commands
+
+```bash
+cd contracts
+export PATH="$HOME/.foundry/bin:$PATH"   # if forge is not found
+forge build
+forge test
+```
+
+`forge build` does **not** fail on those messages: they come from Foundry’s **linter** (style / micro-optimizations). This repo sets **`lint_on_build = false`** in `foundry.toml` so builds stay quiet. To run linter explicitly: `forge lint`.
+
+## Deploy (Mezo testnet)
+
+Set env (example addresses from `web/src/lib/constants`):
+
+```bash
+# NEVER commit a real key. Export in your shell only, or use `source` on a gitignored file.
+# With or without `0x` prefix (64 hex chars); deploy script normalizes either form.
+export PRIVATE_KEY=0xYOUR_KEY_HERE
+export MUSD=0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503
+export MUSD_VAULT=0x6f461c68b2c5492c0f5ccec5a264d692aa7a8e16
+export SMUSD_GAUGE=0xa6972f35550717280f2538ea77638b29073e3f07
+export SWAP_ROUTER=0xd245bec6836d85e159763a5d2bfce7cbc3488e03
+export GAUGE_REWARD_TOKEN=0x7B7c000000000000000000000000000000000001
+# optional:
+# export FEE_RECEIVER=0x...
+# export FEE_BPS=100
+# export RELAYER=0x...
+
+forge script script/DeploySnapZoHub.s.sol:DeploySnapZoHub \
+  --rpc-url https://rpc.test.mezo.org \
+  --broadcast
+```
+
+**Deploy right now (checklist)**
+
+1. **Remove any real key from git** — if you pasted a live `PRIVATE_KEY` into this repo, **rotate that key** (generate a new deployer wallet) and treat the old one as leaked. Never commit keys; use `export` in the terminal or a **gitignored** `contracts/.env` (see `.gitignore`).
+2. **Fund the deployer** with **Mezo testnet BTC** for gas (`forge script` sends real txs on `--broadcast`).
+3. From the repo: `cd contracts`, set `PATH` to Foundry if needed, `export PRIVATE_KEY=0x…` (hex `uint256` form is fine) plus the `MUSD`, `MUSD_VAULT`, … vars above.
+4. Run the **`forge script … --broadcast`** line. On success, the console prints **implementation**, **proxy (hub)**, and **SNAP** addresses — copy the **proxy** as the app’s hub address.
+
+### Deployed instance (Mezo testnet, chain 31611 — 2026-04-17)
+
+| Role | Address |
+|------|---------|
+| **Hub (proxy — use this in the app)** | `0x9Cd1C98aC5C4F68881dcC63Ded54Ddb239033BfD` |
+| **Implementation** | `0x9e2D31B2B9E3f59B26b2b32ca840d0aD6925fbB8` |
+| **SNAP token** | `0xCA1A5C01c533dDE957f0eFC79b25906b0187039D` |
+
+- Proxy deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x9016570537f8e8b250a7026b1bfe0e4147a905508da2a9ea8f26fec75199acdf)  
+- Impl deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x69a2dc638b2f0ee29fb32edf99b90eb752028fe27bdf96bf3aa4a14ae625638d)  
+- `contracts/cache/` may contain **sensitive** script metadata — keep it **gitignored** (already under `cache/`).
+
+After deploy: **whitelist relayer addresses** on the hub (`setRelayer`), have users **approve MUSD → hub** (and optionally use **MUSD `permit`** in the same tx via `depositWithSigAndPermit`), and **`encode` restake router routes** when liquidity exists (`setRestakeRoutes` while **paused**).
+
+### Web app (`web/`)
+
+1. Copy `web/.env.example` → **`web/.env.local`** (gitignored).
+2. **`RELAYER_PRIVATE_KEY`** — EOA that is **`isRelayer` on-chain** with **Mezo testnet BTC** for gas (owner is fine for demos). Required for **Sign & relay** to succeed.
+3. Hub + SNAP addresses **default** to the latest testnet deploy in code; override with `NEXT_PUBLIC_SNAPZO_HUB_ADDRESS` / `NEXT_PUBLIC_SNAP_TOKEN_ADDRESS` if you redeploy. Set `NEXT_PUBLIC_SNAPZO_HUB_UI=false` to hide the hub card.
+4. Run `pnpm dev` in `web/`, open **`/earn`** — **SnapZo hub (pooled)** is at the **top**; classic vault/gauge stays below. Restart dev server after env changes.
+
+## No on-chain liquidity: manual reward → MUSD → strategy (no SNAP mint)
+
+1. **`harvest()`** (owner or relayer) so reward token accrues on the hub (minus performance fee).  
+2. **`recoverRewardToken(yourWallet, amount)`** — **owner only**; moves the configured **reward token** to your wallet so you can swap **off-chain / elsewhere**.  
+   - You cannot use **`sweep`** for reward/MUSD/SNAP/vault tokens; those stay denylisted for safety.  
+3. After you hold **MUSD**, either:  
+   - **`injectMusdWithoutMint(amount)`** — **owner** pulls MUSD from your wallet (approve hub first) and pushes **vault → gauge** with **no new SNAP** (NAV gift to existing holders), or  
+   - **`transfer` MUSD to the hub** then **`restake()`** — same outcome: idle MUSD on the hub is deposited and staked **without minting SNAP**.
+
+## Upgrade
+
+Deploy new `SnapZoHub` implementation, then `UUPSUpgradeable.upgradeToAndCall` (or OZ `upgradeTo`) from **owner** — follow OpenZeppelin UUPS checklist (storage layout, `gap`, no `initialize` on impl except `_disableInitializers`).
+
+## Typed data (off-chain)
+
+- **Domain:** `name` = `SnapZoHub`, `version` = `1`, `chainId`, `verifyingContract` = hub **proxy** address.  
+- On-chain helper: `domainSeparatorV4()`.  
+- **Types:**  
+  - `Deposit(address user,uint256 assets,uint256 nonce,uint256 deadline)`  
+  - `Withdraw(address user,uint256 snapAmount,uint256 nonce,uint256 deadline)`  
+
+Primary-type name must match the **typehash strings** in `SnapZoHub.sol`.
