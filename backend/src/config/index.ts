@@ -31,7 +31,7 @@ export interface ChainConfig {
 }
 
 export interface IpfsConfig {
-  nftStorageToken: string;
+  pinataJwt: string;
 }
 
 export interface ReplyConfig {
@@ -68,7 +68,7 @@ const config: AppConfig = {
   },
 
   ipfs: {
-    nftStorageToken: required('NFT_STORAGE_TOKEN', ''),
+    pinataJwt: required('PINATA_JWT', ''),
   },
 
   reply: {

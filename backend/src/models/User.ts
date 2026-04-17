@@ -3,10 +3,12 @@ import { Schema, model, Types, type HydratedDocument } from 'mongoose';
 export interface IUser {
   _id?: Types.ObjectId;
   walletAddress: string;
+  displayName?: string;
   username?: string;
   bio?: string;
-  profileImage?: string;
+  profileImage?: string; // IPFS CID
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 const userSchema = new Schema<IUser>(
@@ -23,10 +25,12 @@ const userSchema = new Schema<IUser>(
         message: 'walletAddress must be a 0x-prefixed 20-byte hex address',
       },
     },
-    username: { type: String, trim: true, maxlength: 64 },
+    displayName: { type: String, trim: true, maxlength: 64 },
+    username: { type: String, trim: true, maxlength: 32 },
     bio: { type: String, trim: true, maxlength: 280 },
     profileImage: { type: String, trim: true },
     createdAt: { type: Date, default: Date.now, index: true },
+    updatedAt: { type: Date },
   },
   { versionKey: false }
 );

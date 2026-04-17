@@ -22,6 +22,7 @@ const swaggerDefinition = {
   ],
   tags: [
     { name: 'Health', description: 'Service liveness probes.' },
+    { name: 'Auth', description: 'Wallet login / first-time signup.' },
     { name: 'Posts', description: 'Create and read posts.' },
     { name: 'Feed', description: 'Public feed (locked previews + unlocked content).' },
     { name: 'Unlock', description: 'Pay-to-Unlock locked posts.' },
@@ -43,10 +44,52 @@ const swaggerDefinition = {
         properties: {
           id: { type: 'string' },
           walletAddress: { type: 'string', example: '0xabc...' },
+          displayName: { type: 'string', nullable: true },
           username: { type: 'string', nullable: true },
           bio: { type: 'string', nullable: true },
           profileImage: { type: 'string', nullable: true, description: 'IPFS CID' },
           createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time', nullable: true },
+        },
+      },
+      UpdateProfileRequest: {
+        type: 'object',
+        description:
+          'All fields are optional. Pass `null` on a field to clear it. ' +
+          'When `avatarBase64` is provided it is uploaded to IPFS and its CID is stored as `profileImage`.',
+        properties: {
+          displayName: { type: 'string', nullable: true, maxLength: 64 },
+          username: { type: 'string', nullable: true, maxLength: 30, description: 'lowercase, a-z/0-9/_' },
+          bio: { type: 'string', nullable: true, maxLength: 280 },
+          avatarBase64: {
+            type: 'string',
+            nullable: true,
+            description: 'Base64 file body (optional `data:...;base64,` prefix supported).',
+          },
+          avatarMimeType: { type: 'string', example: 'image/jpeg' },
+          avatarName: { type: 'string', example: 'avatar.jpg' },
+          profileImage: {
+            type: 'string',
+            nullable: true,
+            description: 'Pre-uploaded IPFS CID (alternative to avatarBase64).',
+          },
+        },
+      },
+      LoginRequest: {
+        type: 'object',
+        required: ['walletAddress'],
+        properties: {
+          walletAddress: { type: 'string', example: '0xabc...' },
+        },
+      },
+      LoginResponse: {
+        type: 'object',
+        properties: {
+          user: { $ref: '#/components/schemas/User' },
+          isNew: {
+            type: 'boolean',
+            description: 'true when the user was just created, false when it already existed.',
+          },
         },
       },
       Post: {

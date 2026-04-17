@@ -1,29 +1,27 @@
 /**
- * IPFS service backed by nft.storage.
+ * IPFS service backed by Pinata.
  *
- * Exposes:
- *   - uploadJSON(obj)   → CID
- *   - uploadFile({ data, name, mimeType }) → CID
+ * Pinata exposes a simple REST endpoint:
+ *   POST https://api.pinata.cloud/pinning/pinFileToIPFS
+ *     Authorization: Bearer <JWT>
+ *     Content-Type: multipart/form-data
+ *     body: { file: <binary> }
+ *   → { IpfsHash: "<CID>", PinSize: 123, Timestamp: "..." }
  *
- * Inputs are buffers / base64 strings (never raw filesystem paths) so the
- * controllers stay platform-independent.
+ * We keep the public surface of this module identical to the previous
+ * nft.storage-backed version (`uploadJSON`, `uploadFile`, `gatewayUrl`)
+ * so the rest of the codebase doesn't need to change.
  */
 
-// nft.storage's typings don't always match latest Node Blob/File globals,
-// so we import then use loose typing where needed.
-import { NFTStorage, File, Blob } from 'nft.storage';
 import config from '../config';
 import logger from '../utils/logger';
 
-let client: NFTStorage | null = null;
+const PINATA_PIN_ENDPOINT = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 
-function getClient(): NFTStorage {
-  if (client) return client;
-  if (!config.ipfs.nftStorageToken) {
-    throw new Error('NFT_STORAGE_TOKEN is not configured');
-  }
-  client = new NFTStorage({ token: config.ipfs.nftStorageToken });
-  return client;
+interface PinataPinResponse {
+  IpfsHash?: string;
+  PinSize?: number;
+  Timestamp?: string;
 }
 
 function decodeBase64(input: Buffer | string): Buffer {
@@ -31,17 +29,45 @@ function decodeBase64(input: Buffer | string): Buffer {
   if (typeof input !== 'string') {
     throw new Error('expected base64 string or Buffer');
   }
-  // Strip "data:...;base64," prefix if present.
+  // Strip a "data:...;base64," prefix if present.
   const idx = input.indexOf('base64,');
   const stripped = idx >= 0 ? input.slice(idx + 'base64,'.length) : input;
   return Buffer.from(stripped, 'base64');
 }
 
-/** Upload a JSON-serializable object as a file to IPFS. */
+/** Low-level: send a Blob to Pinata and return its CID. */
+async function pinBlob(blob: Blob, fileName: string): Promise<string> {
+  if (!config.ipfs.pinataJwt) {
+    throw new Error('PINATA_JWT is not configured');
+  }
+
+  const form = new FormData();
+  form.append('file', blob, fileName);
+
+  const res = await fetch(PINATA_PIN_ENDPOINT, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.ipfs.pinataJwt}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(
+      `Pinata upload failed (${res.status} ${res.statusText}): ${text.slice(0, 500)}`
+    );
+  }
+
+  const data = (await res.json()) as PinataPinResponse;
+  if (!data.IpfsHash) {
+    throw new Error('Pinata response missing IpfsHash');
+  }
+  return data.IpfsHash;
+}
+
+/** Upload a JSON-serializable object to IPFS. */
 export async function uploadJSON(obj: unknown): Promise<string> {
-  const c = getClient();
   const blob = new Blob([JSON.stringify(obj)], { type: 'application/json' });
-  const cid = await c.storeBlob(blob as unknown as Blob);
+  const cid = await pinBlob(blob, 'data.json');
   logger.debug(`ipfsService: uploaded JSON → ${cid}`);
   return cid;
 }
@@ -52,16 +78,15 @@ export interface UploadFileParams {
   mimeType?: string;
 }
 
-/** Upload a file (image, video, etc.) to IPFS. */
+/** Upload a binary file (image, video, …) to IPFS. */
 export async function uploadFile({
   data,
   name = 'file.bin',
   mimeType = 'application/octet-stream',
 }: UploadFileParams): Promise<string> {
-  const c = getClient();
   const buf = decodeBase64(data);
-  const file = new File([buf], name, { type: mimeType });
-  const cid = await c.storeBlob(file as unknown as Blob);
+  const blob = new Blob([buf], { type: mimeType });
+  const cid = await pinBlob(blob, name);
   logger.debug(`ipfsService: uploaded file ${name} (${buf.length}B) → ${cid}`);
   return cid;
 }
@@ -69,7 +94,7 @@ export async function uploadFile({
 /** Best-effort gateway URL helper for clients. */
 export function gatewayUrl(cid: string | null | undefined): string | null {
   if (!cid) return null;
-  return `https://${cid}.ipfs.nftstorage.link`;
+  return `https://gateway.pinata.cloud/ipfs/${cid}`;
 }
 
 export default { uploadJSON, uploadFile, gatewayUrl };

@@ -16,6 +16,7 @@ import * as web3Service from './src/services/web3Service';
 import * as cronService from './src/services/cronService';
 
 import healthRoutes from './src/routes/health';
+import authRoutes from './src/routes/auth';
 import postsRoutes from './src/routes/posts';
 import feedRoutes from './src/routes/feed';
 import unlockRoutes from './src/routes/unlock';
@@ -98,12 +99,14 @@ app.get('/', (_req: Request, res: Response) =>
 );
 
 app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/feed', feedRoutes);
 app.use('/api/unlock', unlockRoutes);
 app.use('/api/tip', tipRoutes);
 app.use('/api/reply', replyRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/users', userRoutes);
 
 // ---- Swagger UI ------------------------------------------------------------
 app.use(

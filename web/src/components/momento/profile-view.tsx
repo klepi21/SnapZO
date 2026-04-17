@@ -2,15 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, Settings, Share2, UserPen, X } from "lucide-react";
+import { ChevronLeft, Settings, Share2, User as UserIcon, UserPen, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAccount } from "wagmi";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
-import { DUMMY_PROFILE, picsumAvatar, picsumPost } from "@/lib/dummy/social";
+import { updateProfile, type UpdateProfilePayload } from "@/lib/snapzo-api";
 import {
   defaultSnapzoProfile,
   persistSnapzoProfile,
   readSnapzoProfile,
+  SNAPZO_PROFILE_HYDRATED_EVENT,
   type SnapzoProfileLocal,
 } from "@/lib/snapzo-profile-local";
 
@@ -52,10 +54,15 @@ async function fileToAvatarDataUrl(file: File): Promise<string | null> {
   return canvas.toDataURL("image/jpeg", 0.82);
 }
 
+function shortenAddress(addr?: string): string {
+  if (!addr) return "";
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
 export function ProfileView() {
-  const p = DUMMY_PROFILE;
   const labelId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { address } = useAccount();
 
   const [profile, setProfile] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
 
@@ -64,7 +71,12 @@ export function ProfileView() {
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydrate profile from localStorage after mount (SSR-safe default) */
   useEffect(() => {
-    setProfile(readSnapzoProfile());
+    const reload = () => setProfile(readSnapzoProfile());
+    reload();
+    // Re-read when WalletLoginEffect finishes hydrating from the backend.
+    window.addEventListener(SNAPZO_PROFILE_HYDRATED_EVENT, reload);
+    return () =>
+      window.removeEventListener(SNAPZO_PROFILE_HYDRATED_EVENT, reload);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -74,10 +86,40 @@ export function ProfileView() {
   }, []);
 
   const saveEdit = useCallback(() => {
+    // 1. Persist locally (instant UX).
     persistSnapzoProfile(draft);
+    const previous = profile;
     setProfile(readSnapzoProfile());
     setEditOpen(false);
-  }, [draft]);
+
+    // 2. Sync to backend (best-effort; failure shouldn't block the UI).
+    if (!address) return;
+
+    const payload: UpdateProfilePayload = {
+      displayName: draft.displayName,
+      username: draft.username,
+      bio: draft.bio,
+    };
+
+    // Only include avatar in the payload when it actually changed.
+    if (draft.avatarDataUrl !== previous.avatarDataUrl) {
+      if (!draft.avatarDataUrl) {
+        payload.avatarBase64 = null;
+      } else if (draft.avatarDataUrl.startsWith("data:")) {
+        // Freshly picked image → upload to IPFS on the backend.
+        payload.avatarBase64 = draft.avatarDataUrl;
+        payload.avatarMimeType = "image/jpeg";
+        payload.avatarName = "avatar.jpg";
+      }
+      // Otherwise it's an `https://` gateway URL (already on IPFS) — no
+      // re-upload needed.
+    }
+
+    updateProfile(address, payload).catch((err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn("[snapzo] profile sync failed", err);
+    });
+  }, [draft, profile, address]);
 
   const handleAvatarPick = useCallback(
     async (file: File | null) => {
@@ -161,13 +203,12 @@ export function ProfileView() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <Image
-                        src={picsumAvatar(p.avatarSeed, 160)}
-                        alt=""
-                        width={80}
-                        height={80}
-                        className="h-full w-full object-cover"
-                      />
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-500/40 to-sky-500/25">
+                        <UserIcon
+                          className="h-9 w-9 text-white/70"
+                          strokeWidth={1.4}
+                        />
+                      </div>
                     )}
                   </button>
                   <div className="min-w-0 flex-1">
@@ -280,19 +321,18 @@ export function ProfileView() {
         )
       : null;
 
+  const walletShort = shortenAddress(address);
+  const hasProfileImage = !!profile.avatarDataUrl;
+  const hasDisplayName = !!profile.displayName;
+  const hasUsername = !!profile.username;
+  const hasBio = !!profile.bio;
+  const headerTitle = profile.displayName || walletShort || "Unnamed";
+
   return (
     <div className="pb-28">
       {editModal}
 
-      <div className="relative h-44 w-full overflow-hidden">
-        <Image
-          src={picsumPost(p.coverSeed, 800, 400)}
-          alt=""
-          fill
-          className="object-cover blur-[2px] brightness-[0.55]"
-          sizes="430px"
-          priority
-        />
+      <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950">
         <div className="absolute inset-0 bg-gradient-to-t from-[#060814] via-transparent to-black/30" />
         <Link
           href="/feed"
@@ -322,31 +362,36 @@ export function ProfileView() {
       <div className="relative -mt-14 flex flex-col items-center px-4">
         <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-full bg-[#060814] p-[3px] shadow-[0_0_0_3px_rgba(59,130,246,0.35),0_0_40px_rgba(59,130,246,0.25)]">
           <div className="relative h-full w-full overflow-hidden rounded-full">
-            {profile.avatarDataUrl ? (
+            {hasProfileImage ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL from user
               <img
-                src={profile.avatarDataUrl}
+                src={profile.avatarDataUrl ?? undefined}
                 alt=""
                 width={104}
                 height={104}
                 className="h-full w-full object-cover"
               />
             ) : (
-              <Image
-                src={picsumAvatar(p.avatarSeed, 256)}
-                alt=""
-                width={104}
-                height={104}
-                className="h-full w-full object-cover"
-              />
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-500/40 to-sky-500/25">
+                <UserIcon
+                  className="h-12 w-12 text-white/70"
+                  strokeWidth={1.3}
+                />
+              </div>
             )}
           </div>
         </div>
-        <h1 className="mt-4 text-center text-xl font-bold text-white">
-          {profile.displayName}
+        <h1
+          className={`mt-4 text-center text-xl font-bold ${
+            hasDisplayName ? "text-white" : "font-mono text-zinc-300"
+          }`}
+        >
+          {headerTitle}
         </h1>
-        <p className="text-sm text-zinc-500">@{profile.username}</p>
-        {profile.bio ? (
+        {hasUsername ? (
+          <p className="text-sm text-zinc-500">@{profile.username}</p>
+        ) : null}
+        {hasBio ? (
           <p className="mt-3 max-w-sm text-center text-sm leading-relaxed text-zinc-400">
             {profile.bio}
           </p>
@@ -358,7 +403,7 @@ export function ProfileView() {
               Likes
             </p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-white">
-              {p.likesLabel}
+              0
             </p>
           </div>
           <div className="border-x border-white/[0.06] text-center">
@@ -366,7 +411,7 @@ export function ProfileView() {
               Replies
             </p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-white">
-              {p.repliesLabel}
+              0
             </p>
           </div>
           <div className="text-center">
@@ -374,7 +419,7 @@ export function ProfileView() {
               Earnings
             </p>
             <p className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold tabular-nums text-white">
-              <span>{p.earningsLabel}</span>
+              <span>0</span>
               <MusdInlineIcon size={16} />
               <span className="sr-only">MUSD</span>
             </p>
@@ -395,28 +440,11 @@ export function ProfileView() {
 
       <div className="mt-8 px-4">
         <h2 className="text-sm font-semibold tracking-tight text-white">Posts</h2>
-        <p className="mt-0.5 text-xs text-zinc-500">
-          {p.gallery.length} on this profile
-        </p>
+        <p className="mt-0.5 text-xs text-zinc-500">No posts yet</p>
       </div>
 
-      <div className="columns-2 gap-2 px-4 pt-3">
-        {p.gallery.map((g) => (
-          <div
-            key={g.id}
-            className="mb-2 break-inside-avoid overflow-hidden rounded-2xl bg-zinc-900"
-            style={{ minHeight: g.h }}
-          >
-            <Image
-              src={picsumPost(g.id, 400, g.h * 2)}
-              alt=""
-              width={400}
-              height={g.h * 2}
-              className="w-full object-cover"
-              sizes="200px"
-            />
-          </div>
-        ))}
+      <div className="mx-4 mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#0a0e17] px-6 py-10 text-center">
+        <p className="text-sm text-zinc-400">Share your first post to fill this space.</p>
       </div>
     </div>
   );

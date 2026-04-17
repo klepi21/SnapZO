@@ -31,7 +31,6 @@
     "ethers": "^6.13.2",
     "express": "^4.19.2",
     "mongoose": "^8.5.0",
-    "nft.storage": "^7.2.0",
     "node-cron": "^3.0.3",
     "socket.io": "^4.7.5",
     "swagger-jsdoc": "^6.2.8",
