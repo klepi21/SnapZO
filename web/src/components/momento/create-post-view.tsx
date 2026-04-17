@@ -363,7 +363,7 @@ export function CreatePostView() {
                 </span>
               </div>
               <p id="snapzo-unlock-hint" className="mt-2 text-xs leading-relaxed text-zinc-500">
-                Shown in MUSD; fans settle in 6-decimal SNAP from the Earn hub at the live pool
+                Shown in MUSD; fans settle in 18-decimal SNAP from the Earn hub at the live pool
                 ratio. Required when hidden mode is on.
               </p>
             </div>

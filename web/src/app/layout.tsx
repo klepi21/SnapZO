@@ -19,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "SnapZo · SNAP & MUSD on Mezo",
   description:
-    "SnapZo — MUSD-quoted tips & unlocks settle in 6-decimal SNAP; creators hold hub-backed MUSD yield until they redeem. Mezo testnet.",
+    "SnapZo — MUSD-quoted tips & unlocks settle in 18-decimal SNAP (1:1 with hub sMUSD wei); creators hold hub-backed MUSD yield until they redeem. Mezo testnet.",
 };
 
 export const viewport: Viewport = {

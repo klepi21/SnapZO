@@ -43,6 +43,13 @@ export const snapZoHubAdminAbi = [
   { type: "function", name: "pause", stateMutability: "nonpayable", inputs: [], outputs: [] },
   { type: "function", name: "unpause", stateMutability: "nonpayable", inputs: [], outputs: [] },
   { type: "function", name: "harvest", stateMutability: "nonpayable", inputs: [], outputs: [] },
+  {
+    type: "function",
+    name: "syncGaugeRewards",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
   { type: "function", name: "restake", stateMutability: "nonpayable", inputs: [], outputs: [] },
   {
     type: "function",

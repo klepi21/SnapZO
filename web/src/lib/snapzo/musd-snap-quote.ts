@@ -1,11 +1,10 @@
-/** Matches hub `MUSD_WEI_PER_SNAP_UNIT` (MUSD 18d → SNAP 6d, 1:1 human on first mint). */
-export const MUSD_WEI_PER_SNAP_BASE = BigInt(1_000_000_000_000);
+const WAD = BigInt("1000000000000000000");
 
-/** One full SNAP token in base units (6 decimals). */
-export const SNAP_ONE_IN_BASE_UNITS = BigInt(1_000_000);
+/** One full SNAP token in base units (18 decimals, same as sMUSD). */
+export const SNAP_ONE_IN_BASE_UNITS = WAD;
 
 /**
- * SNAP base units for a MUSD wei quote when the pool already has supply (same as hub `mulDiv` ceil).
+ * SNAP base units for a MUSD wei quote at the live hub ratio (same as `ceil(musd * ts / ta)`).
  * Use **ceil** so tips/unlocks deliver at least the quoted MUSD worth.
  */
 export function musdWeiToSnapBaseUnitsCeil(
@@ -17,7 +16,7 @@ export function musdWeiToSnapBaseUnitsCeil(
     return BigInt(0);
   }
   if (totalSupplySnap <= BigInt(0)) {
-    return musdWei / MUSD_WEI_PER_SNAP_BASE;
+    return BigInt(0);
   }
   return (musdWei * totalSupplySnap + totalAssetsMusd - BigInt(1)) / totalAssetsMusd;
 }

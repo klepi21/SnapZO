@@ -14,24 +14,26 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {SnapToken} from "./SnapToken.sol";
 import {IERC20Permit, IMusdVault, ISmusdGauge, IMezoRouter} from "./interfaces/IMezo.sol";
+import {ISnapZoHubHook} from "./interfaces/ISnapZoHubHook.sol";
 
 /// @title SnapZoHub
 /// @notice Pooled MUSD → vault → gauge strategy with SNAP receipt shares; relayer-gated EIP-712 deposit/withdraw.
+/// @dev Gauge MEZO is claimed into the hub, indexed to SNAP (reward-per-token). Fee applies to MEZO only on withdraw.
 contract SnapZoHub is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,
     ReentrancyGuardUpgradeable,
     EIP712Upgradeable,
-    UUPSUpgradeable
+    UUPSUpgradeable,
+    ISnapZoHubHook
 {
     using SafeERC20 for IERC20;
 
     uint256 public constant MIN_DEPOSIT = 1 ether;
-    /// @dev MUSD is 18 decimals, SNAP is 6 — first mint maps 1 MUSD : 1 SNAP (human) via `assets / 1e12`.
-    uint256 public constant MUSD_WEI_PER_SNAP_UNIT = 1e12;
     uint256 public constant BPS = 10_000;
     uint16 public constant MAX_FEE_BPS = 1_000;
+    uint256 internal constant REWARD_PRECISION = 1e18;
 
     bytes32 private constant DEPOSIT_TYPEHASH =
         keccak256("Deposit(address user,uint256 assets,uint256 nonce,uint256 deadline)");
@@ -50,6 +52,13 @@ contract SnapZoHub is
     mapping(address => bool) public isRelayer;
     bytes private _restakeRoutes;
 
+    /// @notice Cumulative MEZO per SNAP (scaled by REWARD_PRECISION). Updated when gauge rewards hit the hub.
+    uint256 public rewardPerTokenStored;
+    /// @notice MEZO received while `totalSupply()==0`, later merged on first stake.
+    uint256 public unallocatedReward;
+    mapping(address => uint256) public userRewardPerTokenPaid;
+    mapping(address => uint256) public rewards;
+
     error SnapZoHub__ZeroAddress();
     error SnapZoHub__Expired();
     error SnapZoHub__BadNonce();
@@ -63,10 +72,13 @@ contract SnapZoHub is
     error SnapZoHub__Denylisted();
     error SnapZoHub__FeeTooHigh();
     error SnapZoHub__ZeroAmount();
+    error SnapZoHub__NotSnapToken();
 
     event Deposit(address indexed user, uint256 assets, uint256 sharesMinted, address indexed relayer);
-    event Withdraw(address indexed user, uint256 sharesBurned, uint256 musdOut, address indexed relayer);
-    event Harvest(uint256 rewardClaimed, uint256 feeToReceiver);
+    event Withdraw(
+        address indexed user, uint256 sharesBurned, uint256 musdOut, uint256 mezoOut, address indexed relayer
+    );
+    event Harvest(uint256 rewardClaimed);
     event Restake(uint256 musdRestaked, bool swapSkipped);
     event RelayerUpdated(address indexed relayer, bool allowed);
     event IntegrationsUpdated(address musd, address vault, address gauge, address router, address rewardToken);
@@ -127,11 +139,30 @@ contract SnapZoHub is
         }
     }
 
+    /// @inheritdoc ISnapZoHubHook
+    function snapTransferHook(address from, address to, uint256) external override {
+        if (msg.sender != address(snapToken)) revert SnapZoHub__NotSnapToken();
+        _updateReward(from);
+        _updateReward(to);
+    }
+
+    /// @notice Pending MEZO claimable on full balance (before withdraw fee); use for UI.
+    function earned(address account) public view returns (uint256) {
+        if (account == address(0) || account == address(this)) {
+            return 0;
+        }
+        uint256 bal = snapToken.balanceOf(account);
+        uint256 paid = userRewardPerTokenPaid[account];
+        uint256 pending = (bal * (rewardPerTokenStored - paid)) / REWARD_PRECISION;
+        return rewards[account] + pending;
+    }
+
     function setRelayer(address relayer, bool allowed) external onlyOwner {
         isRelayer[relayer] = allowed;
         emit RelayerUpdated(relayer, allowed);
     }
 
+    /// @notice `feeBps` applies to **MEZO** paid out on withdraw (not MUSD).
     function setFee(uint16 feeBps_, address feeReceiver_) external onlyOwner {
         if (feeBps_ > MAX_FEE_BPS) revert SnapZoHub__FeeTooHigh();
         feeBps = feeBps_;
@@ -181,6 +212,11 @@ contract SnapZoHub is
             return musdOnHub;
         }
         return musdOnHub + _assetsFromVaultShares(shares);
+    }
+
+    /// @dev sMUSD (vault + gauge) wei controlled by the hub — SNAP mints 1:1 with increases from deposits.
+    function _hubSmUsdShares() internal view returns (uint256) {
+        return IMusdVault(vault).balanceOf(address(this)) + ISmusdGauge(gauge).balanceOf(address(this));
     }
 
     function _assetsFromVaultShares(uint256 shares) internal view returns (uint256) {
@@ -238,37 +274,20 @@ contract SnapZoHub is
         _withdraw(user, snapAmount);
     }
 
+    /// @notice Pull gauge MEZO to the hub and increase `rewardPerTokenStored` (no fee here).
     function harvest() external whenNotPaused nonReentrant onlyHarvester {
-        uint256 beforeBal = rewardToken.balanceOf(address(this));
-        ISmusdGauge(gauge).getReward(address(this));
-        uint256 claimed = rewardToken.balanceOf(address(this)) - beforeBal;
-        uint256 fee;
-        if (claimed > 0 && feeBps > 0) {
-            fee = (claimed * uint256(feeBps)) / BPS;
-            if (fee > 0) {
-                rewardToken.safeTransfer(feeReceiver, fee);
-            }
-        }
-        emit Harvest(claimed, fee);
+        uint256 d = _syncGaugeRewards();
+        emit Harvest(d);
+    }
+
+    /// @notice Owner-only gauge sync (same as harvest reward leg).
+    function syncGaugeRewards() external whenNotPaused nonReentrant onlyOwner {
+        uint256 d = _syncGaugeRewards();
+        emit Harvest(d);
     }
 
     function restake() external whenNotPaused nonReentrant onlyHarvester {
-        bool swapSkipped = true;
-        uint256 rBal = rewardToken.balanceOf(address(this));
-        if (rBal > 0 && router != address(0) && _restakeRoutes.length > 0) {
-            IMezoRouter.Route[] memory routes = abi.decode(_restakeRoutes, (IMezoRouter.Route[]));
-            if (routes.length > 0) {
-                uint256 expected = _quoteRewardToMusd(rBal, routes);
-                if (expected > 0) {
-                    rewardToken.forceApprove(router, rBal);
-                    IMezoRouter(router).swapExactTokensForTokens(
-                        rBal, 0, routes, address(this), block.timestamp + 600
-                    );
-                    swapSkipped = false;
-                }
-            }
-        }
-
+        // Gauge MEZO is owed to SNAP holders via `rewardPerTokenStored`; do not swap rewardToken here.
         uint256 musdBal = musd.balanceOf(address(this));
         if (musdBal > 0) {
             musd.forceApprove(vault, musdBal);
@@ -279,7 +298,7 @@ contract SnapZoHub is
                 ISmusdGauge(gauge).deposit(s, address(this));
             }
         }
-        emit Restake(musdBal, swapSkipped);
+        emit Restake(musdBal, true);
     }
 
     function sweep(address token, uint256 amount) external onlyOwner whenPaused {
@@ -287,8 +306,8 @@ contract SnapZoHub is
         IERC20(token).safeTransfer(owner(), amount);
     }
 
-    /// @notice Send reward tokens held by the hub to `to` (e.g. manual swap when DEX has no route). Does not mint SNAP.
-    function recoverRewardToken(address to, uint256 amount) external onlyOwner nonReentrant {
+    /// @notice Send reward tokens held by the hub to `to`. Paused only — avoids draining indexed MEZO while live.
+    function recoverRewardToken(address to, uint256 amount) external onlyOwner whenPaused nonReentrant {
         if (to == address(0)) revert SnapZoHub__ZeroAddress();
         rewardToken.safeTransfer(to, amount);
         emit RewardTokenRecovered(to, amount);
@@ -376,19 +395,19 @@ contract SnapZoHub is
     }
 
     function _deposit(address user, uint256 assets) internal {
-        uint256 ta = totalAssets();
-        uint256 ts = snapToken.totalSupply();
+        _updateReward(user);
+        _syncGaugeRewards();
+
+        uint256 sBefore = _hubSmUsdShares();
         musd.safeTransferFrom(user, address(this), assets);
-        uint256 shares;
-        if (ts == 0) {
-            shares = assets / MUSD_WEI_PER_SNAP_UNIT;
-        } else {
-            shares = Math.mulDiv(assets, ts, ta, Math.Rounding.Floor);
-        }
-        if (shares == 0) revert SnapZoHub__ZeroShares();
-        snapToken.mint(user, shares);
         _pushToStrategy(assets);
-        emit Deposit(user, assets, shares, msg.sender);
+        uint256 sAfter = _hubSmUsdShares();
+        uint256 ds = sAfter - sBefore;
+        if (ds == 0) revert SnapZoHub__ZeroShares();
+        snapToken.mint(user, ds);
+        _mergeUnallocatedRewards();
+        _updateReward(user);
+        emit Deposit(user, assets, ds, msg.sender);
     }
 
     function _pushToStrategy(uint256 musdAmount) internal {
@@ -402,9 +421,18 @@ contract SnapZoHub is
     }
 
     function _withdraw(address user, uint256 snapAmount) internal {
+        if (snapToken.balanceOf(user) < snapAmount) revert SnapZoHub__InsufficientSnap();
+
+        _updateReward(user);
+        _syncGaugeRewards();
+        _updateReward(user);
+
         uint256 supplyBefore = snapToken.totalSupply();
         if (supplyBefore == 0) revert SnapZoHub__ZeroShares();
-        if (snapToken.balanceOf(user) < snapAmount) revert SnapZoHub__InsufficientSnap();
+        uint256 balBefore = snapToken.balanceOf(user);
+        uint256 materialized = rewards[user];
+        uint256 mezoGross = Math.min((materialized * snapAmount) / balBefore, materialized);
+        rewards[user] = materialized - mezoGross;
 
         uint256 stIdle = IMusdVault(vault).balanceOf(address(this));
         uint256 stStaked = ISmusdGauge(gauge).balanceOf(address(this));
@@ -426,7 +454,64 @@ contract SnapZoHub is
         IMusdVault(vault).withdraw(toFreeShares);
         uint256 musdOut = musd.balanceOf(address(this)) - musdBefore;
         musd.safeTransfer(user, musdOut);
-        emit Withdraw(user, snapAmount, musdOut, msg.sender);
+
+        uint256 mezoOut;
+        if (mezoGross > 0) {
+            uint256 fee = (mezoGross * uint256(feeBps)) / BPS;
+            mezoOut = mezoGross - fee;
+            rewardToken.safeTransfer(user, mezoOut);
+            if (fee > 0) {
+                rewardToken.safeTransfer(feeReceiver, fee);
+            }
+        }
+
+        _updateReward(user);
+        emit Withdraw(user, snapAmount, musdOut, mezoOut, msg.sender);
+    }
+
+    function _syncGaugeRewards() internal returns (uint256 delta) {
+        uint256 beforeBal = rewardToken.balanceOf(address(this));
+        ISmusdGauge(gauge).getReward(address(this));
+        delta = rewardToken.balanceOf(address(this)) - beforeBal;
+        uint256 u = unallocatedReward;
+        uint256 add = delta + u;
+        if (add == 0) {
+            return 0;
+        }
+        uint256 ts = snapToken.totalSupply();
+        if (ts == 0) {
+            unallocatedReward = add;
+            return delta;
+        }
+        unallocatedReward = 0;
+        rewardPerTokenStored += add * REWARD_PRECISION / ts;
+        return delta;
+    }
+
+    /// @dev If MEZO was claimed while `totalSupply()==0`, merge it on first mint once SNAP exists.
+    function _mergeUnallocatedRewards() internal {
+        uint256 u = unallocatedReward;
+        if (u == 0) {
+            return;
+        }
+        uint256 ts = snapToken.totalSupply();
+        if (ts == 0) {
+            return;
+        }
+        unallocatedReward = 0;
+        rewardPerTokenStored += u * REWARD_PRECISION / ts;
+    }
+
+    function _updateReward(address account) internal {
+        if (account == address(0) || account == address(this)) {
+            return;
+        }
+        uint256 bal = snapToken.balanceOf(account);
+        uint256 paid = userRewardPerTokenPaid[account];
+        if (bal > 0 && rewardPerTokenStored > paid) {
+            rewards[account] += (bal * (rewardPerTokenStored - paid)) / REWARD_PRECISION;
+        }
+        userRewardPerTokenPaid[account] = rewardPerTokenStored;
     }
 
     modifier onlyRelayer() {
@@ -441,5 +526,5 @@ contract SnapZoHub is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    uint256[50] private __gap;
+    uint256[46] private __gap;
 }

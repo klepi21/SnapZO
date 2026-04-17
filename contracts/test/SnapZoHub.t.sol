@@ -90,8 +90,7 @@ contract SnapZoHubTest is Test {
         vm.prank(relayer);
         hub.depositWithSig(alice, assets, 0, deadline, sig);
 
-        uint256 expectedSnap = assets / 1e12;
-        assertEq(hub.snapToken().balanceOf(alice), expectedSnap);
+        assertEq(hub.snapToken().balanceOf(alice), assets);
         assertEq(gauge.balanceOf(address(hub)), assets);
         assertEq(musd.balanceOf(alice), 100 ether - assets);
     }
@@ -113,7 +112,7 @@ contract SnapZoHubTest is Test {
         assertEq(musd.balanceOf(alice), 100 ether);
     }
 
-    function testHarvest_transfersRewardAndFee() public {
+    function testHarvest_indexesRewardToHub_noHarvestFee() public {
         reward.mint(address(gauge), 10 ether);
 
         uint256 assets = 5 ether;
@@ -124,8 +123,77 @@ contract SnapZoHubTest is Test {
         vm.prank(relayer);
         hub.harvest();
 
-        assertEq(reward.balanceOf(address(hub)), 9 ether, "hub reward after 10% fee");
-        assertEq(reward.balanceOf(owner), 1 ether, "treasury fee");
+        assertEq(reward.balanceOf(address(hub)), 10 ether, "all MEZO stays on hub for indexing");
+        assertEq(reward.balanceOf(owner), 0, "fee applies on MEZO withdraw only");
+        assertEq(hub.earned(alice), 10 ether);
+    }
+
+    function testWithdraw_appliesFeeOnlyToMezo() public {
+        reward.mint(address(gauge), 10 ether);
+
+        uint256 assets = 5 ether;
+        uint256 d1 = block.timestamp + 1 days;
+        vm.prank(relayer);
+        hub.depositWithSig(alice, assets, 0, d1, _signDeposit(alice, alicePk, assets, 0, d1));
+
+        vm.prank(relayer);
+        hub.harvest();
+
+        uint256 snap = hub.snapToken().balanceOf(alice);
+        uint256 d2 = block.timestamp + 2 days;
+        vm.prank(relayer);
+        hub.withdrawWithSig(alice, snap, 1, d2, _signWithdraw(alice, alicePk, snap, 1, d2));
+
+        assertEq(reward.balanceOf(alice), 9 ether, "90% MEZO to user (10% fee)");
+        assertEq(reward.balanceOf(owner), 1 ether, "10% MEZO fee to feeReceiver");
+        assertEq(musd.balanceOf(alice), 100 ether, "full MUSD principal back");
+    }
+
+    function testLateDepositor_doesNotEarnPreJoinRewards() public {
+        uint256 bobPk = 0xB0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B1;
+        address bob = vm.addr(bobPk);
+
+        reward.mint(address(gauge), 10 ether);
+
+        uint256 d1 = block.timestamp + 1 days;
+        vm.prank(relayer);
+        hub.depositWithSig(alice, 5 ether, 0, d1, _signDeposit(alice, alicePk, 5 ether, 0, d1));
+
+        vm.prank(relayer);
+        hub.harvest();
+
+        musd.mint(bob, 100 ether);
+        vm.startPrank(bob);
+        musd.approve(address(hub), type(uint256).max);
+        vm.stopPrank();
+
+        uint256 d2 = block.timestamp + 2 days;
+        vm.prank(relayer);
+        hub.depositWithSig(bob, 5 ether, 0, d2, _signDeposit(bob, bobPk, 5 ether, 0, d2));
+
+        assertEq(hub.earned(bob), 0);
+        assertEq(hub.earned(alice), 10 ether);
+    }
+
+    function testSnapTransfer_updatesRewardDebt() public {
+        uint256 bobPk = 0xC0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C0C1;
+        address bob = vm.addr(bobPk);
+
+        reward.mint(address(gauge), 10 ether);
+
+        uint256 d1 = block.timestamp + 1 days;
+        vm.prank(relayer);
+        hub.depositWithSig(alice, 5 ether, 0, d1, _signDeposit(alice, alicePk, 5 ether, 0, d1));
+
+        vm.prank(relayer);
+        hub.harvest();
+
+        uint256 half = 5 ether / 2;
+        vm.startPrank(alice);
+        hub.snapToken().transfer(bob, half);
+        vm.stopPrank();
+
+        assertApproxEqAbs(hub.earned(alice) + hub.earned(bob), 10 ether, 3);
     }
 
     function testRestake_depositsIdleMusd() public {
@@ -148,7 +216,9 @@ contract SnapZoHubTest is Test {
     function testRecoverAndInject_manualRewardLoop() public {
         reward.mint(address(hub), 5 ether);
         uint256 snapBefore = hub.snapToken().totalSupply();
+        hub.pause();
         hub.recoverRewardToken(owner, 5 ether);
+        hub.unpause();
         assertEq(reward.balanceOf(owner), 5 ether);
 
         musd.mint(owner, 2 ether);

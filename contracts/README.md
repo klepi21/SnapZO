@@ -2,6 +2,8 @@
 
 UUPS-upgradeable **`SnapZoHub`** plus immutable **`SnapToken` (`SNAP`)** minted on first `initialize`. Relayers submit **EIP-712** `deposit` / `withdraw`; **owner or relayer** may **harvest** and **restake**. See `../docs/SC_PLAN.md` Part D for product rules.
 
+**SNAP (18 decimals):** each deposit mints SNAP **1:1 with the hub’s increase in sMUSD wei** (gauge + vault) after routing MUSD through the vault — so MUSD→SNAP count follows the vault’s **MUSD→sMUSD** exchange (e.g. 100 MUSD can mint ~500 SNAP if the vault mints ~500 sMUSD). Withdrawals still burn SNAP **pro‑rata** against hub sMUSD and redeem through the vault for MUSD.
+
 ## Requirements
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge`, `cast`)

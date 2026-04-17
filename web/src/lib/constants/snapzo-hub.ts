@@ -40,8 +40,8 @@ export const SNAPZO_SNAP_TOKEN_ADDRESS = pickAddr(
   SNAP_MEZO_TESTNET,
 );
 
-/** SNAP uses 6 decimals on-chain (matches hub `MUSD_WEI_PER_SNAP_UNIT` / first-mint mapping). */
-export const SNAP_DECIMALS = 6;
+/** SNAP uses 18 decimals on-chain (1:1 wei with sMUSD minted to the hub on deposit). */
+export const SNAP_DECIMALS = 18;
 
 /** Set `NEXT_PUBLIC_SNAPZO_HUB_UI=false` to hide the hub card on `/earn`. */
 export function isSnapZoHubConfigured(): boolean {
@@ -104,9 +104,23 @@ export const snapZoHubAbi = [
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "earned",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "feeBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint16" }],
+  },
 ] as const;
 
-/** Hub `Withdraw` log — use for realized MUSD per SNAP when vault previews revert. */
+/** Hub `Withdraw` log — realized MUSD + net MEZO (after withdraw fee) per burn. */
 export const snapZoHubWithdrawEventAbi = [
   {
     type: "event",
@@ -115,6 +129,7 @@ export const snapZoHubWithdrawEventAbi = [
       { name: "user", type: "address", indexed: true },
       { name: "sharesBurned", type: "uint256", indexed: false },
       { name: "musdOut", type: "uint256", indexed: false },
+      { name: "mezoOut", type: "uint256", indexed: false },
       { name: "relayer", type: "address", indexed: true },
     ],
   },

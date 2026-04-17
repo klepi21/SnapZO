@@ -20,7 +20,7 @@ const steps = [
     icon: Sparkles,
     body: [
       "SnapZo is a social feed on Mezo testnet: share photos, optional paid unlocks, and creator support — MUSD-quoted prices on the feed, SNAP transfers in the wallet, pooled MUSD in the Earn hub.",
-      "SNAP is a 6-decimal hub share token: deposit MUSD on Earn to mint it; tips and unlocks send SNAP to creators at the live pool ratio so the quoted MUSD value clears on-chain.",
+      "SNAP is an 18-decimal hub token minted 1:1 with sMUSD wei the vault assigns on your deposit (so 100 MUSD can become ~500 SNAP if the vault mints ~500 sMUSD). Tips and unlocks send SNAP at the live hub NAV so the quoted MUSD value clears on-chain.",
     ],
   },
   {
@@ -29,7 +29,7 @@ const steps = [
     icon: Wallet,
     body: [
       "You always sign ERC-20 transfers in your wallet: for social actions that means sending SNAP, even when the UI shows a MUSD price.",
-      "MUSD is Mezo’s Bitcoin-backed stablecoin. Deposit MUSD on Earn to mint 6-decimal SNAP; withdraw later for MUSD. Larger whole-number SNAP balances than old 18-decimal shares.",
+      "MUSD is Mezo’s Bitcoin-backed stablecoin. Deposit MUSD on Earn to mint SNAP (18d, tied to sMUSD); withdraw later for MUSD plus pooled yield.",
     ],
   },
   {

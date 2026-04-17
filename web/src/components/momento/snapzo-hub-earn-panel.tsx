@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Loader2 } from "lucide-react";
+
+import { HelpPopover } from "@/components/ui/help-popover";
 import {
   UserRejectedRequestError,
   formatUnits,
@@ -10,6 +13,7 @@ import {
   maxUint256,
   parseUnits,
 } from "viem";
+import { getPublicClient } from "wagmi/actions";
 import {
   useAccount,
   useChainId,
@@ -23,6 +27,8 @@ import {
 } from "wagmi";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { MezoInlineIcon } from "@/components/icons/mezo-inline-icon";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { erc20AllowanceAbi, erc20ApproveAbi } from "@/lib/constants/mezo-dex";
@@ -34,7 +40,12 @@ import {
   SNAPZO_SNAP_TOKEN_ADDRESS,
   snapZoHubAbi,
 } from "@/lib/constants/snapzo-hub";
-import { MUSD_WEI_PER_SNAP_BASE } from "@/lib/snapzo/musd-snap-quote";
+import {
+  MEZO_MUSD_VAULT,
+  MEZO_SMUSD_GAUGE,
+  mezoMusdVaultAbi,
+  mezoSmusdGaugeAbi,
+} from "@/lib/constants/mezo-earn";
 import {
   erc20BalanceAbi,
   MUSD_ADDRESS_MEZO_TESTNET,
@@ -45,10 +56,40 @@ import {
   snapZoDepositTypes,
   snapZoWithdrawTypes,
 } from "@/lib/snapzo/eip712";
+import { wagmiConfig } from "@/lib/wagmi/config";
+import {
+  pickWithdrawDisplayMusdWei,
+  snapWithdrawToFreeSharesFloor,
+} from "@/lib/snapzo/preview-withdraw-musd";
 
 const ZERO = BigInt(0);
+const BPS = BigInt(10_000);
 const MIN_DEPOSIT_WEI = BigInt("1000000000000000000");
 const DEADLINE_SECS = BigInt(3600);
+/** One full MUSD unit in wei — used for marginal `convertToShares` rate (same as deposit preview). */
+const ONE_MUSD_WEI = parseUnits("1", MUSD_DECIMALS);
+
+/**
+ * Mirrors `SnapZoHub._withdraw` MEZO leg before an extra `getReward` in the same tx:
+ * gross = floor(earned × withdrawSnap ÷ balance), fee on gross, net = gross − fee.
+ */
+function previewWithdrawMezoWei(args: {
+  earnedWei: bigint;
+  snapBalanceWei: bigint;
+  withdrawSnapWei: bigint;
+  feeBps: bigint;
+}): { grossWei: bigint; feeWei: bigint; netWei: bigint } | undefined {
+  const { earnedWei, snapBalanceWei, withdrawSnapWei, feeBps } = args;
+  if (snapBalanceWei <= ZERO || withdrawSnapWei <= ZERO || withdrawSnapWei > snapBalanceWei) {
+    return undefined;
+  }
+  let gross = (earnedWei * withdrawSnapWei) / snapBalanceWei;
+  if (gross > earnedWei) {
+    gross = earnedWei;
+  }
+  const fee = (gross * feeBps) / BPS;
+  return { grossWei: gross, feeWei: fee, netWei: gross - fee };
+}
 
 type HubMode = "deposit" | "withdraw";
 
@@ -123,8 +164,11 @@ function parsedSnapAmount(s: string): bigint | undefined {
   }
 }
 
+const VAULT_SHARES_PER_ONE_MUSD_QUERY_KEY = "mezoVaultConvertToShares1Musd" as const;
+
 export function SnapZoHubEarnPanel() {
   const configured = isSnapZoHubConfigured();
+  const queryClient = useQueryClient();
   const toast = useSnapzoToast();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -182,16 +226,93 @@ export function SnapZoHubEarnPanel() {
     },
   });
 
+  /** Gauge MEZO indexed to this wallet’s SNAP; gross of withdraw `feeBps` (same 18 dp as on-chain). */
+  const hubEarnedMezo = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_HUB_ADDRESS,
+    abi: snapZoHubAbi,
+    functionName: "earned",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(
+        configured && isConnected && address && chainId === mezoTestnet.id,
+      ),
+    },
+  });
+
+  const hubFeeBps = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_HUB_ADDRESS,
+    abi: snapZoHubAbi,
+    functionName: "feeBps",
+    query: {
+      enabled: Boolean(configured && chainId === mezoTestnet.id),
+    },
+  });
+
   const hubDepositParsed = useMemo(() => parsedMusdAmount(hubDepositIn), [hubDepositIn]);
   const hubWithdrawParsed = useMemo(() => parsedSnapAmount(hubWithdrawIn), [hubWithdrawIn]);
 
-  const hubNav = useReadContracts({
+  const depositPreviewSnap = useReadContract({
+    chainId: mezoTestnet.id,
+    address: MEZO_MUSD_VAULT,
+    abi: mezoMusdVaultAbi,
+    functionName: "convertToShares",
+    args:
+      configured && hubDepositParsed !== undefined && hubDepositParsed > ZERO
+        ? [hubDepositParsed]
+        : undefined,
+    query: {
+      enabled: Boolean(
+        configured &&
+          hubDepositParsed !== undefined &&
+          hubDepositParsed > ZERO,
+      ),
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+    },
+  });
+
+  /**
+   * Marginal MUSD→sMUSD rate via `getPublicClient` (same pattern as Earn vault stats).
+   * `useReadContract` alone can fail under SSR / hydration while TVL fallback still runs — this path is stable.
+   */
+  const vaultSharesPerOneMusdQuery = useQuery({
+    queryKey: [VAULT_SHARES_PER_ONE_MUSD_QUERY_KEY, mezoTestnet.id] as const,
+    queryFn: async () => {
+      const client = getPublicClient(wagmiConfig, { chainId: mezoTestnet.id });
+      if (!client) {
+        throw new Error("No RPC client");
+      }
+      return client.readContract({
+        address: MEZO_MUSD_VAULT,
+        abi: mezoMusdVaultAbi,
+        functionName: "convertToShares",
+        args: [ONE_MUSD_WEI],
+      });
+    },
+    enabled: configured,
+    staleTime: 30_000,
+    gcTime: 300_000,
+    retry: 3,
+    refetchOnWindowFocus: true,
+  });
+
+  const hubWithdrawPositionReads = useReadContracts({
     contracts: [
       {
         chainId: mezoTestnet.id,
-        address: SNAPZO_HUB_ADDRESS,
-        abi: snapZoHubAbi,
-        functionName: "totalAssets",
+        address: MEZO_SMUSD_GAUGE,
+        abi: mezoSmusdGaugeAbi,
+        functionName: "balanceOf",
+        args: [SNAPZO_HUB_ADDRESS],
+      },
+      {
+        chainId: mezoTestnet.id,
+        address: MEZO_MUSD_VAULT,
+        abi: mezoMusdVaultAbi,
+        functionName: "balanceOf",
+        args: [SNAPZO_HUB_ADDRESS],
       },
       {
         chainId: mezoTestnet.id,
@@ -207,24 +328,97 @@ export function SnapZoHubEarnPanel() {
     },
   });
 
-  const hubTa =
-    hubNav.data?.[0]?.status === "success" ? hubNav.data[0].result : undefined;
-  const hubTs =
-    hubNav.data?.[1]?.status === "success" ? hubNav.data[1].result : undefined;
+  const smusdStakedOnHub =
+    hubWithdrawPositionReads.data?.[0]?.status === "success"
+      ? hubWithdrawPositionReads.data[0].result
+      : undefined;
+  const smusdIdleOnHub =
+    hubWithdrawPositionReads.data?.[1]?.status === "success"
+      ? hubWithdrawPositionReads.data[1].result
+      : undefined;
+  const snapTotalSupply =
+    hubWithdrawPositionReads.data?.[2]?.status === "success"
+      ? hubWithdrawPositionReads.data[2].result
+      : undefined;
 
-  const depositPreviewSnap = useMemo(() => {
-    const amt = hubDepositParsed;
-    if (!amt || amt <= ZERO || hubTa === undefined || hubTs === undefined) {
+  const hubTotalSmusdWei = useMemo(() => {
+    if (smusdStakedOnHub === undefined || smusdIdleOnHub === undefined) {
       return undefined;
     }
-    if (hubTa <= ZERO) {
+    return smusdStakedOnHub + smusdIdleOnHub;
+  }, [smusdIdleOnHub, smusdStakedOnHub]);
+
+  const withdrawToFreeSharesWei = useMemo(() => {
+    if (
+      hubWithdrawParsed === undefined ||
+      hubWithdrawParsed <= ZERO ||
+      snapTotalSupply === undefined ||
+      hubTotalSmusdWei === undefined
+    ) {
       return undefined;
     }
-    if (hubTs === ZERO) {
-      return amt / MUSD_WEI_PER_SNAP_BASE;
+    return snapWithdrawToFreeSharesFloor(
+      hubWithdrawParsed,
+      hubTotalSmusdWei,
+      snapTotalSupply,
+    );
+  }, [hubTotalSmusdWei, hubWithdrawParsed, snapTotalSupply]);
+
+  const sharesPerOneMusdWei =
+    vaultSharesPerOneMusdQuery.isSuccess &&
+    vaultSharesPerOneMusdQuery.data !== undefined &&
+    vaultSharesPerOneMusdQuery.data > ZERO
+      ? vaultSharesPerOneMusdQuery.data
+      : undefined;
+
+  /** MUSD implied by vault `convertToShares(1 MUSD)` marginal rate (often wrong vs wallet on testnet). */
+  const withdrawVaultMarginalMusdWei = useMemo(() => {
+    if (
+      withdrawToFreeSharesWei === undefined ||
+      withdrawToFreeSharesWei <= ZERO ||
+      sharesPerOneMusdWei === undefined
+    ) {
+      return undefined;
     }
-    return (amt * hubTs) / hubTa;
-  }, [hubDepositParsed, hubTa, hubTs]);
+    return (withdrawToFreeSharesWei * ONE_MUSD_WEI) / sharesPerOneMusdWei;
+  }, [sharesPerOneMusdWei, withdrawToFreeSharesWei]);
+
+  const withdrawMusdDisplay = useMemo(
+    () =>
+      pickWithdrawDisplayMusdWei(withdrawToFreeSharesWei, withdrawVaultMarginalMusdWei),
+    [withdrawToFreeSharesWei, withdrawVaultMarginalMusdWei],
+  );
+
+  const withdrawMezoPreview = useMemo(() => {
+    if (
+      hubWithdrawParsed === undefined ||
+      hubWithdrawParsed <= ZERO ||
+      snapBal.data === undefined ||
+      snapBal.data <= ZERO ||
+      hubWithdrawParsed > snapBal.data ||
+      hubEarnedMezo.data === undefined ||
+      hubFeeBps.data === undefined
+    ) {
+      return undefined;
+    }
+    return previewWithdrawMezoWei({
+      earnedWei: hubEarnedMezo.data,
+      snapBalanceWei: snapBal.data,
+      withdrawSnapWei: hubWithdrawParsed,
+      feeBps: BigInt(hubFeeBps.data),
+    });
+  }, [hubEarnedMezo.data, hubFeeBps.data, hubWithdrawParsed, snapBal.data]);
+
+  const withdrawPoolReady = useMemo(
+    () =>
+      hubWithdrawParsed !== undefined &&
+      hubWithdrawParsed > ZERO &&
+      snapTotalSupply !== undefined &&
+      snapTotalSupply > ZERO &&
+      hubTotalSmusdWei !== undefined &&
+      hubTotalSmusdWei > ZERO,
+    [hubTotalSmusdWei, hubWithdrawParsed, snapTotalSupply],
+  );
 
   const musdAllowHub = useReadContract({
     chainId: mezoTestnet.id,
@@ -251,9 +445,25 @@ export function SnapZoHubEarnPanel() {
     await musdBal.refetch();
     await snapBal.refetch();
     await hubNonce.refetch();
+    await hubEarnedMezo.refetch();
+    await hubFeeBps.refetch();
     await musdAllowHub.refetch();
-    await hubNav.refetch();
-  }, [hubNav, hubNonce, musdAllowHub, musdBal, snapBal]);
+    await depositPreviewSnap.refetch();
+    await hubWithdrawPositionReads.refetch();
+    await queryClient.invalidateQueries({ queryKey: [VAULT_SHARES_PER_ONE_MUSD_QUERY_KEY] });
+    await vaultSharesPerOneMusdQuery.refetch();
+  }, [
+    depositPreviewSnap,
+    hubEarnedMezo,
+    hubFeeBps,
+    hubNonce,
+    hubWithdrawPositionReads,
+    musdAllowHub,
+    musdBal,
+    queryClient,
+    snapBal,
+    vaultSharesPerOneMusdQuery,
+  ]);
 
   const addSnapToWallet = useCallback(async () => {
     if (!walletClient) {
@@ -487,35 +697,47 @@ export function SnapZoHubEarnPanel() {
 
   return (
     <section className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-gradient-to-b from-zinc-900/90 to-black/80 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 gap-y-1">
-            <h2 className="text-lg font-semibold tracking-tight text-white">
-              SnapZo pool
-            </h2>
-            <span className="inline-flex max-w-[11rem] items-center rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase leading-tight tracking-wide text-emerald-200/95 sm:max-w-none">
-              Gasless transactions
+            <h2 className="text-lg font-semibold tracking-tight text-white">SnapZo pool</h2>
+            <span className="inline-flex items-center rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase leading-tight tracking-wide text-emerald-200/95">
+              Gasless
             </span>
+            <HelpPopover label="How the pool works" size="sm">
+              <p>
+                <strong>Deposit.</strong> MUSD goes to the Mezo vault + gauge; SNAP mints 1:1 with
+                the sMUSD wei credited to the hub on that deposit (vault rate applies).
+              </p>
+              <p>
+                <strong>Withdraw.</strong> Burning SNAP returns MUSD from the hub position. Gauge
+                MEZO is indexed to SNAP; you receive MEZO on the same withdrawal, and the hub fee
+                applies only to that MEZO portion.
+              </p>
+            </HelpPopover>
           </div>
-          <p className="mt-1 max-w-md text-sm leading-relaxed text-zinc-400">
+          <p className="mt-1.5 text-sm text-zinc-400">
             {hubMode === "deposit" ? (
               <>
                 Send{" "}
-                <span className="inline-flex items-center gap-0.5 align-middle">
+                <span className="inline-flex items-center gap-0.5 align-middle font-medium text-zinc-200">
                   <MusdInlineIcon size={13} className="shrink-0 rounded-full object-cover" />
-                  <span className="font-medium text-zinc-300">MUSD</span>
+                  MUSD
                 </span>{" "}
-                to the hub. You get SNAP (6 decimals) representing your share — larger whole
-                numbers than 18-decimal shares.
+                → receive{" "}
+                <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
+                  <SnapInlineIcon size={26} decorative /> SNAP
+                </span>
+                .
               </>
             ) : (
               <>
-                Burn SNAP.{" "}
-                <span className="inline-flex items-center gap-0.5 align-middle">
+                Burn <SnapInlineIcon size={26} decorative /> SNAP →{" "}
+                <span className="inline-flex items-center gap-0.5 align-middle font-medium text-zinc-200">
                   <MusdInlineIcon size={13} className="shrink-0 rounded-full object-cover" />
-                  <span className="font-medium text-zinc-300">MUSD</span>
+                  MUSD
                 </span>{" "}
-                returns to your wallet after the relayer runs the tx.
+                + MEZO (fee on MEZO only).
               </>
             )}
           </p>
@@ -524,9 +746,12 @@ export function SnapZoHubEarnPanel() {
           <button
             type="button"
             onClick={() => void addSnapToWallet()}
-            className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-100"
+            className="shrink-0 self-start rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-100 sm:self-auto"
           >
-            Add SNAP to wallet
+            <span className="inline-flex items-center gap-1">
+              <SnapInlineIcon size={26} decorative />
+              SNAP
+            </span>
           </button>
         ) : null}
       </div>
@@ -546,25 +771,45 @@ export function SnapZoHubEarnPanel() {
         </div>
       ) : null}
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
-        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-2.5 sm:px-4">
+      <div className="mb-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3 sm:gap-3">
+        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
           <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
             <MusdInlineIcon size={14} className="shrink-0 rounded-full object-cover" />
             MUSD
           </p>
-          <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-white">
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-white sm:text-base">
             {isConnected && !wrongChain
               ? formatUnitsMax2dp(musdBal.data, MUSD_DECIMALS)
               : "—"}
           </p>
         </div>
-        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-2.5 sm:px-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
+          <p className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <SnapInlineIcon size={24} decorative />
             SNAP
           </p>
-          <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-emerald-200/95">
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-emerald-200/95 sm:text-base">
             {isConnected && !wrongChain
               ? formatUnitsMax2dp(snapBal.data, SNAP_DECIMALS)
+              : "—"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
+          <div className="flex items-center justify-between gap-1">
+            <p className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <MezoInlineIcon size={24} decorative />
+              MEZO
+            </p>
+            <HelpPopover label="MEZO rewards" size="sm">
+              <p>
+                Gauge emissions are claimed into the hub and indexed to SNAP. This number is what
+                you could claim on a full exit right now (before the withdraw fee on MEZO).
+              </p>
+            </HelpPopover>
+          </div>
+          <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-sky-200/95 sm:text-base">
+            {isConnected && !wrongChain
+              ? formatUnitsMax2dp(hubEarnedMezo.data, MUSD_DECIMALS)
               : "—"}
           </p>
         </div>
@@ -623,27 +868,123 @@ export function SnapZoHubEarnPanel() {
         </button>
       </div>
 
-      <p className="mt-2 flex items-start gap-1.5 text-xs text-zinc-500">
+      <div className="mt-3 rounded-2xl border border-white/[0.08] bg-black/40 p-3 sm:p-4">
+        <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            {hubMode === "deposit" ? "Deposit" : "Withdraw"} preview
+          </span>
+          <HelpPopover label="How previews are calculated" size="sm">
+            <p>
+              <strong>Deposit — SNAP.</strong> From the vault{" "}
+              <span className="font-mono text-zinc-200">convertToShares</span> for your MUSD input;
+              the hub mints the same sMUSD wei as SNAP.
+            </p>
+            <p>
+              <strong>Withdraw — MUSD.</strong> Hub sMUSD freed = floor(your SNAP × hub sMUSD ÷ SNAP
+              supply). Shown as MUSD unless a vault marginal quote disagrees by more than 50%
+              (testnet reads are noisy).
+            </p>
+            <p>
+              <strong>Withdraw — <MezoInlineIcon size={14} decorative /> MEZO.</strong> Pro-rata from your current{" "}
+              <span className="font-mono text-zinc-200">earned()</span>. The tx also claims the
+              gauge, so <MezoInlineIcon size={14} decorative /> MEZO can be slightly higher if new rewards land in the same block.
+            </p>
+          </HelpPopover>
+        </div>
+
         {hubMode === "deposit" ? (
-          <>
-            <MusdInlineIcon size={14} className="mt-0.5 shrink-0 rounded-full object-cover opacity-90" />
-            <span>
-              Minimum 1 MUSD. First time: approve the hub, then sign the deposit message.
-              {depositPreviewSnap !== undefined ? (
-                <>
-                  {" "}
-                  <span className="font-medium text-zinc-400">
-                    ~{formatUnits(depositPreviewSnap, SNAP_DECIMALS)} SNAP minted (floor, same as
-                    hub).
-                  </span>
-                </>
-              ) : null}
-            </span>
-          </>
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-500">Minimum 1 MUSD · approve once, then sign</p>
+            {depositPreviewSnap.isSuccess &&
+            depositPreviewSnap.data !== undefined &&
+            depositPreviewSnap.data > ZERO ? (
+              <div className="flex flex-col gap-1 rounded-xl bg-white/[0.04] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                  <SnapInlineIcon size={24} decorative />
+                  SNAP (approx.)
+                </span>
+                <span className="font-mono text-sm font-semibold text-zinc-100">
+                  ~{formatUnits(depositPreviewSnap.data, SNAP_DECIMALS)}
+                </span>
+              </div>
+            ) : null}
+            {depositPreviewSnap.isError ? (
+              <p className="text-xs font-medium text-amber-200/85">Mint preview unavailable.</p>
+            ) : null}
+          </div>
         ) : (
-          "Amount in SNAP (6 decimals). No approve needed — only your signature."
+          <div className="space-y-2.5">
+            <p className="text-xs text-zinc-500">No approve · sign only</p>
+            {withdrawPoolReady ? (
+              withdrawToFreeSharesWei === undefined ? (
+                <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-100/90">
+                  Too small — hub share rounds to zero. Try more SNAP.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex flex-col gap-1 rounded-xl bg-white/[0.04] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                      <MusdInlineIcon size={14} className="shrink-0 rounded-full object-cover" />
+                      MUSD (approx.)
+                    </span>
+                    <div className="text-right">
+                      <span className="font-mono text-sm font-semibold text-white">
+                        ~{formatUnitsMax2dp(withdrawMusdDisplay.musdWei, MUSD_DECIMALS)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] font-normal text-zinc-500 sm:mt-0 sm:ml-2 sm:inline">
+                        {withdrawMusdDisplay.basis === "vault-marginal"
+                          ? "marginal quote"
+                          : "share parity"}
+                      </span>
+                    </div>
+                  </div>
+                  {withdrawMezoPreview !== undefined ? (
+                    <div className="flex flex-col gap-1 rounded-xl bg-sky-500/[0.08] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-200/85">
+                        <MezoInlineIcon size={14} decorative />
+                        MEZO net (approx.)
+                      </span>
+                      <div className="text-right">
+                        <span className="font-mono text-sm font-semibold text-sky-50">
+                          ~{formatUnitsMax2dp(withdrawMezoPreview.netWei, MUSD_DECIMALS)}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-sky-300/75 sm:mt-0 sm:ml-2 sm:inline">
+                          fee {formatUnitsMax2dp(withdrawMezoPreview.feeWei, MUSD_DECIMALS)} on{" "}
+                          {formatUnitsMax2dp(withdrawMezoPreview.grossWei, MUSD_DECIMALS)} gross
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )
+            ) : hubWithdrawParsed !== undefined &&
+              hubWithdrawParsed > ZERO &&
+              snapBal.data !== undefined &&
+              snapBal.data > ZERO &&
+              hubWithdrawParsed <= snapBal.data &&
+              withdrawMezoPreview !== undefined ? (
+                <div className="space-y-1.5">
+                  <div className="flex flex-col gap-1 rounded-xl bg-sky-500/[0.08] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-200/85">
+                      <MezoInlineIcon size={14} decorative />
+                      MEZO net (approx.)
+                    </span>
+                    <div className="text-right">
+                      <span className="font-mono text-sm font-semibold text-sky-50">
+                        ~{formatUnitsMax2dp(withdrawMezoPreview.netWei, MUSD_DECIMALS)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-sky-300/75 sm:mt-0 sm:ml-2 sm:inline">
+                        fee {formatUnitsMax2dp(withdrawMezoPreview.feeWei, MUSD_DECIMALS)} on{" "}
+                        {formatUnitsMax2dp(withdrawMezoPreview.grossWei, MUSD_DECIMALS)} gross
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-600">MUSD line appears when hub totals load.</p>
+                </div>
+              ) : null}
+          </div>
         )}
-      </p>
+      </div>
 
       <button
         type="button"

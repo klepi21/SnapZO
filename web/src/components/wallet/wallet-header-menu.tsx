@@ -4,12 +4,16 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ArrowLeftRight, ChevronDown, LogOut, PiggyBank, Shield } from "lucide-react";
+import { getAddress } from "viem";
 import { useChainId, useDisconnect } from "wagmi";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { useMezoBalancesReadout } from "@/hooks/use-mezo-balances-readout";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { MUSD_ADDRESS_MEZO_TESTNET } from "@/lib/constants/musd";
 import { isSnapZoHubConfigured } from "@/lib/constants/snapzo-hub";
+
+const ADMIN_WALLET = getAddress("0xE5f3e81f3045865EB140fCC44038433891D0e25f");
 
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -20,7 +24,7 @@ export function WalletHeaderMenu() {
   const rootRef = useRef<HTMLDivElement>(null);
   const { disconnect, isPending: isDisconnecting } = useDisconnect();
   const chainId = useChainId();
-  const { native, musdBalance, btcFormatted, musdFormatted } =
+  const { native, musdBalance, snapBalance, btcFormatted, musdFormatted, snapFormatted } =
     useMezoBalancesReadout();
 
   const unsupported = chainId !== mezoTestnet.id;
@@ -64,6 +68,8 @@ export function WalletHeaderMenu() {
             </button>
           );
         }
+
+        const canSeeAdmin = hubAdmin && getAddress(account.address) === ADMIN_WALLET;
 
         return (
           <div ref={rootRef} className="relative">
@@ -136,6 +142,19 @@ export function WalletHeaderMenu() {
                               : (musdFormatted ?? "0")}
                         </dd>
                       </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="flex items-center gap-1.5 text-zinc-500">
+                          <SnapInlineIcon size={16} decorative />
+                          <span className="sr-only">SNAP</span>
+                        </dt>
+                        <dd className="font-mono text-zinc-100">
+                          {snapBalance.isPending
+                            ? "…"
+                            : snapBalance.error
+                              ? "—"
+                              : (snapFormatted ?? "0")}
+                        </dd>
+                      </div>
                     </dl>
                     <p
                       className="mt-2 truncate font-mono text-[9px] text-zinc-600"
@@ -160,7 +179,7 @@ export function WalletHeaderMenu() {
                         <PiggyBank className="h-3.5 w-3.5" aria-hidden />
                         Earn (MUSD vault)
                       </Link>
-                      {hubAdmin ? (
+                      {canSeeAdmin ? (
                         <Link
                           href="/admin/snapzo"
                           onClick={close}

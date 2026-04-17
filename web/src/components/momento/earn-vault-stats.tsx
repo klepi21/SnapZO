@@ -7,6 +7,8 @@ import { useReadContracts } from "wagmi";
 import { getPublicClient } from "wagmi/actions";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
+import { HelpPopover } from "@/components/ui/help-popover";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import {
   MEZO_MUSD_VAULT,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/constants/musd";
 import {
   erc20TotalSupplyAbi,
+  SNAP_DECIMALS,
   SNAPZO_HUB_ADDRESS,
   SNAPZO_SNAP_TOKEN_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
@@ -266,26 +269,35 @@ export function EarnVaultStats() {
               ? formatMusdWeiUpTo3(musdWeiPerSnap)
               : "—";
 
-  const smusdRateHint =
-    smusdMusdRateQuery.data?.kind === "ok"
-      ? smusdMusdRateQuery.data.source === "vault-linear"
-        ? "MUSD.balanceOf(MUSD vault) × 1 sMUSD ÷ vault.totalSupply. On testnet `previewRedeem` reverts; this TVL ratio is what we can read on-chain (actual `withdraw` payouts can differ)."
-        : "From vault previewRedeem / convertToAssets for 1 full sMUSD (1e18 shares)."
-      : smusdMusdRateQuery.data?.kind === "fail"
-        ? smusdMusdRateQuery.data.message
-        : "Vault preview or TVL ratio for 1 sMUSD.";
-
-  const snapHint =
-    musdWeiPerSnap !== undefined && musdWeiPerSmusd !== undefined && smusdPerSnapWei !== undefined
-      ? "(Hub sMUSD per 1 SNAP) × (MUSD per 1 sMUSD). Hub sMUSD = gauge.balanceOf(hub) + vault.balanceOf(hub); per-SNAP slice = total × 1e6 ÷ SNAP supply."
-      : "Need hub sMUSD position and SNAP supply.";
-
   return (
     <section
       className="rounded-[22px] border border-white/[0.08] bg-zinc-900/50 px-4 py-4 backdrop-blur-sm sm:px-5"
       aria-label="SnapZo hub gauge position"
     >
-      <h2 className="text-sm font-semibold tracking-tight text-white">Hub on-chain</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight text-white">Hub on-chain</h2>
+        <HelpPopover label="How these stats are derived" size="sm">
+          <p>
+            <strong>sMUSD total.</strong>{" "}
+            <span className="font-mono text-zinc-200">gauge.balanceOf(hub) + vault.balanceOf(hub)</span>{" "}
+            — staked vs idle breakdown is the same pair.
+          </p>
+          <p>
+            <strong>1 sMUSD → MUSD.</strong>{" "}
+            {smusdMusdRateQuery.data?.kind === "ok"
+              ? smusdMusdRateQuery.data.source === "vault-linear"
+                ? "TVL ratio (MUSD in vault × 1 share ÷ totalSupply) because preview views often revert on testnet."
+                : "From vault previewRedeem / convertToAssets for 1e18 shares."
+              : smusdMusdRateQuery.data?.kind === "fail"
+                ? smusdMusdRateQuery.data.message
+                : "Vault view when available."}
+          </p>
+          <p>
+            <strong>1 <SnapInlineIcon size={24} decorative /> SNAP → MUSD.</strong> (Hub sMUSD per SNAP) × (MUSD per sMUSD share). Per-SNAP
+            slice = hub sMUSD × 1e18 ÷ SNAP supply.
+          </p>
+        </HelpPopover>
+      </div>
 
       {isError ? (
         <p className="mt-3 text-sm text-amber-200/90">
@@ -295,28 +307,23 @@ export function EarnVaultStats() {
         <dl className="mt-4 space-y-3">
           <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
             <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              Hub sMUSD total (gauge + vault)
+              Hub sMUSD
             </dt>
             <dd className="mt-1 font-mono text-lg font-semibold tabular-nums text-emerald-200/95">
               {loading || totalSmusdWei === undefined ? "…" : formatBigintFixed(totalSmusdWei, SMUSD_DECIMALS, 6)}
             </dd>
-            <p className="mt-1.5 text-[10px] leading-snug text-zinc-600">
-              Staked{" "}
-              <span className="font-mono text-zinc-400">
-                {loading ? "…" : formatBigintFixed(stStaked, SMUSD_DECIMALS, 6)}
-              </span>
-              {" · "}
-              Idle on vault{" "}
-              <span className="font-mono text-zinc-400">
-                {loading ? "…" : formatBigintFixed(stIdle, SMUSD_DECIMALS, 6)}
-              </span>
+            <p className="mt-1.5 font-mono text-[11px] text-zinc-500">
+              <span className="text-zinc-600">Staked</span>{" "}
+              {loading ? "…" : formatBigintFixed(stStaked, SMUSD_DECIMALS, 4)}{" "}
+              <span className="text-zinc-600">· idle</span>{" "}
+              {loading ? "…" : formatBigintFixed(stIdle, SMUSD_DECIMALS, 4)}
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
               <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                Hub pending rewards
+                Gauge pending
               </dt>
               <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-amber-100/90">
                 {loading ? "…" : formatUnitsMax2dp(pendingRewards, MUSD_DECIMALS)}
@@ -324,53 +331,18 @@ export function EarnVaultStats() {
             </div>
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
               <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                SNAP total supply
+                <span className="inline-flex items-center gap-1">
+                  <SnapInlineIcon size={24} decorative /> SNAP total supply
+                </span>
               </dt>
               <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-zinc-200">
-                {loading || snapSupply === undefined ? "…" : formatBigintFixed(snapSupply, 6, 4)}
+                {loading || snapSupply === undefined
+                  ? "…"
+                  : formatBigintFixed(snapSupply, SNAP_DECIMALS, 4)}
               </dd>
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              1 sMUSD → MUSD
-            </dt>
-            <dd className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-base font-semibold tabular-nums text-white">
-              <span>{smusdRateLabel}</span>
-              <MusdInlineIcon
-                size={18}
-                decorative
-                className="shrink-0 rounded-full object-cover"
-              />
-              <span className="text-sm font-medium text-zinc-300">MUSD</span>
-            </dd>
-            <p
-              className={`mt-2 text-[10px] leading-snug ${
-                smusdMusdRateQuery.data?.kind === "fail"
-                  ? "text-amber-200/80"
-                  : "text-zinc-600"
-              }`}
-            >
-              {smusdRateHint}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              1 SNAP → MUSD (implied)
-            </dt>
-            <dd className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-base font-semibold tabular-nums text-white">
-              <span>{snapToMusdLabel}</span>
-              <MusdInlineIcon
-                size={18}
-                decorative
-                className="shrink-0 rounded-full object-cover"
-              />
-              <span className="text-sm font-medium text-zinc-300">MUSD</span>
-            </dd>
-            <p className="mt-2 text-[10px] leading-snug text-zinc-600">{snapHint}</p>
-          </div>
         </dl>
       )}
     </section>

@@ -29,10 +29,10 @@ import {
   useWriteContract,
 } from "wagmi";
 import { formatUnits, parseUnits, UserRejectedRequestError } from "viem";
-import { APP_CREATOR_REVENUE_ONE_LINER } from "@/lib/brand";
 import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar, picsumPost } from "@/lib/dummy/social";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
 import {
   erc20TotalSupplyAbi,
@@ -78,6 +78,17 @@ function formatMusdHumanFromWei(wei: bigint): string {
   return formatUnits(wei, MUSD_DECIMALS)
     .replace(/(\.\d*?[1-9])0+$/, "$1")
     .replace(/\.$/, "");
+}
+
+function formatUnitsMax2dp(value: bigint, decimals: number): string {
+  const full = formatUnits(value, decimals);
+  const dot = full.indexOf(".");
+  if (dot === -1) {
+    return full;
+  }
+  const intPart = full.slice(0, dot);
+  const frac = full.slice(dot + 1, dot + 3).replace(/0+$/, "");
+  return frac ? `${intPart}.${frac}` : intPart;
 }
 
 function formatTxError(e: unknown): string {
@@ -169,9 +180,9 @@ export function PostCard({ post }: PostCardProps) {
   }, [ta, ts, unlockMusdWei]);
 
   const tipSnapLabel =
-    tipSnapWei !== undefined ? formatUnits(tipSnapWei, SNAP_DECIMALS) : "…";
+    tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "…";
   const unlockSnapLabel =
-    unlockSnapWei !== undefined ? formatUnits(unlockSnapWei, SNAP_DECIMALS) : "…";
+    unlockSnapWei !== undefined ? formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS) : "…";
 
   const isLockedPost = Boolean(post.contentLocked);
   const clientReady = useSyncExternalStore(
@@ -230,14 +241,14 @@ export function PostCard({ post }: PostCardProps) {
       setSessionUnlocked(true);
       toast(
         unlockSnapWei !== undefined
-          ? `Unlocked · ${unlockMusdLabel} MUSD (~${formatUnits(unlockSnapWei, SNAP_DECIMALS)} SNAP)`
+          ? `Unlocked · ${unlockMusdLabel} MUSD (~${formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS)} SNAP)`
           : "Unlocked.",
       );
     } else if (pendingKind === "like") {
       persistPostLiked(post.id);
       toast(
         tipSnapWei !== undefined
-          ? `Sent tip · 0.01 MUSD (~${formatUnits(tipSnapWei, SNAP_DECIMALS)} SNAP)`
+          ? `Sent tip · 0.01 MUSD (~${formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)} SNAP)`
           : "Tip sent.",
       );
     } else if (pendingKind === "comment" && pendingCommentText) {
@@ -253,7 +264,7 @@ export function PostCard({ post }: PostCardProps) {
         setCommentDraft("");
         toast(
           tipSnapWei !== undefined
-            ? `Comment posted · 0.01 MUSD (~${formatUnits(tipSnapWei, SNAP_DECIMALS)} SNAP)`
+            ? `Comment posted · 0.01 MUSD (~${formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)} SNAP)`
             : "Comment posted.",
         );
       }
@@ -332,7 +343,7 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     if (unlockSnapWei === undefined) {
-      toast("Pool ratio not ready — try again or deposit on Earn first.", "error");
+      toast("Pricing unavailable right now. Retry in a moment.", "error");
       return;
     }
     try {
@@ -364,7 +375,7 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     if (tipSnapWei === undefined) {
-      toast("Pool ratio not ready — try again or deposit on Earn first.", "error");
+      toast("Pricing unavailable right now. Retry in a moment.", "error");
       return;
     }
     setLikePressed(true);
@@ -429,7 +440,7 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     if (tipSnapWei === undefined) {
-      toast("Pool ratio not ready — try again or deposit on Earn first.", "error");
+      toast("Pricing unavailable right now. Retry in a moment.", "error");
       return;
     }
     try {
@@ -508,9 +519,11 @@ export function PostCard({ post }: PostCardProps) {
                 <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-200">
                   {unlockMusdLabel} <MusdInlineIcon size={12} decorative />
                 </span>{" "}
-                (settlement ~{" "}
-                <span className="font-semibold text-violet-200">{unlockSnapLabel} SNAP</span>).
-                Deposit on Earn first so the pool has a ratio.
+                (~{" "}
+                <span className="inline-flex items-center gap-1 font-semibold text-violet-200">
+                  {unlockSnapLabel} <SnapInlineIcon size={24} decorative />
+                  SNAP
+                </span>).
               </p>
             </div>
             <button
@@ -561,7 +574,8 @@ export function PostCard({ post }: PostCardProps) {
               </span>
             </button>
           </div>
-          <div className="max-w-[46%] pt-0.5 text-right text-[10px] font-normal leading-snug tracking-wide text-zinc-500">
+          <div className="max-w-[52%] overflow-x-auto pt-0.5 text-right text-[10px] font-normal tracking-wide text-zinc-500">
+            <div className="whitespace-nowrap">
             <span className="text-zinc-400">Like</span>{" "}
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
               0.01 <MusdInlineIcon size={11} decorative />
@@ -571,13 +585,15 @@ export function PostCard({ post }: PostCardProps) {
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
               0.01 <MusdInlineIcon size={11} decorative />
             </span>
-            <span className="text-zinc-600"> · </span>
-            <span className="text-zinc-400">Unlock</span>{" "}
-            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              {unlockMusdLabel} <MusdInlineIcon size={11} decorative />
-            </span>
-            <div className="mt-0.5 max-w-[220px] text-right text-[9px] font-normal normal-case leading-snug tracking-normal text-zinc-600">
-              Earn: MUSD → hub → SNAP. {APP_CREATOR_REVENUE_ONE_LINER}
+            {isLockedPost ? (
+              <>
+                <span className="text-zinc-600"> · </span>
+                <span className="text-zinc-400">Unlock</span>{" "}
+                <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+                  {unlockMusdLabel} <MusdInlineIcon size={11} decorative />
+                </span>
+              </>
+            ) : null}
             </div>
           </div>
         </div>
@@ -745,7 +761,9 @@ export function PostCard({ post }: PostCardProps) {
                     <span className="inline-flex items-center gap-0.5 text-zinc-200">
                       0.01 <MusdInlineIcon size={11} decorative />
                     </span>
-                    <span className="text-violet-200/90">(~{tipSnapLabel} SNAP)</span>
+                    <span className="inline-flex items-center gap-1 text-violet-200/90">
+                      (~{tipSnapLabel} <SnapInlineIcon size={24} decorative /> SNAP)
+                    </span>
                     <span>on-chain</span>
                   </p>
                   <div className="flex items-end gap-2">

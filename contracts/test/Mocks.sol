@@ -39,6 +39,10 @@ contract MockVault is ERC20, IMusdVault {
     function convertToAssets(uint256 shares) external pure returns (uint256) {
         return shares;
     }
+
+    function convertToShares(uint256 assets) external pure returns (uint256) {
+        return assets;
+    }
 }
 
 contract MockGauge is ISmusdGauge {

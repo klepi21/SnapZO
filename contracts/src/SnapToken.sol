@@ -3,7 +3,10 @@ pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+import {ISnapZoHubHook} from "./interfaces/ISnapZoHubHook.sol";
+
 /// @notice Receipt token for SnapZo pooled MUSD strategy; only the hub may mint/burn.
+/// @dev Notifies the hub on every transfer so MEZO reward debt stays correct when SNAP moves wallets.
 contract SnapToken is ERC20 {
     address public immutable minter;
 
@@ -13,9 +16,9 @@ contract SnapToken is ERC20 {
         minter = minter_;
     }
 
-    /// @notice 6 decimals so on-chain amounts stay human-sized (1 MUSD → 1e6 base units on first mint).
+    /// @notice 18 decimals to match Mezo sMUSD (vault share) wei — SNAP minted 1:1 with ΔsMUSD on deposit.
     function decimals() public pure override returns (uint8) {
-        return 6;
+        return 18;
     }
 
     modifier onlyMinter() {
@@ -29,5 +32,10 @@ contract SnapToken is ERC20 {
 
     function burnFrom(address from, uint256 amount) external onlyMinter {
         _burn(from, amount);
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        ISnapZoHubHook(minter).snapTransferHook(from, to, value);
+        super._update(from, to, value);
     }
 }

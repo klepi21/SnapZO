@@ -4,51 +4,68 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { EarnVaultStats } from "@/components/momento/earn-vault-stats";
 import { SnapZoHubEarnPanel } from "@/components/momento/snapzo-hub-earn-panel";
+import { HelpPopover } from "@/components/ui/help-popover";
 import { isSnapZoHubConfigured } from "@/lib/constants/snapzo-hub";
-import { APP_CREATOR_REVENUE_ONE_LINER } from "@/lib/brand";
 
 export function EarnView() {
   const hubUi = isSnapZoHubConfigured();
   return (
-    <main className="pb-32 pt-5">
-      <div className="mb-6 flex items-start gap-3 px-4">
-        <Link
-          href="/feed"
-          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-black/30 text-white shadow-sm backdrop-blur-md transition active:scale-95 hover:bg-white/10"
-          aria-label="Back to feed"
-        >
-          <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Earn</h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-            <span className="inline-flex items-center gap-1 align-middle">
-              Deposit
-              <MusdInlineIcon size={14} className="shrink-0 rounded-full object-cover" />
-              <span className="font-medium text-zinc-300">MUSD</span>
-            </span>{" "}
-            into the pooled strategy and receive{" "}
-            <span className="font-medium text-zinc-300">SNAP</span>{" "}
-            <span className="text-zinc-500">(6 decimals — friendlier whole numbers than 18d shares).</span>{" "}
-            You approve once, sign a message, and a relayer pays gas to complete the tx.
-          </p>
-          <p className="mt-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2.5 text-xs leading-relaxed text-zinc-400">
-            <span className="font-medium text-violet-200/95">Creators:</span>{" "}
-            {APP_CREATOR_REVENUE_ONE_LINER} Redeem SNAP here when you want MUSD in your wallet.
-          </p>
+    <main className="mx-auto max-w-lg pb-32 pt-5 sm:max-w-xl">
+      <div className="mb-6 px-4">
+        <div className="flex items-start gap-3">
+          <Link
+            href="/feed"
+            className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-black/30 text-white shadow-sm backdrop-blur-md transition active:scale-95 hover:bg-white/10"
+            aria-label="Back to feed"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-white">Earn</h1>
+              <HelpPopover label="About this page">
+                <p>
+                  <strong>Pool.</strong> Deposit{" "}
+                  <span className="inline-flex items-center gap-0.5 align-middle">
+                    <MusdInlineIcon size={12} className="shrink-0 rounded-full object-cover" />
+                    MUSD
+                  </span>{" "}
+                  into the SnapZo hub; you receive <SnapInlineIcon size={24} decorative /> SNAP (18
+                  decimals). Mint size follows the vault
+                  MUSD→sMUSD rate on that deposit.
+                </p>
+                <p>
+                  <strong>Gasless.</strong> You approve once, sign an EIP-712 message, and a relayer
+                  submits the transaction (you still need test BTC for unrelated txs).
+                </p>
+                <p>
+                  <strong>Creators.</strong> On the feed, prices show in MUSD; wallets send the
+                  matching <SnapInlineIcon size={24} decorative /> SNAP at the live hub ratio.
+                  Redeem <SnapInlineIcon size={24} decorative /> SNAP here for MUSD when you want.
+                </p>
+              </HelpPopover>
+            </div>
+            <p className="mt-1.5 text-sm text-zinc-400">
+              MUSD pool ·{" "}
+              <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
+                <SnapInlineIcon size={24} decorative /> SNAP receipts
+              </span>{" "}
+              · relayer covers gas
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="mx-4 flex flex-col gap-5">
+      <div className="mx-4 flex flex-col gap-4 sm:gap-5">
         {hubUi ? (
           <SnapZoHubEarnPanel />
         ) : (
           <div className="rounded-2xl border border-white/10 bg-zinc-900/60 px-4 py-6 text-center text-sm text-zinc-400">
-            Pool earn is turned off for this environment (
-            <span className="font-mono text-zinc-500">NEXT_PUBLIC_SNAPZO_HUB_UI</span>
-            ).
+            Pool UI is off for this build (
+            <span className="font-mono text-zinc-500">NEXT_PUBLIC_SNAPZO_HUB_UI</span>).
           </div>
         )}
         <EarnVaultStats />

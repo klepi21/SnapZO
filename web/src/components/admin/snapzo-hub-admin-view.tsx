@@ -25,6 +25,7 @@ import {
 } from "wagmi";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { MezoInlineIcon } from "@/components/icons/mezo-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { erc20AllowanceAbi, erc20ApproveAbi } from "@/lib/constants/mezo-dex";
@@ -44,6 +45,11 @@ import {
 import { fetchHubRelayerRows } from "@/lib/snapzo/hub-relayers-from-chain";
 
 const hub = SNAPZO_HUB_ADDRESS;
+
+/** Mezo MUSD vault shares (sMUSD) use 18 decimals. */
+const SMUSD_DECIMALS = 18;
+
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as const;
 
 function formatTxError(e: unknown): string {
   if (e instanceof UserRejectedRequestError) {
@@ -145,7 +151,6 @@ export function SnapZoHubAdminView() {
       { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "router" },
       { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "rewardToken" },
       { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "snapToken" },
-      { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "totalAssets" },
     ],
     query: {
       enabled: hubOk,
@@ -159,12 +164,46 @@ export function SnapZoHubAdminView() {
   const paused = hubReads.data?.[1]?.status === "success" ? hubReads.data[1].result : undefined;
   const feeBps = hubReads.data?.[2]?.status === "success" ? hubReads.data[2].result : undefined;
   const feeReceiver = hubReads.data?.[3]?.status === "success" ? hubReads.data[3].result : undefined;
+  const vaultAddr =
+    hubReads.data?.[5]?.status === "success" ? hubReads.data[5].result : undefined;
   const gaugeAddr =
     hubReads.data?.[6]?.status === "success" ? hubReads.data[6].result : undefined;
   const rewardTokenAddr =
     hubReads.data?.[8]?.status === "success" ? hubReads.data[8].result : undefined;
-  const totalAssets =
-    hubReads.data?.[10]?.status === "success" ? hubReads.data[10].result : undefined;
+
+  const smusdShareReads = useReadContracts({
+    contracts: [
+      {
+        chainId: mezoTestnet.id,
+        address: (vaultAddr ?? ZERO_ADDR) as `0x${string}`,
+        abi: erc20BalanceAbi,
+        functionName: "balanceOf",
+        args: hubOk && vaultAddr ? [hub] : undefined,
+      },
+      {
+        chainId: mezoTestnet.id,
+        address: (gaugeAddr ?? ZERO_ADDR) as `0x${string}`,
+        abi: erc20BalanceAbi,
+        functionName: "balanceOf",
+        args: hubOk && gaugeAddr ? [hub] : undefined,
+      },
+    ],
+    query: {
+      enabled: Boolean(hubOk && vaultAddr && gaugeAddr),
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
+  const smusdIdleWei =
+    smusdShareReads.data?.[0]?.status === "success" ? smusdShareReads.data[0].result : undefined;
+  const smusdStakedWei =
+    smusdShareReads.data?.[1]?.status === "success" ? smusdShareReads.data[1].result : undefined;
+  const smusdTotalWei =
+    smusdIdleWei !== undefined && smusdStakedWei !== undefined
+      ? smusdIdleWei + smusdStakedWei
+      : undefined;
 
   const isOwner =
     Boolean(address && owner) &&
@@ -252,10 +291,11 @@ export function SnapZoHubAdminView() {
 
   const refetchAll = useCallback(async () => {
     await hubReads.refetch();
+    await smusdShareReads.refetch();
     await secondaryReads.refetch();
     await injectAllowance.refetch();
     await queryClient.invalidateQueries({ queryKey: ["snapzoHubRelayers"] });
-  }, [hubReads, injectAllowance, queryClient, secondaryReads]);
+  }, [hubReads, injectAllowance, queryClient, secondaryReads, smusdShareReads]);
 
   const runWrite = useCallback(
     async (label: string, fn: () => Promise<`0x${string}`>) => {
@@ -304,6 +344,16 @@ export function SnapZoHubAdminView() {
         address: hub,
         abi: snapZoHubAdminAbi,
         functionName: "harvest",
+      }),
+    );
+
+  const onSyncGaugeRewards = () =>
+    void runWrite("Gauge rewards synced", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: hub,
+        abi: snapZoHubAdminAbi,
+        functionName: "syncGaugeRewards",
       }),
     );
 
@@ -375,6 +425,10 @@ export function SnapZoHubAdminView() {
   };
 
   const onRecoverReward = () => {
+    if (!paused) {
+      toast("Pause the hub before recoverRewardToken (protects indexed MEZO).", "error");
+      return;
+    }
     if (!isAddress(recoverTo.trim())) {
       toast("Invalid recipient.", "error");
       return;
@@ -403,6 +457,10 @@ export function SnapZoHubAdminView() {
   };
 
   const onRecoverAllToSelf = () => {
+    if (!paused) {
+      toast("Pause the hub before recovering reward tokens.", "error");
+      return;
+    }
     if (!address) {
       return;
     }
@@ -692,11 +750,21 @@ export function SnapZoHubAdminView() {
                 {feeReceiver ?? "…"}
               </dd>
             </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-zinc-500">totalAssets (hub)</dt>
-              <dd className="font-mono text-zinc-200" title={fmtBalTitle(totalAssets)}>
-                {fmtBalShort(totalAssets)}
-              </dd>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">sMUSD on hub</dt>
+                <dd
+                  className="font-mono text-zinc-200"
+                  title={fmtBalTitle(smusdTotalWei, SMUSD_DECIMALS)}
+                >
+                  {fmtBalShort(smusdTotalWei, 6, SMUSD_DECIMALS)}
+                </dd>
+              </div>
+              <p className="text-[10px] leading-snug text-zinc-600">
+                <span className="font-mono">vault.balanceOf(hub) + gauge.balanceOf(hub)</span> — vault
+                share wei (18 decimals). SNAP mints 1:1 with{" "}
+                <strong className="text-zinc-500">Δ</strong> of this total on each deposit.
+              </p>
             </div>
             <div className="flex justify-between gap-2">
               <dt className="flex items-center gap-1 text-zinc-500">
@@ -723,10 +791,11 @@ export function SnapZoHubAdminView() {
               </dd>
             </div>
             <p className="col-span-full text-[10px] leading-snug text-zinc-600">
-              <span className="font-mono">earned(hub)</span> is rewards that accrue on the gauge every
-              block until <strong>Harvest</strong> calls <span className="font-mono">getReward</span>.
-              <strong> Restake</strong> does not claim gauge rewards; it can add stake and change
-              state, so this number often <strong>rises</strong> until the next harvest.
+              <span className="font-mono">gauge.earned(hub)</span> is emissions still in the gauge
+              contract. <strong>Harvest</strong> or <strong>Sync gauge</strong> calls{" "}
+              <span className="font-mono">getReward</span> into the hub and increases the SNAP reward
+              index (no fee on claim). <strong>Restake</strong> only moves idle MUSD; it does not swap
+              hub-held reward tokens.
             </p>
             <div className="flex justify-between gap-2">
               <dt className="text-zinc-500">Reward token on hub</dt>
@@ -740,11 +809,18 @@ export function SnapZoHubAdminView() {
                 {fmtBalShort(rewardOnFeeReceiver)}
               </dd>
             </div>
+            <p className="col-span-full text-[10px] leading-snug text-zinc-600">
+              The fee recipient balance is mostly from the <strong><MezoInlineIcon size={14} decorative /> MEZO leg on user withdraws</strong>{" "}
+              (<span className="font-mono">feeBps</span>), not from harvest.
+            </p>
           </dl>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button type="button" disabled={!canAct} className={btnPrimary} onClick={onHarvest}>
               {(busy || isWritePending) ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Harvest (claim gauge → hub, fee to recipient)
+              Harvest (relayer / owner)
+            </button>
+            <button type="button" disabled={!canAct} className={btnPrimary} onClick={onSyncGaugeRewards}>
+              Sync gauge (owner)
             </button>
             <button type="button" disabled={!canAct} className={btnMuted} onClick={onRestake}>
               Restake
@@ -754,9 +830,9 @@ export function SnapZoHubAdminView() {
             </button>
           </div>
           <p className="mt-3 text-[10px] text-zinc-600">
-            Harvest calls <span className="font-mono">gauge.getReward(hub)</span> and sends the fee
-            cut to the fee recipient. Remaining reward token stays on the hub until{" "}
-            <span className="font-mono">recoverRewardToken</span>.
+            Harvest and Sync gauge both call <span className="font-mono">gauge.getReward(hub)</span> and
+            index <MezoInlineIcon size={14} decorative /> MEZO to SNAP holders. <span className="font-mono">recoverRewardToken</span> is only
+            allowed while <strong>paused</strong>.
           </p>
           <div className="mt-4 border-t border-white/[0.06] pt-4">
             <p className={label}>Fee recipient → payout reward token</p>
