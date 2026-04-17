@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { ArrowLeft, Loader2, Shield } from "lucide-react";
 import {
+  type Address,
   UserRejectedRequestError,
   formatUnits,
   getAddress,
@@ -34,7 +36,12 @@ import {
   MUSD_DECIMALS,
 } from "@/lib/constants/musd";
 import { snapZoHubAdminAbi } from "@/lib/constants/snapzo-hub-admin-abi";
-import { isSnapZoHubConfigured, SNAPZO_HUB_ADDRESS } from "@/lib/constants/snapzo-hub";
+import {
+  isSnapZoHubConfigured,
+  SNAPZO_HUB_ADDRESS,
+  SNAPZO_HUB_DEPLOY_BLOCK,
+} from "@/lib/constants/snapzo-hub";
+import { fetchHubRelayerRows } from "@/lib/snapzo/hub-relayers-from-chain";
 
 const hub = SNAPZO_HUB_ADDRESS;
 
@@ -84,12 +91,27 @@ function fmtBalTitle(v: bigint | undefined, d = MUSD_DECIMALS): string | undefin
 
 export function SnapZoHubAdminView() {
   const toast = useSnapzoToast();
+  const queryClient = useQueryClient();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { openConnectModal } = useConnectModal();
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: mezoTestnet.id });
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+
+  const hubOk = isSnapZoHubConfigured();
+
+  const relayersListQuery = useQuery({
+    queryKey: ["snapzoHubRelayers", hub, String(SNAPZO_HUB_DEPLOY_BLOCK)] as const,
+    enabled: Boolean(hubOk && publicClient),
+    queryFn: async () => {
+      if (!publicClient) {
+        return [];
+      }
+      return fetchHubRelayerRows(publicClient, hub as Address, SNAPZO_HUB_DEPLOY_BLOCK);
+    },
+    staleTime: 20_000,
+  });
 
   const [busy, setBusy] = useState(false);
   const [injectIn, setInjectIn] = useState("");
@@ -110,7 +132,6 @@ export function SnapZoHubAdminView() {
   const [feePayoutTo, setFeePayoutTo] = useState("");
 
   const wrongChain = isConnected && chainId !== mezoTestnet.id;
-  const hubOk = isSnapZoHubConfigured();
 
   const hubReads = useReadContracts({
     contracts: [
@@ -233,7 +254,8 @@ export function SnapZoHubAdminView() {
     await hubReads.refetch();
     await secondaryReads.refetch();
     await injectAllowance.refetch();
-  }, [hubReads, injectAllowance, secondaryReads]);
+    await queryClient.invalidateQueries({ queryKey: ["snapzoHubRelayers"] });
+  }, [hubReads, injectAllowance, queryClient, secondaryReads]);
 
   const runWrite = useCallback(
     async (label: string, fn: () => Promise<`0x${string}`>) => {
@@ -827,6 +849,75 @@ export function SnapZoHubAdminView() {
 
         <section className={card}>
           <h2 className="mb-3 text-sm font-semibold text-white">Relayers</h2>
+          <p className="mb-2 text-[10px] leading-relaxed text-zinc-600">
+            Allowlist from <span className="font-mono">RelayerUpdated</span> since deploy block{" "}
+            <span className="font-mono">{String(SNAPZO_HUB_DEPLOY_BLOCK)}</span> (override with{" "}
+            <span className="font-mono">NEXT_PUBLIC_SNAPZO_HUB_DEPLOY_BLOCK</span> if you redeploy).
+            Each address is re-checked with <span className="font-mono">isRelayer</span>.
+          </p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
+              onClick={() => void relayersListQuery.refetch()}
+            >
+              Refresh relayer list
+            </button>
+            {relayersListQuery.isFetching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" aria-hidden />
+            ) : null}
+          </div>
+          {relayersListQuery.isError ? (
+            <p className="mb-2 text-xs text-red-300/90">
+              {(relayersListQuery.error as Error)?.message ?? "Could not load relayer logs."}
+            </p>
+          ) : null}
+          <ul className="mb-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-black/25 p-2 text-[11px]">
+            {relayersListQuery.data?.length ? (
+              relayersListQuery.data.map((r) => (
+                <li
+                  key={r.address}
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-2 py-1.5 font-mono text-zinc-200 hover:bg-white/[0.04]"
+                >
+                  <span className="min-w-0 flex-1 break-all">{r.address}</span>
+                  <span
+                    className={
+                      r.isRelayerOnChain ? "shrink-0 text-emerald-400" : "shrink-0 text-amber-300"
+                    }
+                  >
+                    {r.isRelayerOnChain ? "isRelayer ✓" : "log vs chain mismatch"}
+                  </span>
+                  <a
+                    className="shrink-0 text-sky-400/90 underline-offset-2 hover:underline"
+                    href={`${mezoTestnet.blockExplorers.default.url}/address/${r.address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Explorer
+                  </a>
+                </li>
+              ))
+            ) : relayersListQuery.isPending ? (
+              <li className="px-2 py-2 text-zinc-500">Loading…</li>
+            ) : (
+              <li className="px-2 py-2 text-zinc-500">No allowlisted relayers in log range.</li>
+            )}
+          </ul>
+          <p className="mb-3 text-[10px] leading-relaxed text-zinc-600">
+            <strong>Relay gas:</strong> <span className="font-mono">depositWithSig</span> /{" "}
+            <span className="font-mono">withdrawWithSig</span> need hundreds of thousands of gas. A
+            failed tx with <span className="font-mono">gasLimit ≈ 23380</span> (see{" "}
+            <a
+              className="text-sky-400/90 underline-offset-2 hover:underline"
+              href="https://explorer.test.mezo.org/tx/0x2f51e6f83e138170fa8ff37942f3dd93834c6048229d4750d6d233698c1291e7"
+              target="_blank"
+              rel="noreferrer"
+            >
+              example
+            </a>
+            ) ran out of gas, not necessarily a bad private key. Use the app relay routes (they
+            estimate gas + buffer) or set a high manual gas cap.
+          </p>
           <input
             className={input}
             placeholder="Relayer 0x…"

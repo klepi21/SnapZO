@@ -17,6 +17,18 @@ function pickAddr(env: string | undefined, fallback: string): Address {
   return fallback as Address;
 }
 
+/**
+ * First block where the current default hub proxy appears (deploy tx).
+ * Override with `NEXT_PUBLIC_SNAPZO_HUB_DEPLOY_BLOCK` if you redeploy.
+ */
+export const SNAPZO_HUB_DEPLOY_BLOCK = (() => {
+  const raw = process.env.NEXT_PUBLIC_SNAPZO_HUB_DEPLOY_BLOCK?.trim();
+  if (raw && /^\d+$/.test(raw)) {
+    return BigInt(raw);
+  }
+  return BigInt(12_397_374);
+})();
+
 /** UUPS proxy — EIP-712 `verifyingContract` and contract calls. */
 export const SNAPZO_HUB_ADDRESS = pickAddr(
   process.env.NEXT_PUBLIC_SNAPZO_HUB_ADDRESS,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createWalletClient, http, isAddress, isHex } from "viem";
+import { createPublicClient, createWalletClient, http, isAddress, isHex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
@@ -66,18 +66,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Deadline expired" }, { status: 400 });
   }
 
+  const transport = http(mezoTestnet.rpcUrls.default.http[0]);
+  const publicClient = createPublicClient({ chain: mezoTestnet, transport });
   const account = privateKeyToAccount(pk);
   const client = createWalletClient({
     account,
     chain: mezoTestnet,
-    transport: http(mezoTestnet.rpcUrls.default.http[0]),
+    transport,
   });
 
+  const hubAddr = hub as `0x${string}`;
+  const userAddr = user as `0x${string}`;
+
+  let gas: bigint;
+  try {
+    const est = await publicClient.estimateContractGas({
+      address: hubAddr,
+      abi: snapZoHubAbi,
+      functionName: "depositWithSig",
+      args: [userAddr, assetsBi, nonceBi, deadlineBi, signature],
+      account: account.address,
+    });
+    gas = est + (est * BigInt(30)) / BigInt(100);
+    if (gas < BigInt(450_000)) {
+      gas = BigInt(450_000);
+    }
+  } catch {
+    gas = BigInt(600_000);
+  }
+
   const hash = await client.writeContract({
-    address: hub,
+    address: hubAddr,
     abi: snapZoHubAbi,
     functionName: "depositWithSig",
-    args: [user, assetsBi, nonceBi, deadlineBi, signature],
+    args: [userAddr, assetsBi, nonceBi, deadlineBi, signature],
+    gas,
   });
 
   return NextResponse.json({ hash });
