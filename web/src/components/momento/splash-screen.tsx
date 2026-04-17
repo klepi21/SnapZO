@@ -3,20 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { APP_NAME, APP_SPLASH_TAGLINE } from "@/lib/brand";
+import {
+  APP_NAME,
+  APP_SPLASH_BODY,
+  APP_SPLASH_HEADLINE,
+  APP_SPLASH_TAGLINE,
+} from "@/lib/brand";
 import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
-const orbitAvatars = [
-  { id: 44, size: 56, top: "6%", left: "12%", opacity: 0.95 },
-  { id: 65, size: 72, top: "10%", left: "58%", opacity: 1 },
-  { id: 12, size: 48, top: "22%", left: "38%", opacity: 0.85 },
-  { id: 33, size: 64, top: "28%", left: "8%", opacity: 0.9 },
-  { id: 71, size: 52, top: "34%", left: "72%", opacity: 0.88 },
-  { id: 5, size: 68, top: "42%", left: "48%", opacity: 1 },
-  { id: 22, size: 44, top: "48%", left: "22%", opacity: 0.8 },
-  { id: 88, size: 60, top: "18%", left: "78%", opacity: 0.92 },
-  { id: 52, size: 50, top: "52%", left: "62%", opacity: 0.85 },
-] as const;
+const SNAP_HERO_LOGO_PX = 280;
 
 export function SplashScreen() {
   const [startedHref, setStartedHref] = useState("/onboarding");
@@ -37,58 +32,46 @@ export function SplashScreen() {
       />
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:24px_24px]" />
 
-      <div className="relative flex flex-1 flex-col px-6 pb-10 pt-6">
-        <div className="relative mx-auto mt-4 h-[320px] w-full max-w-[340px]">
-          {orbitAvatars.map((a) => (
+      <div className="relative flex flex-1 flex-col items-center px-6 pb-10 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <div className="relative z-10 flex w-full flex-1 flex-col items-center justify-center text-center">
+          <div className="relative mx-auto flex h-[min(52dvh,360px)] w-full max-w-[360px] items-center justify-center">
             <div
-              key={a.id}
-              className="absolute rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.45)] ring-2 ring-white/10"
-              style={{
-                top: a.top,
-                left: a.left,
-                width: a.size,
-                height: a.size,
-                opacity: a.opacity,
-              }}
-            >
+              className="pointer-events-none absolute inset-[10%] rounded-full bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.22),transparent_62%)] blur-2xl"
+              aria-hidden
+            />
+            <div className="relative rounded-full p-[10px] shadow-[0_28px_90px_rgba(0,0,0,0.65)] ring-1 ring-white/12 ring-offset-0">
               <Image
-                src={`https://picsum.photos/id/${a.id}/${a.size * 2}/${a.size * 2}`}
-                alt=""
-                width={a.size * 2}
-                height={a.size * 2}
-                className="h-full w-full rounded-full object-cover"
+                src="/snap-token-logo.png"
+                alt="SnapZO"
+                width={SNAP_HERO_LOGO_PX}
+                height={SNAP_HERO_LOGO_PX}
+                priority
+                className="h-[min(46vw,280px)] w-[min(46vw,280px)] max-h-[280px] max-w-[280px] rounded-full object-cover"
+                sizes="280px"
               />
             </div>
-          ))}
-          <svg
-            className="pointer-events-none absolute inset-0 h-full w-full text-white/[0.08]"
-            viewBox="0 0 340 320"
-            fill="none"
-            aria-hidden
-          >
-            <path
-              d="M40 180 Q 120 80 170 100 T 300 160"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M60 220 Q 160 120 280 200"
-              stroke="currentColor"
-              strokeWidth="1"
-            />
-          </svg>
+          </div>
+
+          <div className="relative z-10 mt-2 w-full max-w-md">
+            <h1 className="text-[2.65rem] font-bold leading-[0.95] tracking-tight text-white sm:text-[2.85rem]">
+              {APP_NAME}
+            </h1>
+            <p className="mx-auto mt-3 max-w-[26rem] text-pretty text-base font-semibold leading-snug tracking-tight text-zinc-100 sm:text-lg">
+              {APP_SPLASH_HEADLINE}
+            </p>
+            <p className="mx-auto mt-3 max-w-[26rem] text-pretty text-sm leading-relaxed text-zinc-400 sm:text-[0.95rem]">
+              {APP_SPLASH_TAGLINE}
+            </p>
+            <p className="mx-auto mt-4 max-w-[26rem] text-pretty text-xs leading-relaxed text-zinc-500 sm:text-sm">
+              {APP_SPLASH_BODY}
+            </p>
+          </div>
         </div>
 
-        <div className="relative z-10 mt-auto text-center">
-          <h1 className="text-[2.75rem] font-bold leading-none tracking-tight text-white">
-            {APP_NAME}
-          </h1>
-          <p className="mx-auto mt-4 max-w-[22rem] text-pretty text-sm leading-relaxed text-zinc-400 sm:text-base">
-            {APP_SPLASH_TAGLINE}
-          </p>
+        <div className="relative z-10 mt-auto w-full max-w-xs pb-[env(safe-area-inset-bottom)]">
           <Link
             href={startedHref}
-            className="mt-10 inline-flex w-full max-w-xs items-center justify-center rounded-full bg-gradient-to-r from-[#3b82f6] via-[#2563eb] to-[#1d4ed8] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(37,99,235,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+            className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#3b82f6] via-[#2563eb] to-[#1d4ed8] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(37,99,235,0.45)] transition hover:brightness-110 active:scale-[0.98]"
           >
             Get Started
           </Link>

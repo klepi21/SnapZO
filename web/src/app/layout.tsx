@@ -17,9 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SnapZo · SNAP & MUSD on Mezo",
+  title: "SnapZO · The Social-Fi Yield Engine for Mezo",
   description:
-    "SnapZo — MUSD-quoted tips & unlocks settle in 18-decimal SNAP (1:1 with hub sMUSD wei); creators hold hub-backed MUSD yield until they redeem. Mezo testnet.",
+    "SnapZO turns social engagement into automated yield on Mezo testnet: deposit MUSD to mint yield-bearing SNAP shares, earn MUSD + MEZO rewards, and move through gasless EIP-712 relayers.",
 };
 
 export const viewport: Viewport = {

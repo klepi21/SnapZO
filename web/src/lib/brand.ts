@@ -1,14 +1,21 @@
-/** Product copy — SnapZo: SNAP social economy + MUSD savings on Mezo */
+/** Product copy — SnapZO: Social-Fi yield + SNAP shares on Mezo */
 
-export const APP_NAME = "snapzo";
+export const APP_NAME = "SnapZO";
+
+/** Splash / hero headline (under the product name) */
+export const APP_SPLASH_HEADLINE = "The Social-Fi Yield Engine for Mezo";
 
 /** Splash / marketing one-liner */
 export const APP_SPLASH_TAGLINE =
-  "Prices show in MUSD; the wallet settles in SNAP (18d, minted 1:1 with hub sMUSD) while your savings stay in the hub — Mezo testnet.";
+  "Turn social engagement into automated yield with gasless, yield-bearing SNAP shares.";
+
+/** Tighter hero body (splash / onboarding intro) */
+export const APP_SPLASH_BODY =
+  "Deposit MUSD to mint SNAP — a hub share that accrues MUSD and MEZO rewards while you scroll. Creators get paid in SNAP so earnings start compounding the moment they land. Gasless flows via EIP-712 relayers on Mezo testnet.";
 
 /** Short blurb under the logo in the feed header (single readable line) */
 export const APP_FEED_BLURB =
-  "MUSD-quoted tips & unlocks · SNAP settlement · pooled MUSD yield in the hub (testnet).";
+  "Social yield on Mezo · MUSD deposits → SNAP shares · gasless relayers (testnet).";
 
 /**
  * Creator economics: unlocks and tips are quoted in MUSD for clarity, but fans send SNAP

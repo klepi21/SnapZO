@@ -10,7 +10,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { APP_CREATOR_REVENUE_EXPLAINER, APP_NAME } from "@/lib/brand";
+import {
+  APP_CREATOR_REVENUE_EXPLAINER,
+  APP_NAME,
+  APP_SPLASH_BODY,
+} from "@/lib/brand";
 import { markOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
 const steps = [
@@ -19,7 +23,7 @@ const steps = [
     title: `Welcome to ${APP_NAME}`,
     icon: Sparkles,
     body: [
-      "SnapZo is a social feed on Mezo testnet: share photos, optional paid unlocks, and creator support — MUSD-quoted prices on the feed, SNAP transfers in the wallet, pooled MUSD in the Earn hub.",
+      APP_SPLASH_BODY,
       "SNAP is an 18-decimal hub token minted 1:1 with sMUSD wei the vault assigns on your deposit (so 100 MUSD can become ~500 SNAP if the vault mints ~500 sMUSD). Tips and unlocks send SNAP at the live hub NAV so the quoted MUSD value clears on-chain.",
     ],
   },
