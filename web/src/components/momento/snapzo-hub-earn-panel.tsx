@@ -15,6 +15,7 @@ import {
   useChainId,
   usePublicClient,
   useReadContract,
+  useReadContracts,
   useSignTypedData,
   useSwitchChain,
   useWalletClient,
@@ -26,11 +27,14 @@ import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { erc20AllowanceAbi, erc20ApproveAbi } from "@/lib/constants/mezo-dex";
 import {
+  erc20TotalSupplyAbi,
   isSnapZoHubConfigured,
+  SNAP_DECIMALS,
   SNAPZO_HUB_ADDRESS,
   SNAPZO_SNAP_TOKEN_ADDRESS,
   snapZoHubAbi,
 } from "@/lib/constants/snapzo-hub";
+import { MUSD_WEI_PER_SNAP_BASE } from "@/lib/snapzo/musd-snap-quote";
 import {
   erc20BalanceAbi,
   MUSD_ADDRESS_MEZO_TESTNET,
@@ -95,13 +99,25 @@ function txToast(hash: `0x${string}`, label: string) {
   } as const;
 }
 
-function parsedAmount(s: string): bigint | undefined {
+function parsedMusdAmount(s: string): bigint | undefined {
   const t = s.trim().replace(",", ".");
   if (!t) {
     return undefined;
   }
   try {
     return parseUnits(t, MUSD_DECIMALS);
+  } catch {
+    return undefined;
+  }
+}
+
+function parsedSnapAmount(s: string): bigint | undefined {
+  const t = s.trim().replace(",", ".");
+  if (!t) {
+    return undefined;
+  }
+  try {
+    return parseUnits(t, SNAP_DECIMALS);
   } catch {
     return undefined;
   }
@@ -166,8 +182,49 @@ export function SnapZoHubEarnPanel() {
     },
   });
 
-  const hubDepositParsed = useMemo(() => parsedAmount(hubDepositIn), [hubDepositIn]);
-  const hubWithdrawParsed = useMemo(() => parsedAmount(hubWithdrawIn), [hubWithdrawIn]);
+  const hubDepositParsed = useMemo(() => parsedMusdAmount(hubDepositIn), [hubDepositIn]);
+  const hubWithdrawParsed = useMemo(() => parsedSnapAmount(hubWithdrawIn), [hubWithdrawIn]);
+
+  const hubNav = useReadContracts({
+    contracts: [
+      {
+        chainId: mezoTestnet.id,
+        address: SNAPZO_HUB_ADDRESS,
+        abi: snapZoHubAbi,
+        functionName: "totalAssets",
+      },
+      {
+        chainId: mezoTestnet.id,
+        address: SNAPZO_SNAP_TOKEN_ADDRESS,
+        abi: erc20TotalSupplyAbi,
+        functionName: "totalSupply",
+      },
+    ],
+    query: {
+      enabled: configured,
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+    },
+  });
+
+  const hubTa =
+    hubNav.data?.[0]?.status === "success" ? hubNav.data[0].result : undefined;
+  const hubTs =
+    hubNav.data?.[1]?.status === "success" ? hubNav.data[1].result : undefined;
+
+  const depositPreviewSnap = useMemo(() => {
+    const amt = hubDepositParsed;
+    if (!amt || amt <= ZERO || hubTa === undefined || hubTs === undefined) {
+      return undefined;
+    }
+    if (hubTa <= ZERO) {
+      return undefined;
+    }
+    if (hubTs === ZERO) {
+      return amt / MUSD_WEI_PER_SNAP_BASE;
+    }
+    return (amt * hubTs) / hubTa;
+  }, [hubDepositParsed, hubTa, hubTs]);
 
   const musdAllowHub = useReadContract({
     chainId: mezoTestnet.id,
@@ -195,7 +252,8 @@ export function SnapZoHubEarnPanel() {
     await snapBal.refetch();
     await hubNonce.refetch();
     await musdAllowHub.refetch();
-  }, [hubNonce, musdAllowHub, musdBal, snapBal]);
+    await hubNav.refetch();
+  }, [hubNav, hubNonce, musdAllowHub, musdBal, snapBal]);
 
   const addSnapToWallet = useCallback(async () => {
     if (!walletClient) {
@@ -210,7 +268,7 @@ export function SnapZoHubEarnPanel() {
           options: {
             address: SNAPZO_SNAP_TOKEN_ADDRESS,
             symbol: "SNAP",
-            decimals: MUSD_DECIMALS,
+            decimals: SNAP_DECIMALS,
           },
         },
       });
@@ -408,7 +466,7 @@ export function SnapZoHubEarnPanel() {
         setHubDepositIn(formatUnits(musdBal.data, MUSD_DECIMALS));
       }
     } else if (snapBal.data !== undefined) {
-      setHubWithdrawIn(formatUnits(snapBal.data, MUSD_DECIMALS));
+      setHubWithdrawIn(formatUnits(snapBal.data, SNAP_DECIMALS));
     }
   };
 
@@ -447,7 +505,8 @@ export function SnapZoHubEarnPanel() {
                   <MusdInlineIcon size={13} className="shrink-0 rounded-full object-cover" />
                   <span className="font-medium text-zinc-300">MUSD</span>
                 </span>{" "}
-                to the hub. You get SNAP representing your share.
+                to the hub. You get SNAP (6 decimals) representing your share — larger whole
+                numbers than 18-decimal shares.
               </>
             ) : (
               <>
@@ -505,7 +564,7 @@ export function SnapZoHubEarnPanel() {
           </p>
           <p className="mt-0.5 font-mono text-base font-semibold tabular-nums text-emerald-200/95">
             {isConnected && !wrongChain
-              ? formatUnitsMax2dp(snapBal.data, MUSD_DECIMALS)
+              ? formatUnitsMax2dp(snapBal.data, SNAP_DECIMALS)
               : "—"}
           </p>
         </div>
@@ -570,10 +629,19 @@ export function SnapZoHubEarnPanel() {
             <MusdInlineIcon size={14} className="mt-0.5 shrink-0 rounded-full object-cover opacity-90" />
             <span>
               Minimum 1 MUSD. First time: approve the hub, then sign the deposit message.
+              {depositPreviewSnap !== undefined ? (
+                <>
+                  {" "}
+                  <span className="font-medium text-zinc-400">
+                    ~{formatUnits(depositPreviewSnap, SNAP_DECIMALS)} SNAP minted (floor, same as
+                    hub).
+                  </span>
+                </>
+              ) : null}
             </span>
           </>
         ) : (
-          "Amount in SNAP. No approve needed — only your signature."
+          "Amount in SNAP (6 decimals). No approve needed — only your signature."
         )}
       </p>
 

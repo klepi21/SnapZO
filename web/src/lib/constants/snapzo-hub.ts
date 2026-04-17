@@ -40,8 +40,8 @@ export const SNAPZO_SNAP_TOKEN_ADDRESS = pickAddr(
   SNAP_MEZO_TESTNET,
 );
 
-/** SNAP is standard ERC-20 (18 decimals) — hub-minted receipt for pooled MUSD. */
-export const SNAP_DECIMALS = 18;
+/** SNAP uses 6 decimals on-chain (matches hub `MUSD_WEI_PER_SNAP_UNIT` / first-mint mapping). */
+export const SNAP_DECIMALS = 6;
 
 /** Set `NEXT_PUBLIC_SNAPZO_HUB_UI=false` to hide the hub card on `/earn`. */
 export function isSnapZoHubConfigured(): boolean {

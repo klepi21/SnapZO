@@ -21,6 +21,8 @@ export interface FeedPost {
   caption: string;
   /** When true, media stays blurred until user confirms an on-chain unlock tx. */
   contentLocked?: boolean;
+  /** Creator-set unlock quote in MUSD (human); on-chain settlement is SNAP at hub NAV. */
+  unlockPriceMusd?: number;
   /** SNAP tip / unlock / paid-comment recipient (dummy address per post). */
   tipRecipient: Address;
 }
@@ -41,6 +43,7 @@ export const DUMMY_POSTS: FeedPost[] = [
     caption:
       "Standing above the clouds today — nothing beats this view. Grateful for every moment we get to share.",
     contentLocked: true,
+    unlockPriceMusd: 0.1,
     tipRecipient: dummyTipRecipient("1"),
   },
   {

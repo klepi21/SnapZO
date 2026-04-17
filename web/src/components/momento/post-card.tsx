@@ -14,6 +14,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -24,18 +25,25 @@ import {
   useChainId,
   useSwitchChain,
   useWaitForTransactionReceipt,
+  useReadContracts,
   useWriteContract,
 } from "wagmi";
-import { parseUnits, UserRejectedRequestError } from "viem";
+import { formatUnits, parseUnits, UserRejectedRequestError } from "viem";
 import { APP_CREATOR_REVENUE_ONE_LINER } from "@/lib/brand";
 import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar, picsumPost } from "@/lib/dummy/social";
-import { erc20TransferAbi } from "@/lib/constants/musd";
+import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
 import {
+  erc20TotalSupplyAbi,
+  isSnapZoHubConfigured,
   SNAP_DECIMALS,
+  SNAPZO_HUB_ADDRESS,
   SNAPZO_SNAP_TOKEN_ADDRESS,
+  snapZoHubAbi,
 } from "@/lib/constants/snapzo-hub";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
+import { musdWeiToSnapBaseUnitsCeil } from "@/lib/snapzo/musd-snap-quote";
 import {
   appendCommentForPost,
   isPostLikedInStorage,
@@ -49,8 +57,28 @@ interface PostCardProps {
   post: FeedPost;
 }
 
-const TIP_AMOUNT = parseUnits("0.01", SNAP_DECIMALS);
-const UNLOCK_AMOUNT = parseUnits("0.1", SNAP_DECIMALS);
+/** Fixed MUSD-quoted like/reply; unlock uses per-post `unlockPriceMusd` (default 0.1). */
+const TIP_MUSD_WEI = parseUnits("0.01", MUSD_DECIMALS);
+const DEFAULT_UNLOCK_MUSD = 0.1;
+
+function unlockMusdWeiFromPost(post: FeedPost): bigint {
+  const human = post.unlockPriceMusd;
+  if (human === undefined || !Number.isFinite(human) || human <= 0) {
+    return parseUnits(String(DEFAULT_UNLOCK_MUSD), MUSD_DECIMALS);
+  }
+  const s = human.toFixed(12).replace(/\.?0+$/, "") || String(DEFAULT_UNLOCK_MUSD);
+  try {
+    return parseUnits(s, MUSD_DECIMALS);
+  } catch {
+    return parseUnits(String(DEFAULT_UNLOCK_MUSD), MUSD_DECIMALS);
+  }
+}
+
+function formatMusdHumanFromWei(wei: bigint): string {
+  return formatUnits(wei, MUSD_DECIMALS)
+    .replace(/(\.\d*?[1-9])0+$/, "$1")
+    .replace(/\.$/, "");
+}
 
 function formatTxError(e: unknown): string {
   if (e instanceof UserRejectedRequestError) {
@@ -91,6 +119,59 @@ export function PostCard({ post }: PostCardProps) {
   const { switchChain } = useSwitchChain();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
   const toast = useSnapzoToast();
+
+  const hubConfigured = isSnapZoHubConfigured();
+  const hubNav = useReadContracts({
+    contracts: [
+      {
+        chainId: mezoTestnet.id,
+        address: SNAPZO_HUB_ADDRESS,
+        abi: snapZoHubAbi,
+        functionName: "totalAssets",
+      },
+      {
+        chainId: mezoTestnet.id,
+        address: SNAPZO_SNAP_TOKEN_ADDRESS,
+        abi: erc20TotalSupplyAbi,
+        functionName: "totalSupply",
+      },
+    ],
+    query: {
+      enabled: hubConfigured,
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+    },
+  });
+
+  const ta = hubNav.data?.[0]?.status === "success" ? hubNav.data[0].result : undefined;
+  const ts = hubNav.data?.[1]?.status === "success" ? hubNav.data[1].result : undefined;
+
+  const unlockMusdWei = useMemo(() => unlockMusdWeiFromPost(post), [post]);
+  const unlockMusdLabel = useMemo(
+    () => formatMusdHumanFromWei(unlockMusdWei),
+    [unlockMusdWei],
+  );
+
+  const tipSnapWei = useMemo(() => {
+    if (ta === undefined || ts === undefined || ta <= BigInt(0)) {
+      return undefined;
+    }
+    const v = musdWeiToSnapBaseUnitsCeil(TIP_MUSD_WEI, ts, ta);
+    return v > BigInt(0) ? v : undefined;
+  }, [ta, ts]);
+
+  const unlockSnapWei = useMemo(() => {
+    if (ta === undefined || ts === undefined || ta <= BigInt(0)) {
+      return undefined;
+    }
+    const v = musdWeiToSnapBaseUnitsCeil(unlockMusdWei, ts, ta);
+    return v > BigInt(0) ? v : undefined;
+  }, [ta, ts, unlockMusdWei]);
+
+  const tipSnapLabel =
+    tipSnapWei !== undefined ? formatUnits(tipSnapWei, SNAP_DECIMALS) : "…";
+  const unlockSnapLabel =
+    unlockSnapWei !== undefined ? formatUnits(unlockSnapWei, SNAP_DECIMALS) : "…";
 
   const isLockedPost = Boolean(post.contentLocked);
   const clientReady = useSyncExternalStore(
@@ -147,10 +228,18 @@ export function PostCard({ post }: PostCardProps) {
     /* eslint-disable react-hooks/set-state-in-effect -- sync UI after wagmi receipt + localStorage */
     if (pendingKind === "unlock") {
       setSessionUnlocked(true);
-      toast("Unlocked · 0.1 SNAP sent");
+      toast(
+        unlockSnapWei !== undefined
+          ? `Unlocked · ${unlockMusdLabel} MUSD (~${formatUnits(unlockSnapWei, SNAP_DECIMALS)} SNAP)`
+          : "Unlocked.",
+      );
     } else if (pendingKind === "like") {
       persistPostLiked(post.id);
-      toast("Sent 0.01 SNAP tip.");
+      toast(
+        tipSnapWei !== undefined
+          ? `Sent tip · 0.01 MUSD (~${formatUnits(tipSnapWei, SNAP_DECIMALS)} SNAP)`
+          : "Tip sent.",
+      );
     } else if (pendingKind === "comment" && pendingCommentText) {
       const trimmed = pendingCommentText.trim();
       if (trimmed) {
@@ -162,7 +251,11 @@ export function PostCard({ post }: PostCardProps) {
         };
         appendCommentForPost(post.id, row);
         setCommentDraft("");
-        toast("Comment posted · 0.01 SNAP sent");
+        toast(
+          tipSnapWei !== undefined
+            ? `Comment posted · 0.01 MUSD (~${formatUnits(tipSnapWei, SNAP_DECIMALS)} SNAP)`
+            : "Comment posted.",
+        );
       }
       setPendingCommentText(null);
     }
@@ -179,6 +272,9 @@ export function PostCard({ post }: PostCardProps) {
     pendingKind,
     pendingCommentText,
     post.id,
+    tipSnapWei,
+    unlockSnapWei,
+    unlockMusdLabel,
     toast,
     setSessionUnlocked,
   ]);
@@ -231,13 +327,21 @@ export function PostCard({ post }: PostCardProps) {
     if (!ensureMezo()) {
       return;
     }
+    if (!hubConfigured) {
+      toast("SnapZo hub is not configured.", "error");
+      return;
+    }
+    if (unlockSnapWei === undefined) {
+      toast("Pool ratio not ready — try again or deposit on Earn first.", "error");
+      return;
+    }
     try {
-      toast("Confirm 0.1 SNAP unlock in your wallet…");
+      toast(`Confirm unlock · ${unlockMusdLabel} MUSD (~${unlockSnapLabel} SNAP)…`);
       const hash = await writeContractAsync({
         address: SNAPZO_SNAP_TOKEN_ADDRESS,
         abi: erc20TransferAbi,
         functionName: "transfer",
-        args: [post.tipRecipient, UNLOCK_AMOUNT],
+        args: [post.tipRecipient, unlockSnapWei],
         chainId: mezoTestnet.id,
       });
       setPendingKind("unlock");
@@ -255,14 +359,22 @@ export function PostCard({ post }: PostCardProps) {
     if (!ensureMezo()) {
       return;
     }
+    if (!hubConfigured) {
+      toast("SnapZo hub is not configured.", "error");
+      return;
+    }
+    if (tipSnapWei === undefined) {
+      toast("Pool ratio not ready — try again or deposit on Earn first.", "error");
+      return;
+    }
     setLikePressed(true);
     try {
-      toast("Confirm 0.01 SNAP tip in your wallet…");
+      toast(`Confirm tip · 0.01 MUSD (~${tipSnapLabel} SNAP)…`);
       const hash = await writeContractAsync({
         address: SNAPZO_SNAP_TOKEN_ADDRESS,
         abi: erc20TransferAbi,
         functionName: "transfer",
-        args: [post.tipRecipient, TIP_AMOUNT],
+        args: [post.tipRecipient, tipSnapWei],
         chainId: mezoTestnet.id,
       });
       setPendingKind("like");
@@ -276,7 +388,10 @@ export function PostCard({ post }: PostCardProps) {
     ensureMezo,
     hasTipped,
     likePressed,
+    hubConfigured,
     post.tipRecipient,
+    tipSnapLabel,
+    tipSnapWei,
     toast,
     writeContractAsync,
   ]);
@@ -309,14 +424,22 @@ export function PostCard({ post }: PostCardProps) {
     if (!ensureMezo()) {
       return;
     }
+    if (!hubConfigured) {
+      toast("SnapZo hub is not configured.", "error");
+      return;
+    }
+    if (tipSnapWei === undefined) {
+      toast("Pool ratio not ready — try again or deposit on Earn first.", "error");
+      return;
+    }
     try {
       setPendingCommentText(text);
-      toast("Confirm 0.01 SNAP in your wallet…");
+      toast(`Confirm reply fee · 0.01 MUSD (~${tipSnapLabel} SNAP)…`);
       const hash = await writeContractAsync({
         address: SNAPZO_SNAP_TOKEN_ADDRESS,
         abi: erc20TransferAbi,
         functionName: "transfer",
-        args: [post.tipRecipient, TIP_AMOUNT],
+        args: [post.tipRecipient, tipSnapWei],
         chainId: mezoTestnet.id,
       });
       setPendingKind("comment");
@@ -382,18 +505,24 @@ export function PostCard({ post }: PostCardProps) {
               <p className="text-sm font-semibold text-white">Hidden content</p>
               <p className="mt-2 max-w-[280px] text-xs leading-relaxed text-zinc-400">
                 Pay{" "}
-                <span className="font-semibold text-violet-200">0.1 SNAP</span> to unlock the
-                full photo. SNAP is the in-app creator economy token; deposit MUSD on Earn to
-                mint SNAP.
+                <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-200">
+                  {unlockMusdLabel} <MusdInlineIcon size={12} decorative />
+                </span>{" "}
+                (settlement ~{" "}
+                <span className="font-semibold text-violet-200">{unlockSnapLabel} SNAP</span>).
+                Deposit on Earn first so the pool has a ratio.
               </p>
             </div>
             <button
               type="button"
-              disabled={isBusy}
+              disabled={isBusy || unlockSnapWei === undefined}
               onClick={handleUnlock}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/30 to-sky-500/20 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.2)] transition hover:border-indigo-300/60 hover:from-indigo-500/40 disabled:opacity-50"
             >
-              <span>Unlock · 0.1 SNAP</span>
+              <span>
+                Unlock · {unlockMusdLabel}{" "}
+                <MusdInlineIcon size={16} className="inline" decorative />
+              </span>
             </button>
           </div>
         ) : null}
@@ -405,8 +534,10 @@ export function PostCard({ post }: PostCardProps) {
             <button
               type="button"
               className={`flex items-center gap-2 border-0 bg-transparent p-0 transition hover:opacity-90 active:opacity-75 disabled:pointer-events-none disabled:opacity-35 ${likedUi ? "text-red-500" : "text-white"}`}
-              aria-label={hasTipped ? "Already tipped" : "Like — tip 0.01 SNAP"}
-              disabled={isBusy || hasTipped || likePressed}
+              aria-label={
+                hasTipped ? "Already tipped" : "Like — tip 0.01 MUSD worth of SNAP"
+              }
+              disabled={isBusy || hasTipped || likePressed || tipSnapWei === undefined}
               onClick={() => void handleLikeTip()}
             >
               <Heart
@@ -432,13 +563,19 @@ export function PostCard({ post }: PostCardProps) {
           </div>
           <div className="max-w-[46%] pt-0.5 text-right text-[10px] font-normal leading-snug tracking-wide text-zinc-500">
             <span className="text-zinc-400">Like</span>{" "}
-            <span className="font-medium text-violet-200">0.01 SNAP</span>
+            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+              0.01 <MusdInlineIcon size={11} decorative />
+            </span>
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Reply</span>{" "}
-            <span className="font-medium text-violet-200">0.01 SNAP</span>
+            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+              0.01 <MusdInlineIcon size={11} decorative />
+            </span>
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Unlock</span>{" "}
-            <span className="font-medium text-violet-200">0.1 SNAP</span>
+            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+              {unlockMusdLabel} <MusdInlineIcon size={11} decorative />
+            </span>
             <div className="mt-0.5 max-w-[220px] text-right text-[9px] font-normal normal-case leading-snug tracking-normal text-zinc-600">
               Earn: MUSD → hub → SNAP. {APP_CREATOR_REVENUE_ONE_LINER}
             </div>
@@ -603,9 +740,12 @@ export function PostCard({ post }: PostCardProps) {
                 </div>
 
                 <div className="shrink-0 border-t border-white/[0.08] bg-[#0b0f18] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
-                  <p className="mb-2 flex items-center justify-center gap-1 text-center text-[10px] font-medium tracking-wide text-zinc-500">
+                  <p className="mb-2 flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[10px] font-medium tracking-wide text-zinc-500">
                     <span>Posting sends</span>
-                    <span className="text-violet-200/90">0.01 SNAP</span>
+                    <span className="inline-flex items-center gap-0.5 text-zinc-200">
+                      0.01 <MusdInlineIcon size={11} decorative />
+                    </span>
+                    <span className="text-violet-200/90">(~{tipSnapLabel} SNAP)</span>
                     <span>on-chain</span>
                   </p>
                   <div className="flex items-end gap-2">
@@ -636,7 +776,7 @@ export function PostCard({ post }: PostCardProps) {
                     />
                     <button
                       type="button"
-                      disabled={isBusy || !commentDraft.trim()}
+                      disabled={isBusy || !commentDraft.trim() || tipSnapWei === undefined}
                       onClick={handleSubmitComment}
                       className="mb-1 shrink-0 px-2 py-1.5 text-sm font-semibold text-[#0095f6] transition enabled:hover:text-[#47b8ff] disabled:cursor-not-allowed disabled:opacity-35"
                     >

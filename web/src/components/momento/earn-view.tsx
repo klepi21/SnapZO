@@ -30,8 +30,9 @@ export function EarnView() {
               <span className="font-medium text-zinc-300">MUSD</span>
             </span>{" "}
             into the pooled strategy and receive{" "}
-            <span className="font-medium text-zinc-300">SNAP</span>. You approve once, sign a
-            message, and a relayer pays gas to complete the tx.
+            <span className="font-medium text-zinc-300">SNAP</span>{" "}
+            <span className="text-zinc-500">(6 decimals — friendlier whole numbers than 18d shares).</span>{" "}
+            You approve once, sign a message, and a relayer pays gas to complete the tx.
           </p>
           <p className="mt-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2.5 text-xs leading-relaxed text-zinc-400">
             <span className="font-medium text-violet-200/95">Creators:</span>{" "}

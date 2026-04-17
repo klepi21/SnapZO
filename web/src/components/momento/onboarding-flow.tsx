@@ -19,8 +19,8 @@ const steps = [
     title: `Welcome to ${APP_NAME}`,
     icon: Sparkles,
     body: [
-      "SnapZo is a social feed on Mezo testnet: share photos, optional paid unlocks, and creator support — powered by a SNAP economy on the feed and MUSD in the Earn hub.",
-      "Fans use SNAP for likes, replies, and unlocks. SNAP comes from depositing MUSD into the SnapZo hub, where principal tracks Mezo yield strategies.",
+      "SnapZo is a social feed on Mezo testnet: share photos, optional paid unlocks, and creator support — MUSD-quoted prices on the feed, SNAP transfers in the wallet, pooled MUSD in the Earn hub.",
+      "SNAP is a 6-decimal hub share token: deposit MUSD on Earn to mint it; tips and unlocks send SNAP to creators at the live pool ratio so the quoted MUSD value clears on-chain.",
     ],
   },
   {
@@ -28,8 +28,8 @@ const steps = [
     title: "SNAP on the feed, MUSD in the hub",
     icon: Wallet,
     body: [
-      "SNAP is your in-app share token: transfer it to tip, comment, or unlock just like any ERC-20 — creators receive SNAP directly.",
-      "MUSD is Mezo’s Bitcoin-backed stablecoin. Deposit MUSD on Earn to mint SNAP; withdraw later for MUSD. You always sign transfers in your own wallet.",
+      "You always sign ERC-20 transfers in your wallet: for social actions that means sending SNAP, even when the UI shows a MUSD price.",
+      "MUSD is Mezo’s Bitcoin-backed stablecoin. Deposit MUSD on Earn to mint 6-decimal SNAP; withdraw later for MUSD. Larger whole-number SNAP balances than old 18-decimal shares.",
     ],
   },
   {
@@ -37,7 +37,7 @@ const steps = [
     title: "How creators earn",
     icon: Coins,
     body: [
-      "Fans pay you in SNAP on the feed — tips, unlocks, and paid replies all land as SNAP in your wallet.",
+      "Fans see MUSD quotes; tips, unlocks, and paid replies settle as SNAP in your wallet at the hub ratio.",
       APP_CREATOR_REVENUE_EXPLAINER,
       "If you keep SNAP instead of redeeming to MUSD right away, your balance stays in the same yield-bearing pool — more upside over time versus immediately cashing out.",
     ],
@@ -48,7 +48,7 @@ const steps = [
     icon: Sparkles,
     body: [
       "Connect your wallet from the feed when you are ready. Explore the demo feed, try create post, and tune your profile.",
-      "Nothing here mints NFTs for your photos by default — normal uploads plus transparent SNAP prices you control.",
+      "Nothing here mints NFTs for your photos by default — normal uploads plus transparent MUSD-quoted unlocks you control.",
     ],
   },
 ] as const;

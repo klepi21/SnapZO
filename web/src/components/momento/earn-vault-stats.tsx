@@ -14,17 +14,27 @@ import {
   mezoMusdVaultAbi,
   mezoSmusdGaugeAbi,
 } from "@/lib/constants/mezo-earn";
-import { MUSD_DECIMALS } from "@/lib/constants/musd";
+import {
+  erc20BalanceAbi,
+  MUSD_ADDRESS_MEZO_TESTNET,
+  MUSD_DECIMALS,
+} from "@/lib/constants/musd";
 import {
   erc20TotalSupplyAbi,
   SNAPZO_HUB_ADDRESS,
   SNAPZO_SNAP_TOKEN_ADDRESS,
-  snapZoHubWithdrawEventAbi,
 } from "@/lib/constants/snapzo-hub";
+import { SNAP_ONE_IN_BASE_UNITS } from "@/lib/snapzo/musd-snap-quote";
 import { wagmiConfig } from "@/lib/wagmi/config";
 
 const WAD = BigInt("1000000000000000000");
 const z = BigInt(0);
+
+/** One full sMUSD vault share (18 decimals on Mezo testnet). */
+const ONE_SMUSD_SHARE_WEI = WAD;
+
+/** sMUSD share token uses 18 decimals on Mezo (same as MUSD). */
+const SMUSD_DECIMALS = 18;
 
 function formatUnitsMax2dp(value: bigint | undefined, decimals: number): string {
   if (value === undefined) {
@@ -45,6 +55,26 @@ function formatUnitsMax2dp(value: bigint | undefined, decimals: number): string 
   return `${intPart}.${fracTrim}`;
 }
 
+/** Human amount with up to `fractionDigits` fractional digits (trim trailing zeros). */
+function formatBigintFixed(
+  value: bigint | undefined,
+  decimals: number,
+  fractionDigits: number,
+): string {
+  if (value === undefined) {
+    return "—";
+  }
+  const full = formatUnits(value, decimals);
+  const dot = full.indexOf(".");
+  if (dot === -1) {
+    return full;
+  }
+  const intPart = full.slice(0, dot);
+  const fracRaw = full.slice(dot + 1, dot + 1 + fractionDigits);
+  const frac = fracRaw.replace(/0+$/, "");
+  return frac.length > 0 ? `${intPart}.${frac}` : intPart;
+}
+
 /** Up to 3 fractional digits, trim trailing zeros (MUSD wei → display). */
 function formatMusdWeiUpTo3(musdWei: bigint | undefined): string {
   if (musdWei === undefined) {
@@ -61,106 +91,72 @@ function formatMusdWeiUpTo3(musdWei: bigint | undefined): string {
   return frac.length > 0 ? `${intPart}.${frac}` : `${intPart}`;
 }
 
-type SnapPreviewResult =
-  | { kind: "ok"; musdWei: bigint; source: "vault-view" | "on-chain-withdraw" }
-  | { kind: "dust" }
+type SmusdMusdRateResult =
+  | {
+      kind: "ok";
+      /** MUSD wei per `ONE_SMUSD_SHARE_WEI` (1e18) vault shares — vault view or TVL ratio. */
+      musdWeiPerSmusd: bigint;
+      source: "vault-view" | "vault-linear";
+    }
   | { kind: "fail"; message: string };
 
-async function fetchLatestWithdrawMusdPerSnap(
-  client: NonNullable<ReturnType<typeof getPublicClient>>,
-): Promise<bigint | null> {
-  const head = await client.getBlockNumber();
-  const spans = [BigInt(80_000), BigInt(400_000), BigInt(2_000_000)];
-
-  for (const span of spans) {
-    const fromBlock = head > span ? head - span : z;
-    try {
-      const events = await client.getContractEvents({
-        address: SNAPZO_HUB_ADDRESS,
-        abi: snapZoHubWithdrawEventAbi,
-        eventName: "Withdraw",
-        fromBlock,
-        toBlock: head,
-        strict: true,
-      });
-      if (events.length === 0) {
-        continue;
-      }
-      const sorted = [...events].sort((a, b) => {
-        const ab = a.blockNumber;
-        const bb = b.blockNumber;
-        if (ab < bb) {
-          return -1;
-        }
-        if (ab > bb) {
-          return 1;
-        }
-        const ai = a.logIndex ?? 0;
-        const bi = b.logIndex ?? 0;
-        return ai < bi ? -1 : ai > bi ? 1 : 0;
-      });
-      const last = sorted[sorted.length - 1];
-      const { sharesBurned, musdOut } = last.args;
-      if (sharesBurned === z) {
-        continue;
-      }
-      return (musdOut * WAD) / sharesBurned;
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
-
-async function fetchMusdForOneSnap(totalS: bigint, snapSupply: bigint): Promise<SnapPreviewResult> {
-  if (snapSupply === z) {
-    return { kind: "fail", message: "No SNAP supply" };
-  }
-  if (totalS === z) {
-    return { kind: "ok", musdWei: z, source: "vault-view" };
-  }
-  const shares = (totalS * WAD) / snapSupply;
-  if (shares === z) {
-    return { kind: "dust" };
-  }
-
+async function fetchMusdPerOneSmusd(): Promise<SmusdMusdRateResult> {
   const client = getPublicClient(wagmiConfig, { chainId: mezoTestnet.id });
   if (!client) {
     return { kind: "fail", message: "No RPC client" };
   }
 
+  const readOpts = { chain: mezoTestnet } as const;
   const base = {
     address: MEZO_MUSD_VAULT,
     abi: mezoMusdVaultAbi,
-    args: [shares] as const,
+    args: [ONE_SMUSD_SHARE_WEI] as const,
   } as const;
 
-  const readOpts = { chain: mezoTestnet } as const;
-
   try {
-    const musdWei = await client.readContract({
+    const musdWeiPerSmusd = await client.readContract({
       ...readOpts,
       ...base,
       functionName: "previewRedeem",
     });
-    return { kind: "ok", musdWei, source: "vault-view" };
+    return { kind: "ok", musdWeiPerSmusd, source: "vault-view" };
   } catch {
     try {
-      const musdWei = await client.readContract({
+      const musdWeiPerSmusd = await client.readContract({
         ...readOpts,
         ...base,
         functionName: "convertToAssets",
       });
-      return { kind: "ok", musdWei, source: "vault-view" };
+      return { kind: "ok", musdWeiPerSmusd, source: "vault-view" };
     } catch {
-      const fromLog = await fetchLatestWithdrawMusdPerSnap(client);
-      if (fromLog !== null) {
-        return { kind: "ok", musdWei: fromLog, source: "on-chain-withdraw" };
+      try {
+        const [vaultTotalSupply, musdInVault] = await Promise.all([
+          client.readContract({
+            ...readOpts,
+            address: MEZO_MUSD_VAULT,
+            abi: mezoMusdVaultAbi,
+            functionName: "totalSupply",
+          }),
+          client.readContract({
+            ...readOpts,
+            address: MUSD_ADDRESS_MEZO_TESTNET,
+            abi: erc20BalanceAbi,
+            functionName: "balanceOf",
+            args: [MEZO_MUSD_VAULT],
+          }),
+        ]);
+        if (vaultTotalSupply > z) {
+          const rawLinear = (musdInVault * ONE_SMUSD_SHARE_WEI) / vaultTotalSupply;
+          if (rawLinear > z) {
+            return { kind: "ok", musdWeiPerSmusd: rawLinear, source: "vault-linear" };
+          }
+        }
+      } catch {
+        /* fall through */
       }
       return {
         kind: "fail",
-        message:
-          "Vault preview reverted and no Withdraw logs found in recent blocks.",
+        message: "Could not read MUSD per 1 sMUSD (vault preview reverted).",
       };
     }
   }
@@ -209,12 +205,18 @@ export function EarnVaultStats() {
   const stIdle = data?.[2]?.status === "success" ? data[2].result : undefined;
   const snapSupply = data?.[3]?.status === "success" ? data[3].result : undefined;
 
-  const totalS = useMemo(() => {
+  const totalSmusdWei = useMemo(() => {
     if (stStaked === undefined || stIdle === undefined) {
       return undefined;
     }
     return stStaked + stIdle;
   }, [stIdle, stStaked]);
+
+  const smusdMusdRateQuery = useQuery({
+    queryKey: ["earnSmusdMusdPerFullShare", mezoTestnet.id] as const,
+    queryFn: () => fetchMusdPerOneSmusd(),
+    staleTime: 30_000,
+  });
 
   const baseReadsReady =
     data !== undefined &&
@@ -223,71 +225,60 @@ export function EarnVaultStats() {
     data[2]?.status === "success" &&
     data[3]?.status === "success";
 
-  const previewEnabled =
-    baseReadsReady &&
-    totalS !== undefined &&
-    snapSupply !== undefined &&
-    snapSupply > z;
+  const musdWeiPerSmusd =
+    smusdMusdRateQuery.data?.kind === "ok" ? smusdMusdRateQuery.data.musdWeiPerSmusd : undefined;
 
-  const previewQuery = useQuery({
-    queryKey: [
-      "earnSnapRedeemPreview",
-      hub,
-      totalS?.toString() ?? "x",
-      snapSupply?.toString() ?? "x",
-    ] as const,
-    queryFn: () => fetchMusdForOneSnap(totalS!, snapSupply!),
-    enabled: Boolean(previewEnabled && totalS !== undefined && snapSupply !== undefined),
-    staleTime: 30_000,
-  });
+  const smusdPerSnapWei = useMemo(() => {
+    if (totalSmusdWei === undefined || snapSupply === undefined || snapSupply === z) {
+      return undefined;
+    }
+    return (totalSmusdWei * SNAP_ONE_IN_BASE_UNITS) / snapSupply;
+  }, [snapSupply, totalSmusdWei]);
+
+  const musdWeiPerSnap = useMemo(() => {
+    if (musdWeiPerSmusd === undefined || smusdPerSnapWei === undefined || smusdPerSnapWei === z) {
+      return undefined;
+    }
+    return (musdWeiPerSmusd * smusdPerSnapWei) / ONE_SMUSD_SHARE_WEI;
+  }, [musdWeiPerSmusd, smusdPerSnapWei]);
 
   const loading = isPending && !data;
 
-  const snapToMusd = (() => {
-    if (!baseReadsReady || snapSupply === undefined) {
-      return loading ? "…" : "—";
-    }
-    if (snapSupply === z) {
-      return "—";
-    }
-    if (totalS === undefined) {
-      return "…";
-    }
-    if (totalS === z) {
-      return "0";
-    }
-    if ((totalS * WAD) / snapSupply === z) {
-      return "—";
-    }
-    if (previewQuery.isPending) {
-      return "…";
-    }
-    if (previewQuery.isError) {
-      return "—";
-    }
-    const r = previewQuery.data;
-    if (!r) {
-      return "—";
-    }
-    if (r.kind === "fail") {
-      return "—";
-    }
-    if (r.kind === "dust") {
-      return "—";
-    }
-    return formatMusdWeiUpTo3(r.musdWei);
-  })();
+  const smusdRateLabel =
+    smusdMusdRateQuery.isPending || smusdMusdRateQuery.isFetching
+      ? "…"
+      : smusdMusdRateQuery.data?.kind === "ok"
+        ? formatMusdWeiUpTo3(musdWeiPerSmusd)
+        : "—";
 
-  const ratioPending = previewEnabled && previewQuery.isPending;
+  const snapToMusdLabel =
+    !baseReadsReady || snapSupply === undefined || snapSupply === z
+      ? loading
+        ? "…"
+        : "—"
+      : totalSmusdWei === undefined || totalSmusdWei === z
+        ? "0"
+        : smusdPerSnapWei === undefined || smusdPerSnapWei === z
+          ? "—"
+          : smusdMusdRateQuery.isPending || smusdMusdRateQuery.isFetching
+            ? "…"
+            : musdWeiPerSnap !== undefined
+              ? formatMusdWeiUpTo3(musdWeiPerSnap)
+              : "—";
 
-  const previewHint =
-    previewQuery.data?.kind === "ok"
-      ? previewQuery.data.source === "on-chain-withdraw"
-        ? "MUSD per SNAP from the latest hub Withdraw event (actual payout rate for that tx)."
-        : "Vault view for the same sMUSD slice as a 1 SNAP withdraw."
-      : previewQuery.data?.kind === "fail"
-        ? previewQuery.data.message
-        : "Vault quote or latest on-chain withdraw.";
+  const smusdRateHint =
+    smusdMusdRateQuery.data?.kind === "ok"
+      ? smusdMusdRateQuery.data.source === "vault-linear"
+        ? "MUSD.balanceOf(MUSD vault) × 1 sMUSD ÷ vault.totalSupply. On testnet `previewRedeem` reverts; this TVL ratio is what we can read on-chain (actual `withdraw` payouts can differ)."
+        : "From vault previewRedeem / convertToAssets for 1 full sMUSD (1e18 shares)."
+      : smusdMusdRateQuery.data?.kind === "fail"
+        ? smusdMusdRateQuery.data.message
+        : "Vault preview or TVL ratio for 1 sMUSD.";
+
+  const snapHint =
+    musdWeiPerSnap !== undefined && musdWeiPerSmusd !== undefined && smusdPerSnapWei !== undefined
+      ? "(Hub sMUSD per 1 SNAP) × (MUSD per 1 sMUSD). Hub sMUSD = gauge.balanceOf(hub) + vault.balanceOf(hub); per-SNAP slice = total × 1e6 ÷ SNAP supply."
+      : "Need hub sMUSD position and SNAP supply.";
 
   return (
     <section
@@ -302,15 +293,27 @@ export function EarnVaultStats() {
         </p>
       ) : (
         <dl className="mt-4 space-y-3">
+          <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
+            <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              Hub sMUSD total (gauge + vault)
+            </dt>
+            <dd className="mt-1 font-mono text-lg font-semibold tabular-nums text-emerald-200/95">
+              {loading || totalSmusdWei === undefined ? "…" : formatBigintFixed(totalSmusdWei, SMUSD_DECIMALS, 6)}
+            </dd>
+            <p className="mt-1.5 text-[10px] leading-snug text-zinc-600">
+              Staked{" "}
+              <span className="font-mono text-zinc-400">
+                {loading ? "…" : formatBigintFixed(stStaked, SMUSD_DECIMALS, 6)}
+              </span>
+              {" · "}
+              Idle on vault{" "}
+              <span className="font-mono text-zinc-400">
+                {loading ? "…" : formatBigintFixed(stIdle, SMUSD_DECIMALS, 6)}
+              </span>
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
-              <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                Hub sMUSD staked
-              </dt>
-              <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-emerald-200/90">
-                {loading ? "…" : formatUnitsMax2dp(stStaked, MUSD_DECIMALS)}
-              </dd>
-            </div>
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
               <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
                 Hub pending rewards
@@ -319,35 +322,54 @@ export function EarnVaultStats() {
                 {loading ? "…" : formatUnitsMax2dp(pendingRewards, MUSD_DECIMALS)}
               </dd>
             </div>
+            <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                SNAP total supply
+              </dt>
+              <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-zinc-200">
+                {loading || snapSupply === undefined ? "…" : formatBigintFixed(snapSupply, 6, 4)}
+              </dd>
+            </div>
           </div>
+
           <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
             <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-              1 SNAP → MUSD
+              1 sMUSD → MUSD
             </dt>
             <dd className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-base font-semibold tabular-nums text-white">
-              {ratioPending ? (
-                "…"
-              ) : (
-                <>
-                  <span>{snapToMusd}</span>
-                  <MusdInlineIcon
-                    size={18}
-                    decorative
-                    className="shrink-0 rounded-full object-cover"
-                  />
-                  <span className="text-sm font-medium text-zinc-300">MUSD</span>
-                </>
-              )}
+              <span>{smusdRateLabel}</span>
+              <MusdInlineIcon
+                size={18}
+                decorative
+                className="shrink-0 rounded-full object-cover"
+              />
+              <span className="text-sm font-medium text-zinc-300">MUSD</span>
             </dd>
             <p
               className={`mt-2 text-[10px] leading-snug ${
-                previewQuery.data?.kind === "fail"
+                smusdMusdRateQuery.data?.kind === "fail"
                   ? "text-amber-200/80"
                   : "text-zinc-600"
               }`}
             >
-              {previewHint}
+              {smusdRateHint}
             </p>
+          </div>
+
+          <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
+            <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              1 SNAP → MUSD (implied)
+            </dt>
+            <dd className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-base font-semibold tabular-nums text-white">
+              <span>{snapToMusdLabel}</span>
+              <MusdInlineIcon
+                size={18}
+                decorative
+                className="shrink-0 rounded-full object-cover"
+              />
+              <span className="text-sm font-medium text-zinc-300">MUSD</span>
+            </dd>
+            <p className="mt-2 text-[10px] leading-snug text-zinc-600">{snapHint}</p>
           </div>
         </dl>
       )}

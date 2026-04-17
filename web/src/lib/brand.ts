@@ -4,20 +4,20 @@ export const APP_NAME = "snapzo";
 
 /** Splash / marketing one-liner */
 export const APP_SPLASH_TAGLINE =
-  "Tip and unlock with SNAP while your MUSD keeps growing in the hub — on Mezo testnet.";
+  "Prices show in MUSD; the wallet settles in SNAP (6-decimal hub shares) while your savings stay in the hub — Mezo testnet.";
 
 /** Short blurb under the logo in the feed header (single readable line) */
 export const APP_FEED_BLURB =
-  "SNAP on the feed · MUSD + yield in the hub until you cash out (testnet).";
+  "MUSD-quoted tips & unlocks · SNAP settlement · pooled MUSD yield in the hub (testnet).";
 
 /**
- * Creator economics (honest to how the hub works): in-app payments are SNAP transfers,
- * but SNAP is the hub receipt over pooled MUSD in the Mezo strategy — so creators hold
- * MUSD-linked value that keeps earning with the pool until they redeem SNAP for MUSD.
+ * Creator economics: unlocks and tips are quoted in MUSD for clarity, but fans send SNAP
+ * on-chain at the live hub ratio. SNAP is a 6-decimal hub receipt over pooled MUSD, so
+ * creators hold MUSD-linked value until they redeem SNAP for MUSD.
  */
 export const APP_CREATOR_REVENUE_EXPLAINER =
-  "Fans pay you in SNAP inside SnapZo. SNAP is not random points — it is the hub share token, so every SNAP represents a slice of the pooled MUSD vault. While you hold SNAP, your slice rides Mezo yield with everyone else; withdrawing turns it back into MUSD when you want spendable stablecoin.";
+  "Fans see MUSD prices on the feed; their wallet sends the matching SNAP amount. SNAP is the hub share token — each unit is a slice of pooled MUSD + strategy yield. While you hold SNAP, your slice rides with the pool; withdrawing turns it back into MUSD when you want spendable stablecoin.";
 
 /** One line for tight UI (banners, footnotes). */
 export const APP_CREATOR_REVENUE_ONE_LINER =
-  "Creators see SNAP: each token is hub-backed MUSD + strategy yield until you redeem.";
+  "Creators receive SNAP (6 decimals) priced against MUSD quotes at the live hub rate.";

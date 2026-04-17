@@ -13,6 +13,11 @@ contract SnapToken is ERC20 {
         minter = minter_;
     }
 
+    /// @notice 6 decimals so on-chain amounts stay human-sized (1 MUSD → 1e6 base units on first mint).
+    function decimals() public pure override returns (uint8) {
+        return 6;
+    }
+
     modifier onlyMinter() {
         if (msg.sender != minter) revert SnapToken__NotMinter();
         _;

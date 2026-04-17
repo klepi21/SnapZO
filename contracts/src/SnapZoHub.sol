@@ -28,6 +28,8 @@ contract SnapZoHub is
     using SafeERC20 for IERC20;
 
     uint256 public constant MIN_DEPOSIT = 1 ether;
+    /// @dev MUSD is 18 decimals, SNAP is 6 — first mint maps 1 MUSD : 1 SNAP (human) via `assets / 1e12`.
+    uint256 public constant MUSD_WEI_PER_SNAP_UNIT = 1e12;
     uint256 public constant BPS = 10_000;
     uint16 public constant MAX_FEE_BPS = 1_000;
 
@@ -377,7 +379,12 @@ contract SnapZoHub is
         uint256 ta = totalAssets();
         uint256 ts = snapToken.totalSupply();
         musd.safeTransferFrom(user, address(this), assets);
-        uint256 shares = ts == 0 ? assets : Math.mulDiv(assets, ts, ta, Math.Rounding.Floor);
+        uint256 shares;
+        if (ts == 0) {
+            shares = assets / MUSD_WEI_PER_SNAP_UNIT;
+        } else {
+            shares = Math.mulDiv(assets, ts, ta, Math.Rounding.Floor);
+        }
         if (shares == 0) revert SnapZoHub__ZeroShares();
         snapToken.mint(user, shares);
         _pushToStrategy(assets);

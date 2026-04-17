@@ -90,7 +90,8 @@ contract SnapZoHubTest is Test {
         vm.prank(relayer);
         hub.depositWithSig(alice, assets, 0, deadline, sig);
 
-        assertEq(hub.snapToken().balanceOf(alice), assets);
+        uint256 expectedSnap = assets / 1e12;
+        assertEq(hub.snapToken().balanceOf(alice), expectedSnap);
         assertEq(gauge.balanceOf(address(hub)), assets);
         assertEq(musd.balanceOf(alice), 100 ether - assets);
     }
