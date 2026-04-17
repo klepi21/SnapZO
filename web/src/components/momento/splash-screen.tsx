@@ -11,7 +11,8 @@ import {
 } from "@/lib/brand";
 import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
-const SNAP_HERO_LOGO_PX = 280;
+/** Intrinsic size for `next/image` (display is capped by viewport). */
+const SNAP_HERO_LOGO_PX = 560;
 
 export function SplashScreen() {
   const [startedHref, setStartedHref] = useState("/onboarding");
@@ -34,20 +35,20 @@ export function SplashScreen() {
 
       <div className="relative flex flex-1 flex-col items-center px-6 pb-10 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <div className="relative z-10 flex w-full flex-1 flex-col items-center justify-center text-center">
-          <div className="relative mx-auto flex h-[min(52dvh,360px)] w-full max-w-[360px] items-center justify-center">
+          <div className="relative mx-auto flex min-h-[min(52dvh,620px)] w-full max-w-[min(560px,calc(100vw-3rem))] items-center justify-center">
             <div
-              className="pointer-events-none absolute inset-[10%] rounded-full bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.22),transparent_62%)] blur-2xl"
+              className="pointer-events-none absolute inset-[8%] rounded-full bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.22),transparent_62%)] blur-3xl"
               aria-hidden
             />
-            <div className="relative rounded-full p-[10px] shadow-[0_28px_90px_rgba(0,0,0,0.65)] ring-1 ring-white/12 ring-offset-0">
+            <div className="relative rounded-full p-3 shadow-[0_28px_90px_rgba(0,0,0,0.65)] ring-1 ring-white/12 ring-offset-0">
               <Image
                 src="/snap-token-logo.png"
                 alt="SnapZO"
                 width={SNAP_HERO_LOGO_PX}
                 height={SNAP_HERO_LOGO_PX}
                 priority
-                className="h-[min(46vw,280px)] w-[min(46vw,280px)] max-h-[280px] max-w-[280px] rounded-full object-cover"
-                sizes="280px"
+                className="aspect-square w-full max-w-[min(560px,calc(100vw-3rem))] rounded-full object-cover"
+                sizes="(max-width: 430px) min(382px, 100vw), 560px"
               />
             </div>
           </div>
