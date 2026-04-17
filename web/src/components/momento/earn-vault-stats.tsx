@@ -7,6 +7,7 @@ import { useReadContracts } from "wagmi";
 import { getPublicClient } from "wagmi/actions";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { MezoInlineIcon } from "@/components/icons/mezo-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { HelpPopover } from "@/components/ui/help-popover";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
@@ -322,8 +323,9 @@ export function EarnVaultStats() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
-              <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                Gauge pending
+              <dt className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                <MezoInlineIcon size={14} decorative />
+                MEZO Rewards
               </dt>
               <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-amber-100/90">
                 {loading ? "…" : formatUnitsMax2dp(pendingRewards, MUSD_DECIMALS)}
