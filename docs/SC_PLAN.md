@@ -274,6 +274,9 @@ This section **supersedes Part B** for the contract you are designing now: a **p
 | 2026-04-17 | **Part D row 22:** MUSD — approve baseline; optional EIP-2612 permit after on-chain verification |
 | 2026-04-17 | **Part D rows 16, 22–23 + D.3–D.4:** reward token address; `getReward` + MUSD permit + router quotes verified via RPC |
 | 2026-04-17 | **Part E:** Foundry `contracts/` — `SnapZoHub` (UUPS) + `SnapToken`, tests, deploy script |
+| 2026-04-18 | **Part F:** Q&A product spec for SNAP social economy (tips, unlocks, paid replies, relayer, UUPS) |
+| 2026-04-18 | **Part F:** paid reply stake = global `replyStakeAmount` (same pattern as `likeTipAmount`) |
+| 2026-04-18 | **Part E:** `SnapZoSocial.sol` (UUPS) + tests + `DeploySnapZoSocial.s.sol` |
 
 ## Part E — Implemented contracts (`contracts/`)
 
@@ -281,8 +284,79 @@ This section **supersedes Part B** for the contract you are designing now: a **p
 |------|----------|
 | Hub (UUPS) + EIP-712 deposit/withdraw, harvest/fee, restake (swap skipped if quote `0`) | `contracts/src/SnapZoHub.sol` |
 | SNAP ERC-20 (hub-only mint/burn) | `contracts/src/SnapToken.sol` |
+| Social economy (UUPS): tips, unlocks, reply escrow — EIP-712, relayer-only | `contracts/src/SnapZoSocial.sol` |
 | Mezo-facing interfaces | `contracts/src/interfaces/IMezo.sol` |
-| Foundry tests (mocks) | `contracts/test/SnapZoHub.t.sol`, `contracts/test/Mocks.sol` |
-| Deploy script + env | `contracts/script/DeploySnapZoHub.s.sol`, `contracts/README.md` |
+| Foundry tests (mocks) | `contracts/test/SnapZoHub.t.sol`, `contracts/test/SnapZoSocial.t.sol`, `contracts/test/Mocks.sol` |
+| Deploy script + env | `contracts/script/DeploySnapZoHub.s.sol`, `contracts/script/DeploySnapZoSocial.s.sol`, `contracts/README.md` |
 
 Build / test: `cd contracts && forge build && forge test`.
+
+---
+
+## Part F — Product spec (Q&A): **SNAP social economy** (tips, unlocks, paid replies)
+
+**Status:** agreed in product Q&A (2026-04-18). **Next implementation:** single **upgradeable** contract (working name: e.g. `SnapZoSocial`) that moves **SNAP only**, integrates with existing **`SnapToken`** + relayer pattern.
+
+### F.0 DB vs chain (important)
+
+- **Posting stays off-chain:** creators do **not** send a tx to set price; the **app DB** is the UX source of truth for “what unlock costs” and feed metadata.
+- **Security still requires a binding amount on-chain:** when a user **signs** a gasless unlock, the **EIP-712 payload must include the exact `amount` (and `postId`, `creator`, `deadline`, `nonce`, …)** that the UI read from the DB at sign time. The contract then **`transferFrom`s exactly that amount** and reverts if the signature or amount does not match. So: **no on-chain price registry**, but **no underpay unlock** either — the **signature**, not a later relayer choice, fixes the price for that action.
+- Same pattern wherever a user could otherwise cheat: **signed fields == enforced transfer**.
+
+### F.1 Scope
+
+| In | Out (v1) |
+|----|-----------|
+| **Tip (like)** — SNAP from fan → **through contract** → creator | MUSD |
+| **Unlock** — SNAP from fan → **through contract** → creator; **exact amount** from signed intent (DB-backed at sign time) | On-chain `setPrice(postId)` registry (not required) |
+| **Paid reply** — payer locks SNAP in contract; **24h**; creator **fulfills** with a **second signed tx** (no payment); else payer **refunds** | Protocol fee (**none** for v1) |
+| **Relayer-only** execution paths (whitelist like hub) | Public/open relayers |
+| **UUPS upgradeable** | — |
+| **Identifiers:** global unique **`postId`**; always pass **`creator`** alongside for safety | — |
+
+### F.2 Roles
+
+| Role | Responsibility |
+|------|------------------|
+| **Fan / payer** | Signs EIP-712 for tip, unlock, or reply-deposit |
+| **Relayer** | Submits txs, pays gas; **must** be allowlisted |
+| **Creator** | Signs EIP-712 **fulfill** for paid reply (no SNAP paid; calldata binds **`commentId`** for DB correlation) |
+| **Owner** | Relayer list, upgrades, **`likeTipAmount`** and **`replyStakeAmount`** (global, set/edit on-chain — same pattern for likes and paid replies) |
+
+### F.3 Like / tip (fixed amount on-chain)
+
+- **Decision:** tip amount is **configured on the SC** (owner **set / edit**), e.g. global `likeTipAmount` (extend later to per-post if needed).
+- **User signs** gasless data including **`postId`**, **`creator`**, **`nonce`**, **`deadline`**. Contract reads **`likeTipAmount`** from storage and pulls that much SNAP (or require signature to include amount and match storage — implementation detail).
+- **Flow:** `transferFrom(tipper → this, amount)` → `transfer(creator, amount)`, **emit event** with `postId`, `creator`, `tipper`, `amount` for indexer/DB.
+
+### F.4 Unlock
+
+- **DB** drives what the UI shows; **user signs** EIP-712 including **`unlockAmount`**, **`postId`**, **`creator`**, **`nonce`**, **`deadline`**.
+- Contract enforces **`transferFrom` == `unlockAmount`** and valid signature; forwards SNAP to **creator**, emits event.
+
+### F.5 Paid reply (escrow + creator fulfill)
+
+- **Stake amount:** **Single global `replyStakeAmount`** on the SC (owner **set / edit**), **same model as likes** — not per-request in the signature.
+- **Payer** signs EIP-712 to **open** a reply request with **`postId`**, **`creator`**, **`nonce`**, **`deadline`** (no variable amount field). Contract pulls **`replyStakeAmount`** from storage into escrow (same pattern as **`likeTipAmount`** for tips).
+- **`requestId`:** **`keccak256(abi.encode(chainId, contractAddress, postId, creator, requester, nonceRequest))`** with **`nonceRequest`** = **per-requester** nonce **incremented in the contract** at deposit (unique, replay-safe). (This is the “best default” for **E**.)
+- **`deadlineReply`:** store **`block.timestamp + 24 hours`** at deposit.
+- **Creator fulfill:** creator signs **`FulfillReply(requestId, commentId, deadline)`** — relayer submits; contract releases escrowed **`replyStakeAmount`** to **creator**; event includes **`commentId`** for DB.
+- **Refund:** after 24h if not fulfilled, **requester** signs **`RefundReply(requestId)`** (or equivalent); **`replyStakeAmount`** returned to requester.
+
+### F.6 SNAP / hub integration notes
+
+- Moves use **SNAP** `transferFrom` / `transfer`. **`SnapZoHub`** updates **MEZO reward debt** on SNAP transfer via **`snapTransferHook`** — escrow **holds** SNAP briefly; hooks still apply on each transfer.
+
+### F.7 Fees & upgrades
+
+| Topic | Decision |
+|-------|----------|
+| **Protocol fee** | **0%** (v1) |
+| **Contract count** | **One** upgradeable contract |
+| **Upgrade pattern** | **UUPS** (align with `SnapZoHub`) |
+
+### F.8 Minor choices left to implementation
+
+1. **Like / reply stake:** amount enforced from **storage only** vs **also duplicated in signature** for extra safety — storage-only means fewer fields; users mid-sign must handle owner changing **`likeTipAmount`** / **`replyStakeAmount`** (same tradeoff for both globals).
+
+**Locked for v1:** paid reply uses **global `replyStakeAmount`** (not variable per request).

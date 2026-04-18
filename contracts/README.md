@@ -2,6 +2,8 @@
 
 UUPS-upgradeable **`SnapZoHub`** plus immutable **`SnapToken` (`SNAP`)** minted on first `initialize`. Relayers submit **EIP-712** `deposit` / `withdraw`; **owner or relayer** may **harvest** and **restake**. See `../docs/SC_PLAN.md` Part D for product rules.
 
+**`SnapZoSocial`** (UUPS) routes **SNAP** for **tips**, **unlocks**, and **paid-reply escrow** (Part F). Relayer-only; same whitelist pattern as the hub. Deploy **after** the hub exists and point **`SNAP_TOKEN`** at `hub.snapToken()`.
+
 **SNAP (18 decimals):** each deposit mints SNAP **1:1 with the hub’s increase in sMUSD wei** (gauge + vault) after routing MUSD through the vault — so MUSD→SNAP count follows the vault’s **MUSD→sMUSD** exchange (e.g. 100 MUSD can mint ~500 SNAP if the vault mints ~500 sMUSD). Withdrawals still burn SNAP **pro‑rata** against hub sMUSD and redeem through the vault for MUSD.
 
 ## Requirements
@@ -61,6 +63,23 @@ forge script script/DeploySnapZoHub.s.sol:DeploySnapZoHub \
   --broadcast
 ```
 
+### Deploy `SnapZoSocial` (after hub + SNAP exist)
+
+```bash
+export PRIVATE_KEY=0xYOUR_KEY_HERE
+export SNAP_TOKEN=0x...   # hub.snapToken()
+# optional defaults: 1 ether / 2 ether
+# export LIKE_TIP_AMOUNT_WEI=1000000000000000000
+# export REPLY_STAKE_AMOUNT_WEI=2000000000000000000
+# export RELAYER=0x...
+
+forge script script/DeploySnapZoSocial.s.sol:DeploySnapZoSocial \
+  --rpc-url https://rpc.test.mezo.org \
+  --broadcast
+```
+
+Users must **`approve(SNAP → SnapZoSocial proxy)`** before relayers can execute `tipWithSig` / `unlockWithSig` / `replyDepositWithSig`.
+
 **Deploy right now (checklist)**
 
 1. **Remove any real key from git** — if you pasted a live `PRIVATE_KEY` into this repo, **rotate that key** (generate a new deployer wallet) and treat the old one as leaked. Never commit keys; use `export` in the terminal or a **gitignored** `contracts/.env` (see `.gitignore`).
@@ -79,6 +98,17 @@ forge script script/DeploySnapZoHub.s.sol:DeploySnapZoHub \
 - Proxy deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x9016570537f8e8b250a7026b1bfe0e4147a905508da2a9ea8f26fec75199acdf)  
 - Impl deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x69a2dc638b2f0ee29fb32edf99b90eb752028fe27bdf96bf3aa4a14ae625638d)  
 - `contracts/cache/` may contain **sensitive** script metadata — keep it **gitignored** (already under `cache/`).
+
+### Deployed `SnapZoSocial` (Mezo testnet, chain 31611 — 2026-04-18)
+
+| Role | Address |
+|------|---------|
+| **Social (proxy — tips / unlocks / reply escrow)** | `0xee3294D7B254066E172F820B0389e8a39E59D56A` |
+| **Implementation** | `0xa34e98C13A5CEf9E27a7F2eE353CC053da033645` |
+
+- Proxy deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x25b63e842547688b58e5126e708cde5cf344ab4508a54f59252517eb84919697)  
+- Impl deploy tx: [explorer](https://explorer.test.mezo.org/tx/0xb5d3ead51c0cff544b0c182fed82f75bcfffeefcf22903021eac11cc49a57fbf)  
+- Block: **12430314**
 
 After deploy: **whitelist relayer addresses** on the hub (`setRelayer`), have users **approve MUSD → hub** (and optionally use **MUSD `permit`** in the same tx via `depositWithSigAndPermit`), and **`encode` restake router routes** when liquidity exists (`setRestakeRoutes` while **paused**).
 
@@ -111,3 +141,15 @@ Deploy new `SnapZoHub` implementation, then `UUPSUpgradeable.upgradeToAndCall` (
   - `Withdraw(address user,uint256 snapAmount,uint256 nonce,uint256 deadline)`  
 
 Primary-type name must match the **typehash strings** in `SnapZoHub.sol`.
+
+### `SnapZoSocial` typed data
+
+- **Domain:** `name` = `SnapZoSocial`, `version` = `1`, `chainId`, `verifyingContract` = social **proxy** address.  
+- **Types** (see `SnapZoSocial.sol`):  
+  - `Tip(address tipper,uint256 postId,address creator,uint256 nonce,uint256 deadline)`  
+  - `Unlock(address unlocker,uint256 postId,address creator,uint256 amount,uint256 nonce,uint256 deadline)`  
+  - `ReplyDeposit(address payer,uint256 postId,address creator,uint256 nonce,uint256 deadline)`  
+  - `FulfillReply(address creator,bytes32 requestId,uint256 commentId,uint256 nonce,uint256 deadline)`  
+  - `RefundReply(address requester,bytes32 requestId,uint256 nonce,uint256 deadline)`  
+
+**`requestId`** for reply flows: `keccak256(abi.encode(chainId, social, postId, creator, payer, nonceUsed))` where `nonceUsed` is the **signed** `nonce` at deposit time (matches `nonces[payer]` before increment).

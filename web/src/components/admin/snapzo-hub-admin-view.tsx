@@ -25,6 +25,7 @@ import {
 } from "wagmi";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { MezoInlineIcon } from "@/components/icons/mezo-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
@@ -37,14 +38,19 @@ import {
   MUSD_DECIMALS,
 } from "@/lib/constants/musd";
 import { snapZoHubAdminAbi } from "@/lib/constants/snapzo-hub-admin-abi";
+import { snapZoSocialAdminAbi } from "@/lib/constants/snapzo-social-admin-abi";
 import {
   isSnapZoHubConfigured,
+  isSnapZoSocialConfigured,
+  SNAP_DECIMALS,
   SNAPZO_HUB_ADDRESS,
   SNAPZO_HUB_DEPLOY_BLOCK,
+  SNAPZO_SOCIAL_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
 import { fetchHubRelayerRows } from "@/lib/snapzo/hub-relayers-from-chain";
 
 const hub = SNAPZO_HUB_ADDRESS;
+const social = SNAPZO_SOCIAL_ADDRESS;
 
 /** Mezo MUSD vault shares (sMUSD) use 18 decimals. */
 const SMUSD_DECIMALS = 18;
@@ -106,6 +112,7 @@ export function SnapZoHubAdminView() {
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
   const hubOk = isSnapZoHubConfigured();
+  const socialOk = isSnapZoSocialConfigured();
 
   const relayersListQuery = useQuery({
     queryKey: ["snapzoHubRelayers", hub, String(SNAPZO_HUB_DEPLOY_BLOCK)] as const,
@@ -136,6 +143,10 @@ export function SnapZoHubAdminView() {
   const [intReward, setIntReward] = useState("");
   const [routesHex, setRoutesHex] = useState("");
   const [feePayoutTo, setFeePayoutTo] = useState("");
+  const [likeTipIn, setLikeTipIn] = useState("");
+  const [replyStakeIn, setReplyStakeIn] = useState("");
+  const [socialRelayerIn, setSocialRelayerIn] = useState("");
+  const [socialRelayerAllowed, setSocialRelayerAllowed] = useState(true);
 
   const wrongChain = isConnected && chainId !== mezoTestnet.id;
 
@@ -160,6 +171,23 @@ export function SnapZoHubAdminView() {
     },
   });
 
+  const socialReads = useReadContracts({
+    contracts: [
+      { chainId: mezoTestnet.id, address: social, abi: snapZoSocialAdminAbi, functionName: "owner" },
+      { chainId: mezoTestnet.id, address: social, abi: snapZoSocialAdminAbi, functionName: "paused" },
+      { chainId: mezoTestnet.id, address: social, abi: snapZoSocialAdminAbi, functionName: "likeTipAmount" },
+      { chainId: mezoTestnet.id, address: social, abi: snapZoSocialAdminAbi, functionName: "replyStakeAmount" },
+      { chainId: mezoTestnet.id, address: social, abi: snapZoSocialAdminAbi, functionName: "snapToken" },
+      { chainId: mezoTestnet.id, address: social, abi: snapZoSocialAdminAbi, functionName: "REPLY_WINDOW" },
+    ],
+    query: {
+      enabled: socialOk,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
   const owner = hubReads.data?.[0]?.status === "success" ? hubReads.data[0].result : undefined;
   const paused = hubReads.data?.[1]?.status === "success" ? hubReads.data[1].result : undefined;
   const feeBps = hubReads.data?.[2]?.status === "success" ? hubReads.data[2].result : undefined;
@@ -170,6 +198,19 @@ export function SnapZoHubAdminView() {
     hubReads.data?.[6]?.status === "success" ? hubReads.data[6].result : undefined;
   const rewardTokenAddr =
     hubReads.data?.[8]?.status === "success" ? hubReads.data[8].result : undefined;
+
+  const socialOwner =
+    socialReads.data?.[0]?.status === "success" ? socialReads.data[0].result : undefined;
+  const socialPaused =
+    socialReads.data?.[1]?.status === "success" ? socialReads.data[1].result : undefined;
+  const likeTipAmount =
+    socialReads.data?.[2]?.status === "success" ? socialReads.data[2].result : undefined;
+  const replyStakeAmount =
+    socialReads.data?.[3]?.status === "success" ? socialReads.data[3].result : undefined;
+  const socialSnapToken =
+    socialReads.data?.[4]?.status === "success" ? socialReads.data[4].result : undefined;
+  const replyWindowSec =
+    socialReads.data?.[5]?.status === "success" ? socialReads.data[5].result : undefined;
 
   const smusdShareReads = useReadContracts({
     contracts: [
@@ -205,9 +246,13 @@ export function SnapZoHubAdminView() {
       ? smusdIdleWei + smusdStakedWei
       : undefined;
 
-  const isOwner =
+  const isHubOwner =
     Boolean(address && owner) &&
     getAddress(address as `0x${string}`) === getAddress(owner as `0x${string}`);
+
+  const isSocialOwner =
+    Boolean(address && socialOwner) &&
+    getAddress(address as `0x${string}`) === getAddress(socialOwner as `0x${string}`);
 
   const secondaryReads = useReadContracts({
     contracts: [
@@ -279,7 +324,7 @@ export function SnapZoHubAdminView() {
     query: {
       enabled: Boolean(
         hubOk &&
-          isOwner &&
+          isHubOwner &&
           address &&
           injectParsed !== undefined &&
           injectParsed > BigInt(0),
@@ -291,13 +336,14 @@ export function SnapZoHubAdminView() {
 
   const refetchAll = useCallback(async () => {
     await hubReads.refetch();
+    await socialReads.refetch();
     await smusdShareReads.refetch();
     await secondaryReads.refetch();
     await injectAllowance.refetch();
     await queryClient.invalidateQueries({ queryKey: ["snapzoHubRelayers"] });
-  }, [hubReads, injectAllowance, queryClient, secondaryReads, smusdShareReads]);
+  }, [hubReads, injectAllowance, queryClient, secondaryReads, smusdShareReads, socialReads]);
 
-  const runWrite = useCallback(
+  const runHubWrite = useCallback(
     async (label: string, fn: () => Promise<`0x${string}`>) => {
       if (!isConnected) {
         openConnectModal?.();
@@ -307,7 +353,7 @@ export function SnapZoHubAdminView() {
         switchChain?.({ chainId: mezoTestnet.id });
         return;
       }
-      if (!isOwner) {
+      if (!isHubOwner) {
         toast("Connect the hub owner wallet.", "error");
         return;
       }
@@ -327,7 +373,47 @@ export function SnapZoHubAdminView() {
     },
     [
       isConnected,
-      isOwner,
+      isHubOwner,
+      openConnectModal,
+      publicClient,
+      refetchAll,
+      switchChain,
+      toast,
+      wrongChain,
+    ],
+  );
+
+  const runSocialWrite = useCallback(
+    async (label: string, fn: () => Promise<`0x${string}`>) => {
+      if (!isConnected) {
+        openConnectModal?.();
+        return;
+      }
+      if (wrongChain) {
+        switchChain?.({ chainId: mezoTestnet.id });
+        return;
+      }
+      if (!isSocialOwner) {
+        toast("Connect the SnapZoSocial owner wallet.", "error");
+        return;
+      }
+      setBusy(true);
+      try {
+        const h = await fn();
+        if (publicClient) {
+          await publicClient.waitForTransactionReceipt({ hash: h });
+        }
+        toast(label);
+        await refetchAll();
+      } catch (e) {
+        toast(formatTxError(e), "error");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [
+      isConnected,
+      isSocialOwner,
       openConnectModal,
       publicClient,
       refetchAll,
@@ -338,7 +424,7 @@ export function SnapZoHubAdminView() {
   );
 
   const onHarvest = () =>
-    void runWrite("Harvest complete", () =>
+    void runHubWrite("Harvest complete", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -348,7 +434,7 @@ export function SnapZoHubAdminView() {
     );
 
   const onSyncGaugeRewards = () =>
-    void runWrite("Gauge rewards synced", () =>
+    void runHubWrite("Gauge rewards synced", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -358,7 +444,7 @@ export function SnapZoHubAdminView() {
     );
 
   const onRestake = () =>
-    void runWrite("Restake complete", () =>
+    void runHubWrite("Restake complete", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -368,7 +454,7 @@ export function SnapZoHubAdminView() {
     );
 
   const onPause = () =>
-    void runWrite("Paused", () =>
+    void runHubWrite("Paused", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -378,7 +464,7 @@ export function SnapZoHubAdminView() {
     );
 
   const onUnpause = () =>
-    void runWrite("Unpaused", () =>
+    void runHubWrite("Unpaused", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -392,7 +478,7 @@ export function SnapZoHubAdminView() {
       toast("Invalid relayer address.", "error");
       return;
     }
-    void runWrite("Relayer updated", () =>
+    void runHubWrite("Relayer updated", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -413,7 +499,7 @@ export function SnapZoHubAdminView() {
       feeRecvIn.trim() === "" || !isAddress(feeRecvIn.trim())
         ? "0x0000000000000000000000000000000000000000"
         : getAddress(feeRecvIn.trim() as `0x${string}`);
-    void runWrite("Fee config updated", () =>
+    void runHubWrite("Fee config updated", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -445,7 +531,7 @@ export function SnapZoHubAdminView() {
       toast("Invalid amount.", "error");
       return;
     }
-    void runWrite("Reward token recovered", () =>
+    void runHubWrite("Reward token recovered", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -464,7 +550,7 @@ export function SnapZoHubAdminView() {
     if (!address) {
       return;
     }
-    void runWrite("Reward token sent to your wallet", async () => {
+    void runHubWrite("Reward token sent to your wallet", async () => {
       const r = await secondaryReads.refetch();
       const bal =
         r.data?.[1]?.status === "success" ? (r.data[1].result as bigint) : undefined;
@@ -497,7 +583,7 @@ export function SnapZoHubAdminView() {
       toast("Invalid sweep amount.", "error");
       return;
     }
-    void runWrite("Swept", () =>
+    void runHubWrite("Swept", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -513,7 +599,7 @@ export function SnapZoHubAdminView() {
       toast("Enter MUSD amount.", "error");
       return;
     }
-    await runWrite("MUSD injected (no SNAP mint)", async () => {
+    await runHubWrite("MUSD injected (no SNAP mint)", async () => {
       const need =
         injectAllowance.data !== undefined ? injectParsed > injectAllowance.data : true;
       if (need) {
@@ -556,7 +642,7 @@ export function SnapZoHubAdminView() {
       toast("All five addresses must be valid.", "error");
       return;
     }
-    void runWrite("Integrations updated", () =>
+    void runHubWrite("Integrations updated", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
@@ -583,13 +669,97 @@ export function SnapZoHubAdminView() {
       toast("Routes must be 0x-prefixed ABI-encoded bytes.", "error");
       return;
     }
-    void runWrite("Restake routes updated", () =>
+    void runHubWrite("Restake routes updated", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: hub,
         abi: snapZoHubAdminAbi,
         functionName: "setRestakeRoutes",
         args: [h as `0x${string}`],
+      }),
+    );
+  };
+
+  const onSocialSetLikeTip = () => {
+    const t = likeTipIn.trim().replace(",", ".");
+    if (!t) {
+      toast("Enter SNAP amount for one like tip.", "error");
+      return;
+    }
+    let amt: bigint;
+    try {
+      amt = parseUnits(t, SNAP_DECIMALS);
+    } catch {
+      toast("Invalid amount.", "error");
+      return;
+    }
+    void runSocialWrite("Like tip amount updated", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: social,
+        abi: snapZoSocialAdminAbi,
+        functionName: "setLikeTipAmount",
+        args: [amt],
+      }),
+    );
+  };
+
+  const onSocialSetReplyStake = () => {
+    const t = replyStakeIn.trim().replace(",", ".");
+    if (!t) {
+      toast("Enter SNAP amount for paid-reply stake.", "error");
+      return;
+    }
+    let amt: bigint;
+    try {
+      amt = parseUnits(t, SNAP_DECIMALS);
+    } catch {
+      toast("Invalid amount.", "error");
+      return;
+    }
+    void runSocialWrite("Reply stake amount updated", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: social,
+        abi: snapZoSocialAdminAbi,
+        functionName: "setReplyStakeAmount",
+        args: [amt],
+      }),
+    );
+  };
+
+  const onSocialPause = () =>
+    void runSocialWrite("SnapZoSocial paused", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: social,
+        abi: snapZoSocialAdminAbi,
+        functionName: "pause",
+      }),
+    );
+
+  const onSocialUnpause = () =>
+    void runSocialWrite("SnapZoSocial unpaused", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: social,
+        abi: snapZoSocialAdminAbi,
+        functionName: "unpause",
+      }),
+    );
+
+  const onSocialSetRelayer = () => {
+    if (!isAddress(socialRelayerIn.trim())) {
+      toast("Invalid relayer address.", "error");
+      return;
+    }
+    void runSocialWrite("Social relayer updated", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: social,
+        abi: snapZoSocialAdminAbi,
+        functionName: "setRelayer",
+        args: [getAddress(socialRelayerIn.trim() as `0x${string}`), socialRelayerAllowed],
       }),
     );
   };
@@ -650,7 +820,9 @@ export function SnapZoHubAdminView() {
     }
   };
 
-  const canAct = isConnected && !wrongChain && !busy && !isWritePending && isOwner;
+  const canAct = isConnected && !wrongChain && !busy && !isWritePending && isHubOwner;
+  const canActSocial =
+    isConnected && !wrongChain && !busy && !isWritePending && isSocialOwner;
   const treasuryCan =
     isConnected &&
     !wrongChain &&
@@ -671,10 +843,12 @@ export function SnapZoHubAdminView() {
   const btnMuted =
     "inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-semibold text-zinc-100 transition hover:bg-white/10 disabled:opacity-40";
 
-  if (!hubOk) {
+  if (!hubOk && !socialOk) {
     return (
       <main className="px-4 pb-32 pt-5">
-        <p className="text-sm text-zinc-400">SnapZo hub is not configured for this build.</p>
+        <p className="text-sm text-zinc-400">
+          SnapZo hub and SnapZoSocial are not configured (set env addresses).
+        </p>
       </main>
     );
   }
@@ -695,7 +869,8 @@ export function SnapZoHubAdminView() {
             <h1 className="text-xl font-semibold text-white">SnapZo admin</h1>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-            Owner-only controls on the hub proxy. All txs use your wallet (gas in test BTC).
+            Owner-only controls on the hub and SnapZoSocial proxies. All txs use your wallet (gas in
+            test BTC).
           </p>
         </div>
       </div>
@@ -717,14 +892,164 @@ export function SnapZoHubAdminView() {
         <p className="mb-4 text-sm text-zinc-400">Connect your wallet to use admin actions.</p>
       ) : null}
 
-      {isConnected && owner && !isOwner ? (
+      {isConnected && hubOk && owner && !isHubOwner ? (
         <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-200">
-          Connected wallet is not the hub owner ({owner.slice(0, 6)}…). Actions are disabled.
+          Connected wallet is not the hub owner ({String(owner).slice(0, 6)}…). Hub actions are
+          disabled.
+        </div>
+      ) : null}
+
+      {isConnected && socialOk && socialOwner && !isSocialOwner ? (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100">
+          Connected wallet is not the SnapZoSocial owner ({String(socialOwner).slice(0, 6)}…). Social
+          admin actions are disabled.
         </div>
       ) : null}
 
       <div className="space-y-4">
-        <section className={card}>
+        {socialOk ? (
+          <section className={card}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-white">SnapZoSocial</h2>
+              <button
+                type="button"
+                className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
+                onClick={() => void socialReads.refetch()}
+              >
+                Refresh
+              </button>
+            </div>
+            <p className="mb-3 text-[10px] leading-relaxed text-zinc-600">
+              Gasless tips, unlocks, and reply escrow (
+              <span className="font-mono">{social}</span>). Same deployer is often owner on both
+              contracts — connect the owner wallet.
+            </p>
+            <dl className="mb-4 grid gap-2 text-xs">
+              <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">Paused</dt>
+                <dd className="font-medium text-zinc-200">
+                  {socialPaused === undefined ? "…" : socialPaused ? "Yes" : "No"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="flex items-center gap-1 text-zinc-500">
+                  <SnapInlineIcon size={12} decorative />
+                  Like tip (per tip)
+                </dt>
+                <dd
+                  className="font-mono text-zinc-200"
+                  title={fmtBalTitle(likeTipAmount, SNAP_DECIMALS)}
+                >
+                  {fmtBalShort(likeTipAmount, 6, SNAP_DECIMALS)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="flex items-center gap-1 text-zinc-500">
+                  <SnapInlineIcon size={12} decorative />
+                  Reply stake (escrow)
+                </dt>
+                <dd
+                  className="font-mono text-zinc-200"
+                  title={fmtBalTitle(replyStakeAmount, SNAP_DECIMALS)}
+                >
+                  {fmtBalShort(replyStakeAmount, 6, SNAP_DECIMALS)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">Reply window</dt>
+                <dd className="font-mono text-zinc-200">
+                  {replyWindowSec === undefined
+                    ? "…"
+                    : `${String(replyWindowSec)} sec (${Number(replyWindowSec) / 3600} h)`}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-zinc-500">SNAP token</dt>
+                <dd className="break-all font-mono text-[10px] text-zinc-300">
+                  {socialSnapToken ?? "…"}
+                </dd>
+              </div>
+            </dl>
+            <p className={`${label} mb-1`}>Set like tip (SNAP, 18 dp)</p>
+            <input
+              className={`${input} mb-2`}
+              inputMode="decimal"
+              placeholder="e.g. 1"
+              value={likeTipIn}
+              onChange={(e) => setLikeTipIn(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${btnPrimary} mb-4 w-full`}
+              disabled={!canActSocial}
+              onClick={() => void onSocialSetLikeTip()}
+            >
+              setLikeTipAmount
+            </button>
+            <p className={`${label} mb-1`}>Set reply stake (SNAP, 18 dp)</p>
+            <input
+              className={`${input} mb-2`}
+              inputMode="decimal"
+              placeholder="e.g. 2"
+              value={replyStakeIn}
+              onChange={(e) => setReplyStakeIn(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${btnPrimary} mb-4 w-full`}
+              disabled={!canActSocial}
+              onClick={() => void onSocialSetReplyStake()}
+            >
+              setReplyStakeAmount
+            </button>
+            <h3 className="mb-2 text-xs font-semibold text-white">Pause social</h3>
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!canActSocial || socialPaused === true}
+                className={btnDanger}
+                onClick={onSocialPause}
+              >
+                Pause SnapZoSocial
+              </button>
+              <button
+                type="button"
+                disabled={!canActSocial || socialPaused === false}
+                className={btnPrimary}
+                onClick={onSocialUnpause}
+              >
+                Unpause SnapZoSocial
+              </button>
+            </div>
+            <h3 className="mb-2 text-xs font-semibold text-white">Social relayers</h3>
+            <input
+              className={input}
+              placeholder="Relayer 0x…"
+              value={socialRelayerIn}
+              onChange={(e) => setSocialRelayerIn(e.target.value)}
+            />
+            <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+              <input
+                type="checkbox"
+                checked={socialRelayerAllowed}
+                onChange={(e) => setSocialRelayerAllowed(e.target.checked)}
+              />
+              Allowed
+            </label>
+            <button
+              type="button"
+              className={`${btnMuted} mt-2 w-full`}
+              disabled={!canActSocial}
+              onClick={onSocialSetRelayer}
+            >
+              setRelayer (social)
+            </button>
+          </section>
+        ) : null}
+
+        {hubOk ? (
+          <>
+          <section className={card}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-white">Hub status</h2>
             <button
@@ -1088,6 +1413,8 @@ export function SnapZoHubAdminView() {
             sweep → owner
           </button>
         </section>
+          </>
+        ) : null}
       </div>
     </main>
   );

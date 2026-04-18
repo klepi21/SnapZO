@@ -2,12 +2,16 @@ import type { Address } from "viem";
 
 /**
  * Mezo testnet (31611) — latest deploy from `contracts/README.md`.
- * Override with `NEXT_PUBLIC_SNAPZO_HUB_ADDRESS` / `NEXT_PUBLIC_SNAP_TOKEN_ADDRESS` for other envs.
+ * Override with `NEXT_PUBLIC_SNAPZO_HUB_ADDRESS` / `NEXT_PUBLIC_SNAP_TOKEN_ADDRESS` /
+ * `NEXT_PUBLIC_SNAPZO_SOCIAL_ADDRESS` for other envs.
  */
 const HUB_MEZO_TESTNET =
   "0x9Cd1C98aC5C4F68881dcC63Ded54Ddb239033BfD" as const;
 const SNAP_MEZO_TESTNET =
   "0xCA1A5C01c533dDE957f0eFC79b25906b0187039D" as const;
+/** `SnapZoSocial` UUPS proxy — Part F (`contracts/src/SnapZoSocial.sol`). */
+const SOCIAL_MEZO_TESTNET =
+  "0xee3294D7B254066E172F820B0389e8a39E59D56A" as const;
 
 function pickAddr(env: string | undefined, fallback: string): Address {
   const t = (env ?? "").trim();
@@ -40,6 +44,12 @@ export const SNAPZO_SNAP_TOKEN_ADDRESS = pickAddr(
   SNAP_MEZO_TESTNET,
 );
 
+/** UUPS proxy — EIP-712 `verifyingContract` for social economy txs (`SnapZoSocial`). */
+export const SNAPZO_SOCIAL_ADDRESS = pickAddr(
+  process.env.NEXT_PUBLIC_SNAPZO_SOCIAL_ADDRESS,
+  SOCIAL_MEZO_TESTNET,
+);
+
 /** SNAP uses 18 decimals on-chain (1:1 wei with sMUSD minted to the hub on deposit). */
 export const SNAP_DECIMALS = 18;
 
@@ -54,6 +64,11 @@ export function isSnapZoHubConfigured(): boolean {
     SNAPZO_HUB_ADDRESS.startsWith("0x") &&
     SNAPZO_SNAP_TOKEN_ADDRESS.startsWith("0x")
   );
+}
+
+/** True when a valid-looking SnapZoSocial proxy address is available (for future UI / relay). */
+export function isSnapZoSocialConfigured(): boolean {
+  return SNAPZO_SOCIAL_ADDRESS.length === 42 && SNAPZO_SOCIAL_ADDRESS.startsWith("0x");
 }
 
 export const snapZoHubAbi = [
