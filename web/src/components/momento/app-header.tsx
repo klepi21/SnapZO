@@ -24,8 +24,8 @@ export function AppHeader() {
           {APP_NAME}
         </h1>
         <div className="flex shrink-0 items-center gap-1.5">
-          <div className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/[0.12] bg-black/25 px-2.5">
-            <SnapInlineIcon size={24} decorative />
+          <div className="inline-flex min-h-10 items-center gap-1 rounded-full border border-white/[0.12] bg-black/25 px-2.5 py-0.5">
+            <SnapInlineIcon decorative />
             <span className="font-mono text-[11px] font-medium text-zinc-100">
               {snapLabel}
             </span>

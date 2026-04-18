@@ -517,12 +517,13 @@ export function PostCard({ post }: PostCardProps) {
               <p className="mt-2 max-w-[280px] text-xs leading-relaxed text-zinc-400">
                 Pay{" "}
                 <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-200">
-                  {unlockMusdLabel} <MusdInlineIcon size={12} decorative />
+                  {unlockMusdLabel} <MusdInlineIcon decorative />
                 </span>{" "}
-                (~{" "}
-                <span className="inline-flex items-center gap-1 font-semibold text-violet-200">
-                  {unlockSnapLabel} <SnapInlineIcon size={24} decorative />
-                  SNAP
+                {"(~"}
+                <span className="inline-flex items-center gap-0 font-semibold text-violet-200">
+                  {unlockSnapLabel}
+                  <SnapInlineIcon decorative />
+                  {"SNAP"}
                 </span>).
               </p>
             </div>
@@ -534,7 +535,7 @@ export function PostCard({ post }: PostCardProps) {
             >
               <span>
                 Unlock · {unlockMusdLabel}{" "}
-                <MusdInlineIcon size={16} className="inline" decorative />
+                <MusdInlineIcon className="inline" decorative />
               </span>
             </button>
           </div>
@@ -578,19 +579,19 @@ export function PostCard({ post }: PostCardProps) {
             <div className="whitespace-nowrap">
             <span className="text-zinc-400">Like</span>{" "}
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              0.01 <MusdInlineIcon size={11} decorative />
+              0.01 <MusdInlineIcon decorative />
             </span>
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Reply</span>{" "}
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              0.01 <MusdInlineIcon size={11} decorative />
+              0.01 <MusdInlineIcon decorative />
             </span>
             {isLockedPost ? (
               <>
                 <span className="text-zinc-600"> · </span>
                 <span className="text-zinc-400">Unlock</span>{" "}
                 <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-                  {unlockMusdLabel} <MusdInlineIcon size={11} decorative />
+                  {unlockMusdLabel} <MusdInlineIcon decorative />
                 </span>
               </>
             ) : null}
@@ -759,10 +760,12 @@ export function PostCard({ post }: PostCardProps) {
                   <p className="mb-2 flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[10px] font-medium tracking-wide text-zinc-500">
                     <span>Posting sends</span>
                     <span className="inline-flex items-center gap-0.5 text-zinc-200">
-                      0.01 <MusdInlineIcon size={11} decorative />
+                      0.01 <MusdInlineIcon decorative />
                     </span>
-                    <span className="inline-flex items-center gap-1 text-violet-200/90">
-                      (~{tipSnapLabel} <SnapInlineIcon size={24} decorative /> SNAP)
+                    <span className="inline-flex items-center gap-0 text-violet-200/90">
+                      (~{tipSnapLabel}
+                      <SnapInlineIcon decorative />
+                      {"SNAP)"}
                     </span>
                     <span>on-chain</span>
                   </p>

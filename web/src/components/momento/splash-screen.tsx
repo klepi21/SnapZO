@@ -11,8 +11,9 @@ import {
 } from "@/lib/brand";
 import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
-/** Intrinsic size for `next/image` (display is capped by viewport). */
-const SNAP_HERO_LOGO_PX = 560;
+/** Natural asset size (PNG with alpha). Display scales up to ~2× prior hero cap via max-* below. */
+const SNAP_LOGO_WIDTH = 638;
+const SNAP_LOGO_HEIGHT = 622;
 
 export function SplashScreen() {
   const [startedHref, setStartedHref] = useState("/onboarding");
@@ -35,22 +36,20 @@ export function SplashScreen() {
 
       <div className="relative flex flex-1 flex-col items-center px-6 pb-10 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <div className="relative z-10 flex w-full flex-1 flex-col items-center justify-center text-center">
-          <div className="relative mx-auto flex min-h-[min(52dvh,620px)] w-full max-w-[min(560px,calc(100vw-3rem))] items-center justify-center">
+          <div className="relative mx-auto flex min-h-[min(58dvh,900px)] w-full max-w-[min(1120px,calc(100vw-2rem))] items-center justify-center px-1">
             <div
-              className="pointer-events-none absolute inset-[8%] rounded-full bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.22),transparent_62%)] blur-3xl"
+              className="pointer-events-none absolute inset-[5%] bg-[radial-gradient(ellipse_70%_50%_at_50%_45%,rgba(255,255,255,0.18),transparent_70%)] blur-3xl"
               aria-hidden
             />
-            <div className="relative rounded-full p-3 shadow-[0_28px_90px_rgba(0,0,0,0.65)] ring-1 ring-white/12 ring-offset-0">
-              <Image
-                src="/snap-token-logo.png"
-                alt="SnapZO"
-                width={SNAP_HERO_LOGO_PX}
-                height={SNAP_HERO_LOGO_PX}
-                priority
-                className="aspect-square w-full max-w-[min(560px,calc(100vw-3rem))] rounded-full object-cover"
-                sizes="(max-width: 430px) min(382px, 100vw), 560px"
-              />
-            </div>
+            <Image
+              src="/snap-token-logo.png"
+              alt="SnapZO"
+              width={SNAP_LOGO_WIDTH}
+              height={SNAP_LOGO_HEIGHT}
+              priority
+              className="relative z-10 h-auto w-full max-w-[min(1120px,calc(100vw-2rem))] max-h-[min(46vmin,380px)] bg-transparent object-contain drop-shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
+              sizes="(max-width: 430px) 96vw, 1120px"
+            />
           </div>
 
           <div className="relative z-10 mt-2 w-full max-w-md">

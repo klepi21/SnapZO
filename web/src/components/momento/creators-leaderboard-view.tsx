@@ -80,7 +80,11 @@ export function CreatorsLeaderboardView() {
       <div className="px-4">
         <h1 className="text-2xl font-semibold tracking-tight text-white">Creators leaderboard</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Top creators by <SnapInlineIcon size={24} decorative /> SNAP balance
+          Top creators by{" "}
+          <span className="inline-flex items-center gap-0 align-middle">
+            <SnapInlineIcon decorative />
+            {"SNAP balance"}
+          </span>
         </p>
       </div>
 
@@ -108,9 +112,9 @@ export function CreatorsLeaderboardView() {
                 <p className="truncate text-xs text-zinc-500">{row.handle}</p>
               </div>
               <div className="text-right">
-                <p className="inline-flex items-center gap-1 font-mono text-sm font-semibold text-emerald-200/95">
+                <p className="inline-flex items-center gap-0 font-mono text-sm font-semibold text-emerald-200/95">
                   {formatSnap2(row.snapBal)}
-                  <SnapInlineIcon size={24} decorative />
+                  <SnapInlineIcon decorative />
                 </p>
                 <p className="text-[10px] text-zinc-600">SNAP</p>
               </div>

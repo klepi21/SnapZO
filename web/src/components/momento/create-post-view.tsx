@@ -359,7 +359,7 @@ export function CreatePostView() {
                 />
                 <span className="inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-violet-500/15 px-2 py-1 font-mono text-xs font-semibold text-violet-200">
                   MUSD
-                  <MusdInlineIcon size={12} className="rounded-full object-cover opacity-90" />
+                  <MusdInlineIcon className="rounded-full object-cover opacity-90" />
                 </span>
               </div>
               <p id="snapzo-unlock-hint" className="mt-2 text-xs leading-relaxed text-zinc-500">

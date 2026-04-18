@@ -721,20 +721,26 @@ export function SnapZoHubEarnPanel() {
               <>
                 Send{" "}
                 <span className="inline-flex items-center gap-0.5 align-middle font-medium text-zinc-200">
-                  <MusdInlineIcon size={13} className="shrink-0 rounded-full object-cover" />
+                  <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
                   MUSD
                 </span>{" "}
                 → receive{" "}
-                <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
-                  <SnapInlineIcon size={26} decorative /> SNAP
+                <span className="inline-flex items-center gap-0 whitespace-nowrap align-middle">
+                  <SnapInlineIcon decorative />
+                  {"SNAP"}
                 </span>
                 .
               </>
             ) : (
               <>
-                Burn <SnapInlineIcon size={26} decorative /> SNAP →{" "}
+                Burn{" "}
+                <span className="inline-flex items-center gap-0 align-middle">
+                  <SnapInlineIcon decorative />
+                  {"SNAP"}
+                </span>{" "}
+                →{" "}
                 <span className="inline-flex items-center gap-0.5 align-middle font-medium text-zinc-200">
-                  <MusdInlineIcon size={13} className="shrink-0 rounded-full object-cover" />
+                  <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
                   MUSD
                 </span>{" "}
                 + MEZO (fee on MEZO only).
@@ -748,9 +754,9 @@ export function SnapZoHubEarnPanel() {
             onClick={() => void addSnapToWallet()}
             className="shrink-0 self-start rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-100 sm:self-auto"
           >
-            <span className="inline-flex items-center gap-1">
-              <SnapInlineIcon size={26} decorative />
-              SNAP
+            <span className="inline-flex items-center gap-0">
+              <SnapInlineIcon decorative />
+              {"SNAP"}
             </span>
           </button>
         ) : null}
@@ -774,7 +780,7 @@ export function SnapZoHubEarnPanel() {
       <div className="mb-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3 sm:gap-3">
         <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
           <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-            <MusdInlineIcon size={14} className="shrink-0 rounded-full object-cover" />
+            <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
             MUSD
           </p>
           <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-white sm:text-base">
@@ -784,9 +790,9 @@ export function SnapZoHubEarnPanel() {
           </p>
         </div>
         <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
-          <p className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-            <SnapInlineIcon size={24} decorative />
-            SNAP
+          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <SnapInlineIcon decorative />
+            {"SNAP"}
           </p>
           <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-emerald-200/95 sm:text-base">
             {isConnected && !wrongChain
@@ -797,7 +803,7 @@ export function SnapZoHubEarnPanel() {
         <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
           <div className="flex items-center justify-between gap-1">
             <p className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-              <MezoInlineIcon size={24} decorative />
+              <MezoInlineIcon decorative />
               MEZO
             </p>
             <HelpPopover label="MEZO rewards" size="sm">
@@ -831,7 +837,7 @@ export function SnapZoHubEarnPanel() {
           }`}
           onClick={() => setHubMode("deposit")}
         >
-          <MusdInlineIcon size={15} className="shrink-0 rounded-full object-cover opacity-90" />
+          <MusdInlineIcon className="shrink-0 rounded-full object-cover opacity-90" />
           Deposit
         </button>
         <button
@@ -885,9 +891,9 @@ export function SnapZoHubEarnPanel() {
               (testnet reads are noisy).
             </p>
             <p>
-              <strong>Withdraw — <MezoInlineIcon size={14} decorative /> MEZO.</strong> Pro-rata from your current{" "}
+              <strong>Withdraw — <MezoInlineIcon decorative /> MEZO.</strong> Pro-rata from your current{" "}
               <span className="font-mono text-zinc-200">earned()</span>. The tx also claims the
-              gauge, so <MezoInlineIcon size={14} decorative /> MEZO can be slightly higher if new rewards land in the same block.
+              gauge, so <MezoInlineIcon decorative /> MEZO can be slightly higher if new rewards land in the same block.
             </p>
           </HelpPopover>
         </div>
@@ -899,9 +905,9 @@ export function SnapZoHubEarnPanel() {
             depositPreviewSnap.data !== undefined &&
             depositPreviewSnap.data > ZERO ? (
               <div className="flex flex-col gap-1 rounded-xl bg-white/[0.04] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
-                  <SnapInlineIcon size={24} decorative />
-                  SNAP (approx.)
+                <span className="inline-flex items-center gap-0 text-xs text-zinc-500">
+                  <SnapInlineIcon decorative />
+                  {"SNAP (approx.)"}
                 </span>
                 <span className="font-mono text-sm font-semibold text-zinc-100">
                   ~{formatUnits(depositPreviewSnap.data, SNAP_DECIMALS)}
@@ -924,7 +930,7 @@ export function SnapZoHubEarnPanel() {
                 <div className="space-y-2">
                   <div className="flex flex-col gap-1 rounded-xl bg-white/[0.04] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                     <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-                      <MusdInlineIcon size={14} className="shrink-0 rounded-full object-cover" />
+                      <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
                       MUSD (approx.)
                     </span>
                     <div className="text-right">
@@ -941,7 +947,7 @@ export function SnapZoHubEarnPanel() {
                   {withdrawMezoPreview !== undefined ? (
                     <div className="flex flex-col gap-1 rounded-xl bg-sky-500/[0.08] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-200/85">
-                        <MezoInlineIcon size={14} decorative />
+                        <MezoInlineIcon decorative />
                         MEZO net (approx.)
                       </span>
                       <div className="text-right">
@@ -966,7 +972,7 @@ export function SnapZoHubEarnPanel() {
                 <div className="space-y-1.5">
                   <div className="flex flex-col gap-1 rounded-xl bg-sky-500/[0.08] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-200/85">
-                      <MezoInlineIcon size={14} decorative />
+                      <MezoInlineIcon decorative />
                       MEZO net (approx.)
                     </span>
                     <div className="text-right">

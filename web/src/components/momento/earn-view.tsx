@@ -30,12 +30,15 @@ export function EarnView() {
                 <p>
                   <strong>Pool.</strong> Deposit{" "}
                   <span className="inline-flex items-center gap-0.5 align-middle">
-                    <MusdInlineIcon size={12} className="shrink-0 rounded-full object-cover" />
+                    <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
                     MUSD
                   </span>{" "}
-                  into the SnapZo hub; you receive <SnapInlineIcon size={24} decorative /> SNAP (18
-                  decimals). Mint size follows the vault
-                  MUSD→sMUSD rate on that deposit.
+                  into the SnapZo hub; you receive{" "}
+                  <span className="inline-flex items-center gap-0 align-middle">
+                    <SnapInlineIcon decorative />
+                    {"SNAP (18 decimals). "}
+                  </span>
+                  Mint size follows the vault MUSD→sMUSD rate on that deposit.
                 </p>
                 <p>
                   <strong>Gasless.</strong> You approve once, sign an EIP-712 message, and a relayer
@@ -43,15 +46,24 @@ export function EarnView() {
                 </p>
                 <p>
                   <strong>Creators.</strong> On the feed, prices show in MUSD; wallets send the
-                  matching <SnapInlineIcon size={24} decorative /> SNAP at the live hub ratio.
-                  Redeem <SnapInlineIcon size={24} decorative /> SNAP here for MUSD when you want.
+                  matching{" "}
+                  <span className="inline-flex items-center gap-0 align-middle">
+                    <SnapInlineIcon decorative />
+                    {"SNAP at the live hub ratio. "}
+                  </span>
+                  Redeem{" "}
+                  <span className="inline-flex items-center gap-0 align-middle">
+                    <SnapInlineIcon decorative />
+                    {"SNAP here for MUSD when you want."}
+                  </span>
                 </p>
               </HelpPopover>
             </div>
             <p className="mt-1.5 text-sm text-zinc-400">
               MUSD pool ·{" "}
-              <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
-                <SnapInlineIcon size={24} decorative /> SNAP receipts
+              <span className="inline-flex items-center gap-0 whitespace-nowrap align-middle">
+                <SnapInlineIcon decorative />
+                {"SNAP receipts"}
               </span>{" "}
               · relayer covers gas
             </p>

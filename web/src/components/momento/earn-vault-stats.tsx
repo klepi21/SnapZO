@@ -294,7 +294,13 @@ export function EarnVaultStats() {
                 : "Vault view when available."}
           </p>
           <p>
-            <strong>1 <SnapInlineIcon size={24} decorative /> SNAP → MUSD.</strong> (Hub sMUSD per SNAP) × (MUSD per sMUSD share). Per-SNAP
+            <strong>
+              <span className="inline-flex items-center gap-0 align-middle">
+                1<SnapInlineIcon decorative />
+                {"SNAP → MUSD."}
+              </span>
+            </strong>{" "}
+            (Hub sMUSD per SNAP) × (MUSD per sMUSD share). Per-SNAP
             slice = hub sMUSD × 1e18 ÷ SNAP supply.
           </p>
         </HelpPopover>
@@ -324,7 +330,7 @@ export function EarnVaultStats() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
               <dt className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                <MezoInlineIcon size={14} decorative />
+                <MezoInlineIcon decorative />
                 MEZO Rewards
               </dt>
               <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-amber-100/90">
@@ -333,8 +339,9 @@ export function EarnVaultStats() {
             </div>
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
               <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                <span className="inline-flex items-center gap-1">
-                  <SnapInlineIcon size={24} decorative /> SNAP total supply
+                <span className="inline-flex items-center gap-0">
+                  <SnapInlineIcon decorative />
+                  {"SNAP total supply"}
                 </span>
               </dt>
               <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-zinc-200">

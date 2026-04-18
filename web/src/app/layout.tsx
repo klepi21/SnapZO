@@ -39,7 +39,11 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className={`min-h-dvh font-sans antialiased ${SHELL_GUTTER_CLASS}`}>
+      {/* suppressHydrationWarning: extensions (e.g. ColorZilla cz-shortcut-listen on body) mutate DOM before hydrate */}
+      <body
+        suppressHydrationWarning
+        className={`min-h-dvh font-sans antialiased ${SHELL_GUTTER_CLASS}`}
+      >
         <Web3Provider>{children}</Web3Provider>
       </body>
     </html>

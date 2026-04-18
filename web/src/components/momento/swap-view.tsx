@@ -401,7 +401,7 @@ export function SwapView() {
               <span className="flex items-center gap-1 text-xs font-medium text-zinc-400">
                 {direction === "btc-musd" ? (
                   <>
-                    <MusdInlineIcon size={18} />
+                    <MusdInlineIcon />
                     <span className="sr-only">MUSD</span>
                   </>
                 ) : (

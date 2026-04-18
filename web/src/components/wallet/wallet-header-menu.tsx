@@ -131,7 +131,7 @@ export function WalletHeaderMenu() {
                       </div>
                       <div className="flex justify-between gap-3">
                         <dt className="flex items-center gap-1.5 text-zinc-500">
-                          <MusdInlineIcon size={14} />
+                          <MusdInlineIcon />
                           <span className="sr-only">MUSD</span>
                         </dt>
                         <dd className="font-mono text-zinc-100">
@@ -143,8 +143,8 @@ export function WalletHeaderMenu() {
                         </dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="flex items-center gap-1.5 text-zinc-500">
-                          <SnapInlineIcon size={16} decorative />
+                        <dt className="flex items-center gap-1 text-zinc-500">
+                          <SnapInlineIcon decorative />
                           <span className="sr-only">SNAP</span>
                         </dt>
                         <dd className="font-mono text-zinc-100">

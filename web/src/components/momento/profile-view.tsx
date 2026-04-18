@@ -420,7 +420,7 @@ export function ProfileView() {
             </p>
             <p className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold tabular-nums text-white">
               <span>0</span>
-              <MusdInlineIcon size={16} />
+              <MusdInlineIcon />
               <span className="sr-only">MUSD</span>
             </p>
           </div>

@@ -36,7 +36,7 @@ export function TestnetBalances({
         Switch to <strong>Mezo testnet</strong> (chain {mezoTestnet.id}) to load
         BTC and{" "}
         <span className="inline-flex items-center gap-0.5 align-middle">
-          <MusdInlineIcon size={13} />
+          <MusdInlineIcon />
         </span>{" "}
         balances.
       </p>
@@ -69,7 +69,7 @@ export function TestnetBalances({
         }
       >
         <span className="inline-flex items-center gap-1 align-middle">
-          <MusdInlineIcon size={12} />
+          <MusdInlineIcon />
         </span>
         : {MUSD_ADDRESS_MEZO_TESTNET}
       </p>
@@ -96,7 +96,7 @@ export function TestnetBalances({
         <div className="flex justify-between gap-4">
           <dt className={shell ? "text-zinc-500" : "text-zinc-600 dark:text-zinc-400"}>
             <span className="inline-flex items-center gap-1.5">
-              <MusdInlineIcon size={14} />
+              <MusdInlineIcon />
               <span className="sr-only">MUSD</span>
             </span>
           </dt>
@@ -113,7 +113,7 @@ export function TestnetBalances({
             ) : (
               <span className="inline-flex items-center gap-1">
                 {musdFormatted ?? "0"}
-                <MusdInlineIcon size={14} />
+                <MusdInlineIcon />
               </span>
             )}
           </dd>

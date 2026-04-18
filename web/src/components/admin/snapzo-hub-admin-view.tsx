@@ -932,9 +932,9 @@ export function SnapZoHubAdminView() {
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt className="flex items-center gap-1 text-zinc-500">
-                  <SnapInlineIcon size={12} decorative />
-                  Like tip (per tip)
+                <dt className="flex items-center gap-0.5 text-zinc-500">
+                  <SnapInlineIcon decorative />
+                  {"Like tip (per tip)"}
                 </dt>
                 <dd
                   className="font-mono text-zinc-200"
@@ -944,9 +944,9 @@ export function SnapZoHubAdminView() {
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt className="flex items-center gap-1 text-zinc-500">
-                  <SnapInlineIcon size={12} decorative />
-                  Reply stake (escrow)
+                <dt className="flex items-center gap-0.5 text-zinc-500">
+                  <SnapInlineIcon decorative />
+                  {"Reply stake (escrow)"}
                 </dt>
                 <dd
                   className="font-mono text-zinc-200"
@@ -1093,7 +1093,7 @@ export function SnapZoHubAdminView() {
             </div>
             <div className="flex justify-between gap-2">
               <dt className="flex items-center gap-1 text-zinc-500">
-                <MusdInlineIcon size={12} decorative />
+                <MusdInlineIcon decorative />
                 MUSD idle on hub
               </dt>
               <dd className="font-mono text-zinc-200" title={fmtBalTitle(musdOnHub)}>
@@ -1135,7 +1135,7 @@ export function SnapZoHubAdminView() {
               </dd>
             </div>
             <p className="col-span-full text-[10px] leading-snug text-zinc-600">
-              The fee recipient balance is mostly from the <strong><MezoInlineIcon size={14} decorative /> MEZO leg on user withdraws</strong>{" "}
+              The fee recipient balance is mostly from the <strong><MezoInlineIcon decorative /> MEZO leg on user withdraws</strong>{" "}
               (<span className="font-mono">feeBps</span>), not from harvest.
             </p>
           </dl>
@@ -1156,7 +1156,7 @@ export function SnapZoHubAdminView() {
           </div>
           <p className="mt-3 text-[10px] text-zinc-600">
             Harvest and Sync gauge both call <span className="font-mono">gauge.getReward(hub)</span> and
-            index <MezoInlineIcon size={14} decorative /> MEZO to SNAP holders. <span className="font-mono">recoverRewardToken</span> is only
+            index <MezoInlineIcon decorative /> MEZO to SNAP holders. <span className="font-mono">recoverRewardToken</span> is only
             allowed while <strong>paused</strong>.
           </p>
           <div className="mt-4 border-t border-white/[0.06] pt-4">
