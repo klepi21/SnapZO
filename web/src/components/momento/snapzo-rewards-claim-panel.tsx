@@ -1,15 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Loader2 } from "lucide-react";
-import { formatUnits, isAddress, parseUnits } from "viem";
+import { formatUnits } from "viem";
 import {
   useAccount,
   useChainId,
   usePublicClient,
   useReadContract,
-  useReadContracts,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
@@ -23,21 +22,6 @@ import {
   isSnapZoRewardsConfigured,
   SNAPZO_REWARDS_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
-
-function parseProofInput(raw: string): `0x${string}`[] | undefined {
-  const parts = raw
-    .split(/[\s,]+/)
-    .map((v) => v.trim())
-    .filter(Boolean);
-  if (parts.length === 0) return [];
-  const out: `0x${string}`[] = [];
-  for (const p of parts) {
-    const ok = /^0x[0-9a-fA-F]{64}$/.test(p);
-    if (!ok) return undefined;
-    out.push(p as `0x${string}`);
-  }
-  return out;
-}
 
 function formatAmount(v: bigint | undefined): string {
   if (v === undefined) return "…";
@@ -58,75 +42,42 @@ export function SnapZoRewardsClaimPanel() {
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
   const [busy, setBusy] = useState(false);
-  const [cycleIn, setCycleIn] = useState("");
-  const [amountIn, setAmountIn] = useState("");
-  const [proofIn, setProofIn] = useState("");
 
   const wrongChain = isConnected && chainId !== mezoTestnet.id;
 
-  const cycle = useMemo(() => {
-    const t = cycleIn.trim();
-    if (!/^\d+$/.test(t)) return undefined;
-    return BigInt(t);
-  }, [cycleIn]);
-
-  const amountWei = useMemo(() => {
-    const t = amountIn.trim().replace(",", ".");
-    if (!t) return undefined;
-    try {
-      return parseUnits(t, MUSD_DECIMALS);
-    } catch {
-      return undefined;
-    }
-  }, [amountIn]);
-
-  const proof = useMemo(() => parseProofInput(proofIn), [proofIn]);
-
-  const reads = useReadContracts({
-    contracts: [
-      {
-        chainId: mezoTestnet.id,
-        address: SNAPZO_REWARDS_ADDRESS,
-        abi: snapZoRewardsAbi,
-        functionName: "rewardToken",
-      },
-      {
-        chainId: mezoTestnet.id,
-        address: SNAPZO_REWARDS_ADDRESS,
-        abi: snapZoRewardsAbi,
-        functionName: "roots",
-        args: cycle !== undefined ? [cycle] : undefined,
-      },
-      {
-        chainId: mezoTestnet.id,
-        address: SNAPZO_REWARDS_ADDRESS,
-        abi: snapZoRewardsAbi,
-        functionName: "hasClaimed",
-        args: cycle !== undefined && address ? [cycle, address] : undefined,
-      },
-    ],
-    query: {
-      enabled: rewardsOk,
-      staleTime: 0,
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-    },
+  const rewardToken = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_REWARDS_ADDRESS,
+    abi: snapZoRewardsAbi,
+    functionName: "rewardToken",
+    query: { enabled: rewardsOk },
   });
 
-  const rewardToken =
-    reads.data?.[0]?.status === "success" ? reads.data[0].result : undefined;
-  const rootForCycle =
-    reads.data?.[1]?.status === "success" ? reads.data[1].result : undefined;
-  const hasClaimed =
-    reads.data?.[2]?.status === "success" ? reads.data[2].result : undefined;
+  const claimable = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_REWARDS_ADDRESS,
+    abi: snapZoRewardsAbi,
+    functionName: "claimable",
+    args: address ? [address] : undefined,
+    query: { enabled: rewardsOk && Boolean(address), staleTime: 0, refetchOnWindowFocus: true },
+  });
+
+  const claimed = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_REWARDS_ADDRESS,
+    abi: snapZoRewardsAbi,
+    functionName: "claimed",
+    args: address ? [address] : undefined,
+    query: { enabled: rewardsOk && Boolean(address), staleTime: 0, refetchOnWindowFocus: true },
+  });
 
   const rewardBalance = useReadContract({
     chainId: mezoTestnet.id,
-    address: (rewardToken ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+    address: (rewardToken.data ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
     abi: erc20BalanceAbi,
     functionName: "balanceOf",
-    args: rewardsOk && rewardToken && address ? [address] : undefined,
-    query: { enabled: Boolean(rewardsOk && rewardToken && address) },
+    args: rewardsOk && rewardToken.data && address ? [address] : undefined,
+    query: { enabled: Boolean(rewardsOk && rewardToken.data && address) },
   });
 
   async function onClaim() {
@@ -138,20 +89,8 @@ export function SnapZoRewardsClaimPanel() {
       switchChain?.({ chainId: mezoTestnet.id });
       return;
     }
-    if (cycle === undefined) {
-      toast("Enter a valid cycle number.", "error");
-      return;
-    }
-    if (amountWei === undefined || amountWei <= BigInt(0)) {
-      toast("Enter a valid claim amount.", "error");
-      return;
-    }
-    if (!proof || proof.length === 0) {
-      toast("Paste a valid merkle proof (one or more bytes32 values).", "error");
-      return;
-    }
-    if (rootForCycle === undefined || /^0x0{64}$/i.test(rootForCycle)) {
-      toast("No root is set for this cycle on SnapZoRewards.", "error");
+    if ((claimable.data ?? BigInt(0)) <= BigInt(0)) {
+      toast("No claimable rewards yet.", "error");
       return;
     }
     setBusy(true);
@@ -161,10 +100,9 @@ export function SnapZoRewardsClaimPanel() {
         address: SNAPZO_REWARDS_ADDRESS,
         abi: snapZoRewardsAbi,
         functionName: "claim",
-        args: [cycle, amountWei, proof],
       });
       if (publicClient) await publicClient.waitForTransactionReceipt({ hash });
-      await Promise.all([reads.refetch(), rewardBalance.refetch()]);
+      await Promise.all([claimable.refetch(), claimed.refetch(), rewardBalance.refetch()]);
       toast("Rewards claimed.");
     } catch (e) {
       const msg =
@@ -177,8 +115,6 @@ export function SnapZoRewardsClaimPanel() {
 
   if (!rewardsOk) return null;
 
-  const input =
-    "w-full rounded-xl border border-white/12 bg-black/40 px-3 py-2.5 font-mono text-sm text-white outline-none placeholder:text-zinc-600 focus:border-sky-500/40";
   const btn =
     "inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-40";
 
@@ -191,17 +127,16 @@ export function SnapZoRewardsClaimPanel() {
         <button
           type="button"
           className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
-          onClick={() => void Promise.all([reads.refetch(), rewardBalance.refetch()])}
+          onClick={() => void Promise.all([claimable.refetch(), claimed.refetch(), rewardBalance.refetch()])}
         >
           Refresh
         </button>
       </div>
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Claim your Merkle-assigned <MezoInlineIcon decorative /> MEZO from{" "}
-        <span className="font-mono text-zinc-400">SnapZoRewards</span>. Ask your
-        backend/ops for cycle, amount, and proof values.
+        Claim your indexed <MezoInlineIcon decorative /> MEZO from{" "}
+        <span className="font-mono text-zinc-400">SnapZoCreators</span>. No inputs are needed.
       </p>
-      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">
             Your MEZO
@@ -212,45 +147,25 @@ export function SnapZoRewardsClaimPanel() {
         </div>
         <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">
-            Cycle status
+            Claimable
           </p>
           <p className="font-mono text-sm font-semibold text-zinc-100">
-            {cycle === undefined
-              ? "Enter cycle"
-              : hasClaimed === undefined
-                ? "…"
-                : hasClaimed
-                  ? "Already claimed"
-                  : "Claimable (if proof valid)"}
+            {formatAmount(claimable.data)}
           </p>
         </div>
-      </div>
-      <div className="space-y-2">
-        <input
-          className={input}
-          inputMode="numeric"
-          placeholder="Cycle (e.g. 1)"
-          value={cycleIn}
-          onChange={(e) => setCycleIn(e.target.value)}
-        />
-        <input
-          className={input}
-          inputMode="decimal"
-          placeholder="Amount in MEZO (e.g. 12.34)"
-          value={amountIn}
-          onChange={(e) => setAmountIn(e.target.value)}
-        />
-        <textarea
-          className={`${input} min-h-[84px] text-xs`}
-          placeholder="Merkle proof bytes32 list (comma or newline separated, each 0x + 64 hex chars)"
-          value={proofIn}
-          onChange={(e) => setProofIn(e.target.value)}
-        />
+        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-2">
+          <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+            Lifetime claimed
+          </p>
+          <p className="font-mono text-sm font-semibold text-zinc-100">
+            {formatAmount(claimed.data)}
+          </p>
+        </div>
       </div>
       <button
         type="button"
         className={`${btn} mt-3`}
-        disabled={busy || isWritePending}
+        disabled={busy || isWritePending || (claimable.data ?? BigInt(0)) <= BigInt(0)}
         onClick={() => void onClaim()}
       >
         {busy || isWritePending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

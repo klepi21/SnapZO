@@ -1,29 +1,27 @@
 /**
- * SnapZoRewards (Merkle distributor) admin + user reads/writes.
- * Matches `contracts/src/SnapZoRewards.sol`.
+ * SnapZoCreators (claim-only distributor) admin + user reads/writes.
+ * Matches `contracts/src/SnapZoCreators.sol`.
  */
 export const snapZoRewardsAbi = [
+  { type: "function", name: "MAX_BPS", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "paused", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
   { type: "function", name: "rewardToken", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "relayer", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
-  {
-    type: "function",
-    name: "roots",
-    stateMutability: "view",
-    inputs: [{ name: "cycle", type: "uint256" }],
-    outputs: [{ type: "bytes32" }],
-  },
   { type: "function", name: "lastUpdateTimestamp", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   {
     type: "function",
-    name: "hasClaimed",
+    name: "claimable",
     stateMutability: "view",
-    inputs: [
-      { name: "cycle", type: "uint256" },
-      { name: "user", type: "address" },
-    ],
-    outputs: [{ type: "bool" }],
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "claimed",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ type: "uint256" }],
   },
   {
     type: "function",
@@ -34,25 +32,28 @@ export const snapZoRewardsAbi = [
   },
   {
     type: "function",
-    name: "updateRoot",
+    name: "setAllocations",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "cycle", type: "uint256" },
-      { name: "root", type: "bytes32" },
+      { name: "users", type: "address[]" },
+      { name: "amounts", type: "uint256[]" },
+      { name: "reset", type: "bool" },
     ],
     outputs: [],
   },
   {
     type: "function",
-    name: "claim",
+    name: "setAllocationsByBps",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "cycle", type: "uint256" },
-      { name: "amount", type: "uint256" },
-      { name: "proof", type: "bytes32[]" },
+      { name: "users", type: "address[]" },
+      { name: "bps", type: "uint256[]" },
+      { name: "poolAmount", type: "uint256" },
+      { name: "reset", type: "bool" },
     ],
     outputs: [],
   },
+  { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [], outputs: [] },
   {
     type: "function",
     name: "withdrawUnclaimed",

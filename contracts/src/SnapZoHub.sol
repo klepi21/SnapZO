@@ -51,8 +51,6 @@ contract SnapZoHub is
     mapping(address => uint256) public nonces;
     mapping(address => bool) public isRelayer;
     bytes private _restakeRoutes;
-    /// @notice Destination for creator rewards (Merkle distributor).
-    address public rewardContract;
 
     /// @notice Cumulative MEZO per SNAP (scaled by REWARD_PRECISION). Updated when gauge rewards hit the hub.
     uint256 public rewardPerTokenStored;
@@ -60,6 +58,11 @@ contract SnapZoHub is
     uint256 public unallocatedReward;
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
+    /// @notice Destination for creator rewards (Merkle distributor).
+    /// @dev MUST stay appended for upgrade-safe storage layout.
+    address public rewardContract;
+    /// @notice One-time latch for `repairAfterBadV2Upgrade`.
+    bool public repairApplied;
 
     error SnapZoHub__ZeroAddress();
     error SnapZoHub__Expired();
@@ -75,6 +78,8 @@ contract SnapZoHub is
     error SnapZoHub__FeeTooHigh();
     error SnapZoHub__ZeroAmount();
     error SnapZoHub__NotSnapToken();
+    error SnapZoHub__RepairAlreadyApplied();
+    error SnapZoHub__InsufficientRewardBalance();
 
     event Deposit(address indexed user, uint256 assets, uint256 sharesMinted, address indexed relayer);
     event Withdraw(
@@ -88,6 +93,8 @@ contract SnapZoHub is
     event RestakeRoutesUpdated(uint256 routeBytesLen);
     event RewardTokenRecovered(address indexed to, uint256 amount);
     event MusdInjectedWithoutMint(address indexed from, uint256 amount);
+    event RepairApplied(address indexed rewardContract, uint256 usersReset);
+    event ExistingRewardsIndexed(uint256 amount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -156,6 +163,9 @@ contract SnapZoHub is
         }
         uint256 bal = snapToken.balanceOf(account);
         uint256 paid = userRewardPerTokenPaid[account];
+        if (rewardPerTokenStored <= paid) {
+            return rewards[account];
+        }
         uint256 pending = (bal * (rewardPerTokenStored - paid)) / REWARD_PRECISION;
         return rewards[account] + pending;
     }
@@ -329,6 +339,58 @@ contract SnapZoHub is
         musd.safeTransferFrom(msg.sender, address(this), amount);
         _pushToStrategy(amount);
         emit MusdInjectedWithoutMint(msg.sender, amount);
+    }
+
+    /**
+     * @notice Owner-only backfill: index reward tokens already held on hub into SNAP rewards.
+     * @dev Useful after repair/recovery so existing hub MEZO becomes claimable via `earned()`.
+     *      Paused-only to avoid mutating index during active user operations.
+     */
+    function indexExistingRewards(uint256 amount) external onlyOwner whenPaused nonReentrant {
+        if (amount == 0) revert SnapZoHub__ZeroAmount();
+        uint256 ts = snapToken.totalSupply();
+        if (ts == 0) revert SnapZoHub__ZeroShares();
+        uint256 bal = rewardToken.balanceOf(address(this));
+        if (amount > bal) revert SnapZoHub__InsufficientRewardBalance();
+        rewardPerTokenStored += (amount * REWARD_PRECISION) / ts;
+        emit ExistingRewardsIndexed(amount);
+    }
+
+    /**
+     * @notice One-time emergency repair for state corruption caused by a bad storage-layout upgrade.
+     * @dev Paused-only to avoid concurrent reward mutations.
+     *      - Resets global reward index fields
+     *      - Re-links reward contract
+     *      - Optionally clears per-user reward debt/claimable for known affected users
+     */
+    function repairAfterBadV2Upgrade(address rewardContract_, address[] calldata usersToReset)
+        external
+        onlyOwner
+        whenPaused
+        nonReentrant
+    {
+        if (repairApplied) revert SnapZoHub__RepairAlreadyApplied();
+        if (rewardContract_ == address(0)) revert SnapZoHub__ZeroAddress();
+
+        rewardContract = rewardContract_;
+        rewardPerTokenStored = 0;
+        unallocatedReward = 0;
+
+        uint256 n = usersToReset.length;
+        for (uint256 i; i < n;) {
+            address u = usersToReset[i];
+            if (u != address(0) && u != address(this)) {
+                rewards[u] = 0;
+                userRewardPerTokenPaid[u] = 0;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        repairApplied = true;
+        emit RewardContractUpdated(rewardContract_);
+        emit RepairApplied(rewardContract_, n);
     }
 
     /// @notice EIP-712 domain separator for `eth_signTypedData_v4` (verifying contract is this hub/proxy).
@@ -548,5 +610,5 @@ contract SnapZoHub is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    uint256[46] private __gap;
+    uint256[45] private __gap;
 }

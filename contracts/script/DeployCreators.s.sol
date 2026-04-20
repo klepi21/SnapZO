@@ -5,7 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {SnapZoCreators} from "../src/SnapZoCreators.sol";
 import {SnapZoHub} from "../src/SnapZoHub.sol";
 
-contract DeployRewards is Script {
+contract DeployCreators is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address hubProxy = vm.envAddress("SNAPZO_HUB_ADDRESS");
@@ -15,18 +15,14 @@ contract DeployRewards is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy Creators rewards contract (claim-only)
-        SnapZoCreators rewards = new SnapZoCreators(
+        SnapZoCreators creators = new SnapZoCreators(
             vm.addr(deployerPrivateKey), // Owner
             rewardToken,
             relayer
         );
 
-        // 2. Link Hub to Rewards
         SnapZoHub hub = SnapZoHub(hubProxy);
-        hub.setRewardContract(address(rewards));
-        
-        // 3. Ensure fee receiver is treasury
+        hub.setRewardContract(address(creators));
         hub.setFee(2000, treasury);
 
         vm.stopBroadcast();

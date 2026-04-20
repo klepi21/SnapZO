@@ -40,7 +40,7 @@ export function BottomNav() {
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50">
       <nav
         aria-label="Main navigation"
-        className="pointer-events-auto mx-auto w-full max-w-[430px] border-t border-white/[0.08] bg-[#080d16]/92 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#080d16]/78"
+        className="pointer-events-auto mx-auto w-full max-w-[430px] overflow-hidden rounded-t-3xl border border-white/[0.08] border-b-0 bg-[#080d16]/92 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#080d16]/78"
       >
         <ul className="grid h-12 w-full grid-cols-5 place-items-center px-1 sm:px-2">
           {items.map((item) => {

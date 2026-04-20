@@ -11,7 +11,6 @@ import {
   formatUnits,
   getAddress,
   isAddress,
-  maxUint256,
   parseUnits,
 } from "viem";
 import {
@@ -24,12 +23,9 @@ import {
   useWriteContract,
 } from "wagmi";
 
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
-import { MezoInlineIcon } from "@/components/icons/mezo-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
-import { erc20AllowanceAbi, erc20ApproveAbi } from "@/lib/constants/mezo-dex";
 import { mezoSmusdGaugeAbi } from "@/lib/constants/mezo-earn";
 import {
   erc20BalanceAbi,
@@ -48,7 +44,6 @@ import {
   SNAPZO_HUB_ADDRESS,
   SNAPZO_HUB_DEPLOY_BLOCK,
   SNAPZO_REWARDS_ADDRESS,
-  SNAPZO_SNAP_TOKEN_ADDRESS,
   SNAPZO_SOCIAL_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
 import { SnapZoRewardsClaimPanel } from "@/components/momento/snapzo-rewards-claim-panel";
@@ -79,13 +74,6 @@ function formatTxError(e: unknown): string {
   return "Something went wrong.";
 }
 
-function fmtBal(v: bigint | undefined, d = MUSD_DECIMALS): string {
-  if (v === undefined) {
-    return "…";
-  }
-  return formatUnits(v, d);
-}
-
 /** Display amount with trimmed fractional digits; hover `title` uses full precision. */
 function fmtBalShort(v: bigint | undefined, maxFrac = 6, d = MUSD_DECIMALS): string {
   if (v === undefined) {
@@ -105,6 +93,34 @@ function fmtBalTitle(v: bigint | undefined, d = MUSD_DECIMALS): string | undefin
     return undefined;
   }
   return formatUnits(v, d);
+}
+
+function parseCsvAddresses(raw: string): Address[] | undefined {
+  const parts = raw
+    .split(/[\s,]+/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+  const out: Address[] = [];
+  for (const p of parts) {
+    if (!isAddress(p)) return undefined;
+    out.push(getAddress(p as Address));
+  }
+  return out;
+}
+
+function parseCsvBigInt(raw: string): bigint[] | undefined {
+  const parts = raw
+    .split(/[\s,]+/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+  const out: bigint[] = [];
+  for (const p of parts) {
+    if (!/^\d+$/.test(p)) return undefined;
+    out.push(BigInt(p));
+  }
+  return out;
 }
 
 export function SnapZoHubAdminView() {
@@ -134,7 +150,6 @@ export function SnapZoHubAdminView() {
   });
 
   const [busy, setBusy] = useState(false);
-  const [injectIn, setInjectIn] = useState("");
   const [relayerIn, setRelayerIn] = useState("");
   const [relayerAllowed, setRelayerAllowed] = useState(true);
   const [feeBpsIn, setFeeBpsIn] = useState("");
@@ -156,10 +171,17 @@ export function SnapZoHubAdminView() {
   const [socialRelayerAllowed, setSocialRelayerAllowed] = useState(true);
   const [hubRewardContractIn, setHubRewardContractIn] = useState("");
   const [rewardsRelayerIn, setRewardsRelayerIn] = useState("");
-  const [rewardsCycleIn, setRewardsCycleIn] = useState("");
-  const [rewardsRootIn, setRewardsRootIn] = useState("");
+  const [rewardsUsersIn, setRewardsUsersIn] = useState("");
+  const [rewardsAmountsIn, setRewardsAmountsIn] = useState("");
+  const [rewardsBpsIn, setRewardsBpsIn] = useState("");
+  const [rewardsPoolIn, setRewardsPoolIn] = useState("");
+  const [rewardsReset, setRewardsReset] = useState(true);
   const [withdrawUnclaimedIn, setWithdrawUnclaimedIn] = useState("");
-  const [rootQueryCycleIn, setRootQueryCycleIn] = useState("");
+  const [rewardsPreviewUserIn, setRewardsPreviewUserIn] = useState("");
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [relayersOpen, setRelayersOpen] = useState(false);
+  const [feeConfigOpen, setFeeConfigOpen] = useState(false);
+  const [dangerOpen, setDangerOpen] = useState(false);
 
   const wrongChain = isConnected && chainId !== mezoTestnet.id;
 
@@ -202,12 +224,6 @@ export function SnapZoHubAdminView() {
     },
   });
 
-  const rootQueryCycle = useMemo(() => {
-    const t = rootQueryCycleIn.trim();
-    if (!/^\d+$/.test(t)) return undefined;
-    return BigInt(t);
-  }, [rootQueryCycleIn]);
-
   const rewardsReads = useReadContracts({
     contracts: [
       { chainId: mezoTestnet.id, address: rewards, abi: snapZoRewardsAbi, functionName: "owner" },
@@ -219,13 +235,6 @@ export function SnapZoHubAdminView() {
         address: rewards,
         abi: snapZoRewardsAbi,
         functionName: "lastUpdateTimestamp",
-      },
-      {
-        chainId: mezoTestnet.id,
-        address: rewards,
-        abi: snapZoRewardsAbi,
-        functionName: "roots",
-        args: rootQueryCycle !== undefined ? [rootQueryCycle] : undefined,
       },
     ],
     query: {
@@ -272,8 +281,19 @@ export function SnapZoHubAdminView() {
     rewardsReads.data?.[3]?.status === "success" ? rewardsReads.data[3].result : undefined;
   const rewardsLastUpdateTs =
     rewardsReads.data?.[4]?.status === "success" ? rewardsReads.data[4].result : undefined;
-  const rewardsRootQueryValue =
-    rewardsReads.data?.[5]?.status === "success" ? rewardsReads.data[5].result : undefined;
+  const rewardsPreviewClaimable = useReadContract({
+    chainId: mezoTestnet.id,
+    address: rewards,
+    abi: snapZoRewardsAbi,
+    functionName: "claimable",
+    args: isAddress(rewardsPreviewUserIn.trim()) ? [getAddress(rewardsPreviewUserIn.trim() as Address)] : undefined,
+    query: {
+      enabled: rewardsOk && isAddress(rewardsPreviewUserIn.trim()),
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
 
   const smusdShareReads = useReadContracts({
     contracts: [
@@ -378,51 +398,15 @@ export function SnapZoHubAdminView() {
   const rewardOnRewardsContract =
     secondaryReads.data?.[4]?.status === "success" ? secondaryReads.data[4].result : undefined;
 
-  const injectParsed = useMemo(() => {
-    const t = injectIn.trim().replace(",", ".");
-    if (!t) {
-      return undefined;
-    }
-    try {
-      return parseUnits(t, MUSD_DECIMALS);
-    } catch {
-      return undefined;
-    }
-  }, [injectIn]);
-
-  const injectAllowance = useReadContract({
-    chainId: mezoTestnet.id,
-    address: MUSD_ADDRESS_MEZO_TESTNET,
-    abi: erc20AllowanceAbi,
-    functionName: "allowance",
-    args:
-      address && injectParsed !== undefined && injectParsed > BigInt(0)
-        ? [address, hub]
-        : undefined,
-    query: {
-      enabled: Boolean(
-        hubOk &&
-          isHubOwner &&
-          address &&
-          injectParsed !== undefined &&
-          injectParsed > BigInt(0),
-      ),
-      staleTime: 0,
-      refetchOnWindowFocus: true,
-    },
-  });
-
   const refetchAll = useCallback(async () => {
     await hubReads.refetch();
     await socialReads.refetch();
     await rewardsReads.refetch();
     await smusdShareReads.refetch();
     await secondaryReads.refetch();
-    await injectAllowance.refetch();
     await queryClient.invalidateQueries({ queryKey: ["snapzoHubRelayers"] });
   }, [
     hubReads,
-    injectAllowance,
     queryClient,
     rewardsReads,
     secondaryReads,
@@ -521,7 +505,7 @@ export function SnapZoHubAdminView() {
         return;
       }
       if (!isRewardsOwner) {
-        toast("Connect the SnapZoRewards owner wallet.", "error");
+        toast("Connect the SnapZoCreators owner wallet.", "error");
         return;
       }
       setBusy(true);
@@ -737,39 +721,6 @@ export function SnapZoHubAdminView() {
     );
   };
 
-  const onInject = async () => {
-    if (!injectParsed || injectParsed === BigInt(0)) {
-      toast("Enter MUSD amount.", "error");
-      return;
-    }
-    await runHubWrite("MUSD injected (no SNAP mint)", async () => {
-      const need =
-        injectAllowance.data !== undefined ? injectParsed > injectAllowance.data : true;
-      if (need) {
-        toast("Approve hub for MUSD…");
-        const h = await writeContractAsync({
-          chainId: mezoTestnet.id,
-          address: MUSD_ADDRESS_MEZO_TESTNET,
-          abi: erc20ApproveAbi,
-          functionName: "approve",
-          args: [hub, maxUint256],
-        });
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash: h });
-        }
-        await injectAllowance.refetch();
-      }
-      return writeContractAsync({
-        chainId: mezoTestnet.id,
-        address: hub,
-        abi: snapZoHubAdminAbi,
-        functionName: "injectMusdWithoutMint",
-        args: [injectParsed],
-      });
-    });
-    setInjectIn("");
-  };
-
   const onSetIntegrations = () => {
     if (!paused) {
       toast("Pause before changing integrations.", "error");
@@ -923,24 +874,70 @@ export function SnapZoHubAdminView() {
     );
   };
 
-  const onRewardsUpdateRoot = () => {
-    const cycleRaw = rewardsCycleIn.trim();
-    if (!/^\d+$/.test(cycleRaw)) {
-      toast("Cycle must be an integer (e.g. 1).", "error");
+  const onRewardsSetAllocations = () => {
+    const users = parseCsvAddresses(rewardsUsersIn);
+    if (!users?.length) {
+      toast("Users must be valid addresses (comma/newline separated).", "error");
       return;
     }
-    const rootRaw = rewardsRootIn.trim();
-    if (!/^0x[0-9a-fA-F]{64}$/.test(rootRaw)) {
-      toast("Root must be 0x + 64 hex chars.", "error");
+    const amountsRaw = rewardsAmountsIn
+      .split(/[\s,]+/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (amountsRaw.length !== users.length) {
+      toast("Users and amounts must have same count.", "error");
       return;
     }
-    void runRewardsWrite("Rewards root updated", () =>
+    const amounts: bigint[] = [];
+    for (const value of amountsRaw) {
+      try {
+        amounts.push(parseUnits(value.replace(",", "."), MUSD_DECIMALS));
+      } catch {
+        toast("Invalid amount in list.", "error");
+        return;
+      }
+    }
+    void runRewardsWrite("Creators allocations updated", () =>
       writeContractAsync({
         chainId: mezoTestnet.id,
         address: rewards,
         abi: snapZoRewardsAbi,
-        functionName: "updateRoot",
-        args: [BigInt(cycleRaw), rootRaw as `0x${string}`],
+        functionName: "setAllocations",
+        args: [users, amounts, rewardsReset],
+      }),
+    );
+  };
+
+  const onRewardsSetAllocationsByBps = () => {
+    const users = parseCsvAddresses(rewardsUsersIn);
+    if (!users?.length) {
+      toast("Users must be valid addresses (comma/newline separated).", "error");
+      return;
+    }
+    const bps = parseCsvBigInt(rewardsBpsIn);
+    if (!bps?.length || bps.length !== users.length) {
+      toast("Users and bps must have same count.", "error");
+      return;
+    }
+    const total = bps.reduce((acc, v) => acc + v, BigInt(0));
+    if (total !== BigInt(10_000)) {
+      toast("BPS must sum to 10000.", "error");
+      return;
+    }
+    let poolAmount: bigint;
+    try {
+      poolAmount = parseUnits(rewardsPoolIn.trim().replace(",", "."), MUSD_DECIMALS);
+    } catch {
+      toast("Invalid pool amount.", "error");
+      return;
+    }
+    void runRewardsWrite("Creators allocations by BPS updated", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "setAllocationsByBps",
+        args: [users, bps, poolAmount, rewardsReset],
       }),
     );
   };
@@ -1060,7 +1057,7 @@ export function SnapZoHubAdminView() {
     getAddress(address as `0x${string}`) === getAddress(feeReceiver as `0x${string}`);
 
   const card =
-    "rounded-2xl border border-white/[0.08] bg-zinc-900/55 p-4 shadow-inner backdrop-blur-sm";
+    "rounded-xl border border-white/[0.08] bg-zinc-900/55 p-3 shadow-inner backdrop-blur-sm";
   const label = "mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500";
   const input =
     "w-full rounded-xl border border-white/12 bg-black/40 px-3 py-2.5 font-mono text-sm text-white outline-none placeholder:text-zinc-600 focus:border-sky-500/40";
@@ -1100,7 +1097,7 @@ export function SnapZoHubAdminView() {
   }
 
   return (
-    <main className="px-4 pb-32 pt-5">
+    <main className="mx-auto w-full max-w-[1400px] px-4 pb-32 pt-5 xl:px-6">
       <div className="mb-5 flex items-start gap-3">
         <Link
           href="/earn"
@@ -1154,12 +1151,172 @@ export function SnapZoHubAdminView() {
 
       {isConnected && rewardsOk && rewardsOwner && !isRewardsOwner ? (
         <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-sm text-sky-100">
-          Connected wallet is not the SnapZoRewards owner ({String(rewardsOwner).slice(0, 6)}…).
+          Connected wallet is not the SnapZoCreators owner ({String(rewardsOwner).slice(0, 6)}…).
           Rewards admin actions are disabled.
         </div>
       ) : null}
 
-      <div className="space-y-4">
+      <div className="space-y-5">
+        {hubOk ? (
+          <section className={`${card} border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.08] to-zinc-900/55`}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-white">Hub control center</h2>
+              <div className="flex items-center gap-2 text-[11px] text-zinc-300">
+                <span className="rounded-md border border-white/15 px-2 py-1 font-mono">
+                  {hub}
+                </span>
+              </div>
+            </div>
+            <div className="grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2">
+                <p className="text-zinc-500">Hub paused</p>
+                <p className="font-semibold text-zinc-100">{paused === undefined ? "…" : paused ? "Yes" : "No"}</p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2">
+                <p className="text-zinc-500">Fee config</p>
+                <p className="font-mono text-zinc-100">
+                  {feeBps === undefined ? "…" : `${String(feeBps)} bps`}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2">
+                <p className="text-zinc-500">Gauge MEZO pending</p>
+                <p className="font-mono text-zinc-100" title={fmtBalTitle(earnedGauge)}>
+                  {fmtBalShort(earnedGauge)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2">
+                <p className="text-zinc-500">Hub reward contract</p>
+                <p className="truncate font-mono text-zinc-100">
+                  {rewardContractAddr ?? "…"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2">
+                <p className="text-zinc-500">Fee receiver</p>
+                <p className="truncate font-mono text-zinc-100">{feeReceiver ?? "…"}</p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2">
+                <p className="text-zinc-500">SNAP token (hub state)</p>
+                <p className="truncate font-mono text-zinc-100">
+                  {hubReads.data?.[10]?.status === "success" ? String(hubReads.data[10].result) : "…"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2">
+                <p className="text-zinc-500">sMUSD on hub</p>
+                <p className="font-mono text-zinc-100" title={fmtBalTitle(smusdTotalWei, SMUSD_DECIMALS)}>
+                  {fmtBalShort(smusdTotalWei, 6, SMUSD_DECIMALS)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" className={miniAction} onClick={() => void copyAddress(hub, "Hub")}>
+                Copy hub
+              </button>
+              <button
+                type="button"
+                className={miniAction}
+                onClick={() => void copyAddress(rewardContractAddr, "Hub reward contract")}
+              >
+                Copy rewardContract
+              </button>
+              <a className={miniAction} href={`${explorerBase}/address/${hub}`} target="_blank" rel="noreferrer">
+                Hub explorer
+              </a>
+              <button type="button" className={miniAction} onClick={() => void refetchAll()}>
+                Refresh all
+              </button>
+            </div>
+            <div className="mt-4 rounded-xl border border-white/[0.08] bg-black/25 p-3">
+              <h3 className="mb-2 text-sm font-semibold text-white">Rewards &amp; treasury</h3>
+              <dl className="mb-3 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-2">
+                  <dt className="text-zinc-500">Gauge pending</dt>
+                  <dd className="font-mono text-zinc-100" title={fmtBalTitle(earnedGauge)}>
+                    {fmtBalShort(earnedGauge)}
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-2">
+                  <dt className="text-zinc-500">Reward token on hub</dt>
+                  <dd className="font-mono text-zinc-100" title={fmtBalTitle(rewardOnHub)}>
+                    {fmtBalShort(rewardOnHub)}
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-2">
+                  <dt className="text-zinc-500">Reward token on fee wallet</dt>
+                  <dd className="font-mono text-zinc-100" title={fmtBalTitle(rewardOnFeeReceiver)}>
+                    {fmtBalShort(rewardOnFeeReceiver)}
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-2">
+                  <dt className="text-zinc-500">MUSD idle on hub</dt>
+                  <dd className="font-mono text-zinc-100" title={fmtBalTitle(musdOnHub)}>
+                    {fmtBalShort(musdOnHub)}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <button type="button" disabled={!canAct} className={btnPrimary} onClick={onHarvest}>
+                  {(busy || isWritePending) ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Harvest
+                </button>
+                <button type="button" disabled={!canAct} className={btnPrimary} onClick={onSyncGaugeRewards}>
+                  Sync gauge
+                </button>
+                <button type="button" disabled={!canAct} className={btnMuted} onClick={onRestake}>
+                  Restake
+                </button>
+                <button type="button" disabled={!canAct} className={btnMuted} onClick={onRecoverAllToSelf}>
+                  Recover hub rewards → me
+                </button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-white/[0.06] bg-black/25 p-2.5">
+                  <p className={label}>Fee wallet payout</p>
+                  <input
+                    className={`${input} mb-2`}
+                    placeholder="Optional recipient 0x… (defaults to hub owner)"
+                    value={feePayoutTo}
+                    onChange={(e) => setFeePayoutTo(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    disabled={!treasuryCan || !rewardOnFeeReceiver || rewardOnFeeReceiver === BigInt(0)}
+                    className={btnMuted}
+                    onClick={() => void onTreasuryTransferOut()}
+                  >
+                    Send all fee rewards
+                  </button>
+                </div>
+                <div className="rounded-lg border border-white/[0.06] bg-black/25 p-2.5">
+                  <p className={label}>Custom recover</p>
+                  <input
+                    className={`${input} mb-2`}
+                    placeholder="Recipient 0x…"
+                    value={recoverTo}
+                    onChange={(e) => setRecoverTo(e.target.value)}
+                  />
+                  <input
+                    className={`${input} mb-2`}
+                    placeholder="Amount (reward token, 18 dp)"
+                    value={recoverAmt}
+                    onChange={(e) => setRecoverAmt(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className={`${btnMuted} w-full`}
+                    disabled={!canAct}
+                    onClick={() => void onRecoverReward()}
+                  >
+                    recoverRewardToken
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <div className="grid gap-4 xl:grid-cols-3">
         {socialOk ? (
           <section className={card}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1172,10 +1329,8 @@ export function SnapZoHubAdminView() {
                 Refresh
               </button>
             </div>
-            <p className="mb-3 text-[10px] leading-relaxed text-zinc-600">
-              Gasless tips, unlocks, and reply escrow (
-              <span className="font-mono">{social}</span>). Same deployer is often owner on both
-              contracts — connect the owner wallet.
+            <p className="mb-2 text-[10px] text-zinc-500">
+              Social contract: <span className="font-mono">{social}</span>
             </p>
             <dl className="mb-4 grid gap-2 text-xs">
               <div className="flex justify-between gap-2">
@@ -1303,7 +1458,7 @@ export function SnapZoHubAdminView() {
         {rewardsOk ? (
           <section className={card}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-white">SnapZoRewards</h2>
+              <h2 className="text-sm font-semibold text-white">SnapZoCreators</h2>
               <button
                 type="button"
                 className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
@@ -1312,9 +1467,8 @@ export function SnapZoHubAdminView() {
                 Refresh
               </button>
             </div>
-            <p className="mb-3 text-[10px] leading-relaxed text-zinc-600">
-              Merkle MEZO distributor (<span className="font-mono">{rewards}</span>) used by the hub
-              fee split path when <span className="font-mono">rewardContract</span> is configured.
+            <p className="mb-2 text-[10px] text-zinc-500">
+              Creators contract: <span className="font-mono">{rewards}</span>
             </p>
             <div className="mb-3 flex flex-wrap gap-2">
               <button
@@ -1347,7 +1501,7 @@ export function SnapZoHubAdminView() {
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt className="text-zinc-500">Last root update</dt>
+                <dt className="text-zinc-500">Last allocation update</dt>
                 <dd className="font-mono text-zinc-200">
                   {rewardsLastUpdateTs === undefined
                     ? "…"
@@ -1383,17 +1537,17 @@ export function SnapZoHubAdminView() {
                 </dd>
               </div>
             </dl>
-            <p className={label}>Query cycle root</p>
+            <p className={label}>Preview claimable for user</p>
             <input
               className={`${input} mb-2`}
-              placeholder="Cycle (e.g. 1)"
-              value={rootQueryCycleIn}
-              onChange={(e) => setRootQueryCycleIn(e.target.value)}
+              placeholder="User 0x…"
+              value={rewardsPreviewUserIn}
+              onChange={(e) => setRewardsPreviewUserIn(e.target.value)}
             />
-            <div className="mb-4 break-all rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2 font-mono text-[10px] text-zinc-300">
-              {rootQueryCycleIn.trim() === ""
-                ? "Enter cycle to read roots(cycle)."
-                : rewardsRootQueryValue ?? "…"}
+            <div className="mb-4 rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2 font-mono text-[11px] text-zinc-300">
+              {isAddress(rewardsPreviewUserIn.trim())
+                ? `claimable = ${fmtBalShort(rewardsPreviewClaimable.data)} MEZO`
+                : "Enter a valid user address to read claimable(user)."}
             </div>
             <p className={label}>Set rewards relayer</p>
             <input
@@ -1410,26 +1564,57 @@ export function SnapZoHubAdminView() {
             >
               setRelayer (rewards)
             </button>
-            <p className={label}>Update Merkle root</p>
+            <p className={label}>Users (comma/newline separated)</p>
             <input
               className={`${input} mb-2`}
-              placeholder="Cycle (uint256)"
-              value={rewardsCycleIn}
-              onChange={(e) => setRewardsCycleIn(e.target.value)}
+              placeholder="0xabc..., 0xdef..."
+              value={rewardsUsersIn}
+              onChange={(e) => setRewardsUsersIn(e.target.value)}
             />
+            <p className={label}>Amounts in MEZO (same order)</p>
             <input
-              className={input}
-              placeholder="Root 0x + 64 hex chars"
-              value={rewardsRootIn}
-              onChange={(e) => setRewardsRootIn(e.target.value)}
+              className={`${input} mb-2`}
+              placeholder="12.5, 22, 0.75"
+              value={rewardsAmountsIn}
+              onChange={(e) => setRewardsAmountsIn(e.target.value)}
             />
+            <label className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
+              <input
+                type="checkbox"
+                checked={rewardsReset}
+                onChange={(e) => setRewardsReset(e.target.checked)}
+              />
+              reset claimable instead of add
+            </label>
             <button
               type="button"
               className={`${btnPrimary} mt-2 mb-4 w-full`}
               disabled={!canActRewards}
-              onClick={onRewardsUpdateRoot}
+              onClick={onRewardsSetAllocations}
             >
-              updateRoot
+              setAllocations
+            </button>
+            <p className={label}>BPS list (same users order, sum 10000)</p>
+            <input
+              className={`${input} mb-2`}
+              placeholder="7000, 3000"
+              value={rewardsBpsIn}
+              onChange={(e) => setRewardsBpsIn(e.target.value)}
+            />
+            <p className={label}>Pool amount in MEZO</p>
+            <input
+              className={`${input} mb-2`}
+              placeholder="1000"
+              value={rewardsPoolIn}
+              onChange={(e) => setRewardsPoolIn(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${btnMuted} mb-4 w-full`}
+              disabled={!canActRewards}
+              onClick={onRewardsSetAllocationsByBps}
+            >
+              setAllocationsByBps
             </button>
             <div className="mb-4 flex flex-wrap gap-2">
               <button
@@ -1475,463 +1660,227 @@ export function SnapZoHubAdminView() {
 
         {hubOk ? (
           <>
-          <section className={card}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-white">Hub status</h2>
-            <button
-              type="button"
-              className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
-              onClick={() => void refetchAll()}
-            >
-              Refresh
+        <section className={card}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white">Pause</h2>
+            <button type="button" className={miniAction} onClick={() => setPauseOpen((v) => !v)}>
+              {pauseOpen ? "Collapse" : "Expand"}
             </button>
           </div>
-          <div className="mb-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={miniAction}
-              onClick={() => void copyAddress(hub, "Hub")}
-            >
-              Copy hub
-            </button>
-            <a
-              className={miniAction}
-              href={`${explorerBase}/address/${hub}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Hub on explorer
-            </a>
-            <button
-              type="button"
-              className={miniAction}
-              onClick={() => void copyAddress(rewardTokenAddr, "Reward token")}
-            >
-              Copy reward token
-            </button>
-            <button
-              type="button"
-              className={miniAction}
-              onClick={() => void copyAddress(rewardContractAddr, "Hub reward contract")}
-            >
-              Copy hub rewardContract
-            </button>
-            {rewardTokenAddr && isAddress(rewardTokenAddr) ? (
-              <a
-                className={miniAction}
-                href={`${explorerBase}/address/${rewardTokenAddr}`}
-                target="_blank"
-                rel="noreferrer"
+          {pauseOpen ? (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={!canAct || paused === true} className={btnDanger} onClick={onPause}>
+                Pause hub
+              </button>
+              <button
+                type="button"
+                disabled={!canAct || paused === false}
+                className={btnPrimary}
+                onClick={onUnpause}
               >
-                Reward token on explorer
-              </a>
-            ) : null}
-            {rewardContractAddr && isAddress(rewardContractAddr) ? (
-              <a
-                className={miniAction}
-                href={`${explorerBase}/address/${rewardContractAddr}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Hub rewardContract on explorer
-              </a>
-            ) : null}
-          </div>
-          <dl className="grid gap-2 text-xs">
-            <div className="flex justify-between gap-2">
-              <dt className="text-zinc-500">Paused</dt>
-              <dd className="font-medium text-zinc-200">{paused === undefined ? "…" : paused ? "Yes" : "No"}</dd>
+                Unpause hub
+              </button>
             </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-zinc-500">Fee bps</dt>
-              <dd className="font-mono text-zinc-200">{feeBps === undefined ? "…" : String(feeBps)}</dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-zinc-500">Fee recipient</dt>
-              <dd className="break-all font-mono text-[10px] text-zinc-300">
-                {feeReceiver ?? "…"}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-zinc-500">Reward contract</dt>
-              <dd className="break-all font-mono text-[10px] text-zinc-300">
-                {rewardContractAddr ?? "…"}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-zinc-500">Snap token (hub state)</dt>
-              <dd className="break-all font-mono text-[10px] text-zinc-300">
-                {hubReads.data?.[10]?.status === "success" ? String(hubReads.data[10].result) : "…"}
-              </dd>
-              <p className="text-[10px] leading-snug text-zinc-600">
-                Matches env:{" "}
-                {hubReads.data?.[10]?.status === "success" &&
-                getAddress(String(hubReads.data[10].result)) === getAddress(SNAPZO_SNAP_TOKEN_ADDRESS)
-                  ? "✓"
-                  : "Mismatch!"}
-              </p>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <div className="flex justify-between gap-2">
-                <dt className="text-zinc-500">sMUSD on hub</dt>
-                <dd
-                  className="font-mono text-zinc-200"
-                  title={fmtBalTitle(smusdTotalWei, SMUSD_DECIMALS)}
-                >
-                  {fmtBalShort(smusdTotalWei, 6, SMUSD_DECIMALS)}
-                </dd>
-              </div>
-              <p className="text-[10px] leading-snug text-zinc-600">
-                <span className="font-mono">vault.balanceOf(hub) + gauge.balanceOf(hub)</span> — vault
-                share wei (18 decimals). SNAP mints 1:1 with{" "}
-                <strong className="text-zinc-500">Δ</strong> of this total on each deposit.
-              </p>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="flex items-center gap-1 text-zinc-500">
-                <MusdInlineIcon decorative />
-                MUSD idle on hub
-              </dt>
-              <dd className="font-mono text-zinc-200" title={fmtBalTitle(musdOnHub)}>
-                {fmtBalShort(musdOnHub)}
-              </dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-white">Rewards &amp; treasury</h2>
-          <dl className="mb-4 grid gap-2 text-xs">
-            <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-2">
-              <dt className="text-zinc-500">Gauge earned (pending)</dt>
-              <dd
-                className="font-mono text-emerald-200/90 sm:text-right"
-                title={fmtBalTitle(earnedGauge)}
-              >
-                {fmtBalShort(earnedGauge)}
-              </dd>
-            </div>
-            <p className="col-span-full text-[10px] leading-snug text-zinc-600">
-              <span className="font-mono">gauge.earned(hub)</span> is emissions still in the gauge
-              contract. <strong>Harvest</strong> or <strong>Sync gauge</strong> calls{" "}
-              <span className="font-mono">getReward</span> into the hub and increases the SNAP reward
-              index (no fee on claim). <strong>Restake</strong> only moves idle MUSD; it does not swap
-              hub-held reward tokens.
-            </p>
-            <div className="flex justify-between gap-2">
-              <dt className="text-zinc-500">Reward token on hub</dt>
-              <dd className="font-mono text-zinc-200" title={fmtBalTitle(rewardOnHub)}>
-                {fmtBalShort(rewardOnHub)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-zinc-500">Reward token on fee recipient</dt>
-              <dd className="font-mono text-amber-100/90" title={fmtBalTitle(rewardOnFeeReceiver)}>
-                {fmtBalShort(rewardOnFeeReceiver)}
-              </dd>
-            </div>
-            <p className="col-span-full text-[10px] leading-snug text-zinc-600">
-              The fee recipient balance is mostly from the <strong><MezoInlineIcon decorative /> MEZO leg on user withdraws</strong>{" "}
-              (<span className="font-mono">feeBps</span>), not from harvest.
-            </p>
-          </dl>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <button type="button" disabled={!canAct} className={btnPrimary} onClick={onHarvest}>
-              {(busy || isWritePending) ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Harvest (relayer / owner)
-            </button>
-            <button type="button" disabled={!canAct} className={btnPrimary} onClick={onSyncGaugeRewards}>
-              Sync gauge (owner)
-            </button>
-            <button type="button" disabled={!canAct} className={btnMuted} onClick={onRestake}>
-              Restake
-            </button>
-            <button type="button" disabled={!canAct} className={btnMuted} onClick={onRecoverAllToSelf}>
-              Recover hub rewards → me
-            </button>
-          </div>
-          <p className="mt-3 text-[10px] text-zinc-600">
-            Harvest and Sync gauge both call <span className="font-mono">gauge.getReward(hub)</span> and
-            index <MezoInlineIcon decorative /> MEZO to SNAP holders. <span className="font-mono">recoverRewardToken</span> is only
-            allowed while <strong>paused</strong>.
-          </p>
-          <div className="mt-4 border-t border-white/[0.06] pt-4">
-            <p className={label}>Fee recipient → payout reward token</p>
-            <p className="mb-2 text-[10px] text-zinc-600">
-              Connect the <span className="font-mono">feeReceiver</span> wallet. Sends the{" "}
-              <strong>full refreshed</strong> reward balance to the hub <strong>owner</strong> by
-              default (ERC-20 <span className="font-mono">transfer</span> to yourself is a no-op).
-            </p>
-            <input
-              className={`${input} mb-2`}
-              placeholder="Optional recipient 0x… (defaults to hub owner)"
-              value={feePayoutTo}
-              onChange={(e) => setFeePayoutTo(e.target.value)}
-            />
-            <button
-              type="button"
-              disabled={
-                !treasuryCan || !rewardOnFeeReceiver || rewardOnFeeReceiver === BigInt(0)
-              }
-              className={btnMuted}
-              onClick={() => void onTreasuryTransferOut()}
-            >
-              Send all fee-recipient rewards → owner
-            </button>
-          </div>
-          <div className="mt-4 border-t border-white/[0.06] pt-4">
-            <p className={label}>Custom recover</p>
-            <input
-              className={`${input} mb-2`}
-              placeholder="Recipient 0x…"
-              value={recoverTo}
-              onChange={(e) => setRecoverTo(e.target.value)}
-            />
-            <input
-              className={input}
-              placeholder="Amount (reward token, 18 dp)"
-              value={recoverAmt}
-              onChange={(e) => setRecoverAmt(e.target.value)}
-            />
-            <button
-              type="button"
-              className={`${btnMuted} mt-2 w-full sm:w-auto`}
-              disabled={!canAct}
-              onClick={() => void onRecoverReward()}
-            >
-              recoverRewardToken
-            </button>
-          </div>
-        </section>
-
-        <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-white">Pause</h2>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={!canAct || paused === true} className={btnDanger} onClick={onPause}>
-              Pause hub
-            </button>
-            <button
-              type="button"
-              disabled={!canAct || paused === false}
-              className={btnPrimary}
-              onClick={onUnpause}
-            >
-              Unpause hub
-            </button>
-          </div>
-        </section>
-
-        <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-white">Inject MUSD (no SNAP)</h2>
-          <p className="mb-2 text-[10px] text-zinc-600">
-            Approve MUSD to the hub, then pull from your wallet into vault/gauge via{" "}
-            <span className="font-mono">injectMusdWithoutMint</span>.
-          </p>
-          <input
-            className={input}
-            inputMode="decimal"
-            placeholder="0.00 MUSD"
-            value={injectIn}
-            onChange={(e) => setInjectIn(e.target.value)}
-          />
-          <button
-            type="button"
-            className={`${btnPrimary} mt-2 w-full`}
-            disabled={!canAct}
-            onClick={() => void onInject()}
-          >
-            Inject
-          </button>
-        </section>
-
-        <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-white">Relayers</h2>
-          <p className="mb-2 text-[10px] leading-relaxed text-zinc-600">
-            Allowlist from <span className="font-mono">RelayerUpdated</span> since deploy block{" "}
-            <span className="font-mono">{String(SNAPZO_HUB_DEPLOY_BLOCK)}</span> (override with{" "}
-            <span className="font-mono">NEXT_PUBLIC_SNAPZO_HUB_DEPLOY_BLOCK</span> if you redeploy).
-            Each address is re-checked with <span className="font-mono">isRelayer</span>.
-          </p>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
-              onClick={() => void relayersListQuery.refetch()}
-            >
-              Refresh relayer list
-            </button>
-            {relayersListQuery.isFetching ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" aria-hidden />
-            ) : null}
-          </div>
-          {relayersListQuery.isError ? (
-            <p className="mb-2 text-xs text-red-300/90">
-              {(relayersListQuery.error as Error)?.message ?? "Could not load relayer logs."}
-            </p>
           ) : null}
-          <ul className="mb-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-black/25 p-2 text-[11px]">
-            {relayersListQuery.data?.length ? (
-              relayersListQuery.data.map((r) => (
-                <li
-                  key={r.address}
-                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-2 py-1.5 font-mono text-zinc-200 hover:bg-white/[0.04]"
-                >
-                  <span className="min-w-0 flex-1 break-all">{r.address}</span>
-                  <span
-                    className={
-                      r.isRelayerOnChain ? "shrink-0 text-emerald-400" : "shrink-0 text-amber-300"
-                    }
-                  >
-                    {r.isRelayerOnChain ? "isRelayer ✓" : "log vs chain mismatch"}
-                  </span>
-                  <a
-                    className="shrink-0 text-sky-400/90 underline-offset-2 hover:underline"
-                    href={`${mezoTestnet.blockExplorers.default.url}/address/${r.address}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Explorer
-                  </a>
-                </li>
-              ))
-            ) : relayersListQuery.isPending ? (
-              <li className="px-2 py-2 text-zinc-500">Loading…</li>
-            ) : (
-              <li className="px-2 py-2 text-zinc-500">No allowlisted relayers in log range.</li>
-            )}
-          </ul>
-          <p className="mb-3 text-[10px] leading-relaxed text-zinc-600">
-            <strong>Relay gas:</strong> <span className="font-mono">depositWithSig</span> /{" "}
-            <span className="font-mono">withdrawWithSig</span> need hundreds of thousands of gas. A
-            failed tx with <span className="font-mono">gasLimit ≈ 23380</span> (see{" "}
-            <a
-              className="text-sky-400/90 underline-offset-2 hover:underline"
-              href="https://explorer.test.mezo.org/tx/0x2f51e6f83e138170fa8ff37942f3dd93834c6048229d4750d6d233698c1291e7"
-              target="_blank"
-              rel="noreferrer"
-            >
-              example
-            </a>
-            ) ran out of gas, not necessarily a bad private key. Use the app relay routes (they
-            estimate gas + buffer) or set a high manual gas cap.
-          </p>
-          <input
-            className={input}
-            placeholder="Relayer 0x…"
-            value={relayerIn}
-            onChange={(e) => setRelayerIn(e.target.value)}
-          />
-          <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
-            <input
-              type="checkbox"
-              checked={relayerAllowed}
-              onChange={(e) => setRelayerAllowed(e.target.checked)}
-            />
-            Allowed
-          </label>
-          <button
-            type="button"
-            className={`${btnMuted} mt-2 w-full`}
-            disabled={!canAct}
-            onClick={onSetRelayer}
-          >
-            setRelayer
-          </button>
         </section>
 
         <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-white">Fee config</h2>
-          <input
-            className={`${input} mb-2`}
-            placeholder="feeBps (0–2000)"
-            value={feeBpsIn}
-            onChange={(e) => setFeeBpsIn(e.target.value)}
-          />
-          <input
-            className={input}
-            placeholder="New feeReceiver (0x… or leave blank to keep)"
-            value={feeRecvIn}
-            onChange={(e) => setFeeRecvIn(e.target.value)}
-          />
-          <button
-            type="button"
-            className={`${btnMuted} mt-2 w-full`}
-            disabled={!canAct}
-            onClick={onSetFee}
-          >
-            setFee
-          </button>
-          <div className="mt-4 border-t border-white/[0.06] pt-4">
-            <p className={label}>Rewards contract link (hub)</p>
-            <p className="mb-2 text-[10px] text-zinc-600">
-              Set <span className="font-mono">hub.rewardContract</span>. When configured, withdraw
-              fee is forced to 20% and split 10% treasury / 10% rewards contract.
-            </p>
-            <input
-              className={input}
-              placeholder="SnapZoRewards 0x…"
-              value={hubRewardContractIn}
-              onChange={(e) => setHubRewardContractIn(e.target.value)}
-            />
-            <button
-              type="button"
-              className={`${btnMuted} mt-2 w-full`}
-              disabled={!canAct}
-              onClick={onSetHubRewardContract}
-            >
-              setRewardContract
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white">Relayers</h2>
+            <button type="button" className={miniAction} onClick={() => setRelayersOpen((v) => !v)}>
+              {relayersOpen ? "Collapse" : "Expand"}
             </button>
           </div>
+          {relayersOpen ? (
+            <>
+              <p className="mb-2 text-[10px] text-zinc-500">
+                Relayers from block <span className="font-mono">{String(SNAPZO_HUB_DEPLOY_BLOCK)}</span>.
+              </p>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
+                  onClick={() => void relayersListQuery.refetch()}
+                >
+                  Refresh relayer list
+                </button>
+                {relayersListQuery.isFetching ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-500" aria-hidden />
+                ) : null}
+              </div>
+              {relayersListQuery.isError ? (
+                <p className="mb-2 text-xs text-red-300/90">
+                  {(relayersListQuery.error as Error)?.message ?? "Could not load relayer logs."}
+                </p>
+              ) : null}
+              <ul className="mb-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-black/25 p-2 text-[11px]">
+                {relayersListQuery.data?.length ? (
+                  relayersListQuery.data.map((r) => (
+                    <li
+                      key={r.address}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-2 py-1.5 font-mono text-zinc-200 hover:bg-white/[0.04]"
+                    >
+                      <span className="min-w-0 flex-1 break-all">{r.address}</span>
+                      <span
+                        className={
+                          r.isRelayerOnChain ? "shrink-0 text-emerald-400" : "shrink-0 text-amber-300"
+                        }
+                      >
+                        {r.isRelayerOnChain ? "isRelayer ✓" : "log vs chain mismatch"}
+                      </span>
+                      <a
+                        className="shrink-0 text-sky-400/90 underline-offset-2 hover:underline"
+                        href={`${mezoTestnet.blockExplorers.default.url}/address/${r.address}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Explorer
+                      </a>
+                    </li>
+                  ))
+                ) : relayersListQuery.isPending ? (
+                  <li className="px-2 py-2 text-zinc-500">Loading…</li>
+                ) : (
+                  <li className="px-2 py-2 text-zinc-500">No allowlisted relayers in log range.</li>
+                )}
+              </ul>
+              <p className="mb-3 text-[10px] text-zinc-500">
+                Relay txs need high gas limits; low gas causes failures.
+              </p>
+              <input
+                className={input}
+                placeholder="Relayer 0x…"
+                value={relayerIn}
+                onChange={(e) => setRelayerIn(e.target.value)}
+              />
+              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={relayerAllowed}
+                  onChange={(e) => setRelayerAllowed(e.target.checked)}
+                />
+                Allowed
+              </label>
+              <button
+                type="button"
+                className={`${btnMuted} mt-2 w-full`}
+                disabled={!canAct}
+                onClick={onSetRelayer}
+              >
+                setRelayer
+              </button>
+            </>
+          ) : null}
         </section>
 
         <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-amber-200/90">Danger zone</h2>
-          <p className="mb-3 text-[10px] text-zinc-500">
-            <span className="font-mono">setIntegrations</span> and{" "}
-            <span className="font-mono">setRestakeRoutes</span> require the hub to be{" "}
-            <strong>paused</strong>. <span className="font-mono">sweep</span> only while paused; cannot
-            target MUSD, SNAP, reward token, or vault token per contract denylist.
-          </p>
-          <p className={`${label} text-zinc-400`}>setIntegrations (paused)</p>
-          <div className="mb-2 grid gap-2">
-            <input className={input} placeholder="MUSD" value={intMusd} onChange={(e) => setIntMusd(e.target.value)} />
-            <input className={input} placeholder="Vault" value={intVault} onChange={(e) => setIntVault(e.target.value)} />
-            <input className={input} placeholder="Gauge" value={intGauge} onChange={(e) => setIntGauge(e.target.value)} />
-            <input className={input} placeholder="Router" value={intRouter} onChange={(e) => setIntRouter(e.target.value)} />
-            <input className={input} placeholder="Reward token" value={intReward} onChange={(e) => setIntReward(e.target.value)} />
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white">Fee config</h2>
+            <button type="button" className={miniAction} onClick={() => setFeeConfigOpen((v) => !v)}>
+              {feeConfigOpen ? "Collapse" : "Expand"}
+            </button>
           </div>
-          <button type="button" disabled={!canAct} className={btnDanger} onClick={() => void onSetIntegrations()}>
-            setIntegrations
-          </button>
-          <p className={`${label} mt-4 text-zinc-400`}>setRestakeRoutes (paused)</p>
-          <textarea
-            className={`${input} min-h-[72px] font-mono text-xs`}
-            placeholder="0x… ABI-encoded routes bytes"
-            value={routesHex}
-            onChange={(e) => setRoutesHex(e.target.value)}
-          />
-          <button type="button" disabled={!canAct} className={`${btnDanger} mt-2`} onClick={() => void onSetRoutes()}>
-            setRestakeRoutes
-          </button>
-          <p className={`${label} mt-4 text-zinc-400`}>sweep (paused)</p>
-          <input
-            className={`${input} mb-2`}
-            placeholder="Token 0x…"
-            value={sweepToken}
-            onChange={(e) => setSweepToken(e.target.value)}
-          />
-          <input
-            className={input}
-            placeholder="Amount (18 dp)"
-            value={sweepAmt}
-            onChange={(e) => setSweepAmt(e.target.value)}
-          />
-          <button type="button" disabled={!canAct} className={`${btnDanger} mt-2`} onClick={() => void onSweep()}>
-            sweep → owner
-          </button>
+          {feeConfigOpen ? (
+            <>
+              <input
+                className={`${input} mb-2`}
+                placeholder="feeBps (0–2000)"
+                value={feeBpsIn}
+                onChange={(e) => setFeeBpsIn(e.target.value)}
+              />
+              <input
+                className={input}
+                placeholder="New feeReceiver (0x… or leave blank to keep)"
+                value={feeRecvIn}
+                onChange={(e) => setFeeRecvIn(e.target.value)}
+              />
+              <button
+                type="button"
+                className={`${btnMuted} mt-2 w-full`}
+                disabled={!canAct}
+                onClick={onSetFee}
+              >
+                setFee
+              </button>
+              <div className="mt-4 border-t border-white/[0.06] pt-4">
+                <p className={label}>Rewards contract link (hub)</p>
+                <p className="mb-2 text-[10px] text-zinc-600">
+                  Set <span className="font-mono">hub.rewardContract</span>.
+                </p>
+                <input
+                  className={input}
+                  placeholder="SnapZoRewards 0x…"
+                  value={hubRewardContractIn}
+                  onChange={(e) => setHubRewardContractIn(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={`${btnMuted} mt-2 w-full`}
+                  disabled={!canAct}
+                  onClick={onSetHubRewardContract}
+                >
+                  setRewardContract
+                </button>
+              </div>
+            </>
+          ) : null}
+        </section>
+
+        <section className={card}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-amber-200/90">Danger zone</h2>
+            <button type="button" className={miniAction} onClick={() => setDangerOpen((v) => !v)}>
+              {dangerOpen ? "Collapse" : "Expand"}
+            </button>
+          </div>
+          {dangerOpen ? (
+            <>
+              <p className="mb-3 text-[10px] text-zinc-500">
+                Advanced paused-only admin actions.
+              </p>
+              <p className={`${label} text-zinc-400`}>setIntegrations (paused)</p>
+              <div className="mb-2 grid gap-2">
+                <input className={input} placeholder="MUSD" value={intMusd} onChange={(e) => setIntMusd(e.target.value)} />
+                <input className={input} placeholder="Vault" value={intVault} onChange={(e) => setIntVault(e.target.value)} />
+                <input className={input} placeholder="Gauge" value={intGauge} onChange={(e) => setIntGauge(e.target.value)} />
+                <input className={input} placeholder="Router" value={intRouter} onChange={(e) => setIntRouter(e.target.value)} />
+                <input className={input} placeholder="Reward token" value={intReward} onChange={(e) => setIntReward(e.target.value)} />
+              </div>
+              <button type="button" disabled={!canAct} className={btnDanger} onClick={() => void onSetIntegrations()}>
+                setIntegrations
+              </button>
+              <p className={`${label} mt-4 text-zinc-400`}>setRestakeRoutes (paused)</p>
+              <textarea
+                className={`${input} min-h-[72px] font-mono text-xs`}
+                placeholder="0x… ABI-encoded routes bytes"
+                value={routesHex}
+                onChange={(e) => setRoutesHex(e.target.value)}
+              />
+              <button type="button" disabled={!canAct} className={`${btnDanger} mt-2`} onClick={() => void onSetRoutes()}>
+                setRestakeRoutes
+              </button>
+              <p className={`${label} mt-4 text-zinc-400`}>sweep (paused)</p>
+              <input
+                className={`${input} mb-2`}
+                placeholder="Token 0x…"
+                value={sweepToken}
+                onChange={(e) => setSweepToken(e.target.value)}
+              />
+              <input
+                className={input}
+                placeholder="Amount (18 dp)"
+                value={sweepAmt}
+                onChange={(e) => setSweepAmt(e.target.value)}
+              />
+              <button type="button" disabled={!canAct} className={`${btnDanger} mt-2`} onClick={() => void onSweep()}>
+                sweep → owner
+              </button>
+            </>
+          ) : null}
         </section>
           </>
         ) : null}
+        </div>
       </div>
     </main>
   );

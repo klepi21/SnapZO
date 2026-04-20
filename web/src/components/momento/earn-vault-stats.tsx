@@ -203,6 +203,7 @@ export function EarnVaultStats() {
       {
         chainId: mezoTestnet.id,
         address: SNAPZO_REWARDS_ADDRESS,
+        abi: erc20BalanceAbi,
         functionName: "balanceOf",
         args: [SNAPZO_REWARDS_ADDRESS],
       },

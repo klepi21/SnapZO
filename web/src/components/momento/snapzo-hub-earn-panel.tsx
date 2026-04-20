@@ -802,33 +802,9 @@ export function SnapZoHubEarnPanel() {
           </div>
           <p className="mt-1.5 text-sm text-zinc-400">
             {hubMode === "deposit" ? (
-              <>
-                Send{" "}
-                <span className="inline-flex items-center gap-0.5 align-middle font-medium text-zinc-200">
-                  <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
-                  MUSD
-                </span>{" "}
-                → receive{" "}
-                <span className="inline-flex items-center gap-0 whitespace-nowrap align-middle">
-                  <SnapInlineIcon decorative />
-                  {"SNAP"}
-                </span>
-                .
-              </>
+              <>Send MUSD → receive SNAP.</>
             ) : (
-              <>
-                Burn{" "}
-                <span className="inline-flex items-center gap-0 align-middle">
-                  <SnapInlineIcon decorative />
-                  {"SNAP"}
-                </span>{" "}
-                →{" "}
-                <span className="inline-flex items-center gap-0.5 align-middle font-medium text-zinc-200">
-                  <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
-                  MUSD
-                </span>{" "}
-                + MEZO (fee on MEZO only).
-              </>
+              <>Burn SNAP → MUSD + MEZO (fee on MEZO only).</>
             )}
           </p>
         </div>

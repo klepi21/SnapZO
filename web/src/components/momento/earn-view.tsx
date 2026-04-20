@@ -60,34 +60,11 @@ export function EarnView() {
                 </p>
               </HelpPopover>
             </div>
-            <p className="mt-1.5 text-sm text-zinc-400">
-              MUSD pool ·{" "}
-              <span className="inline-flex items-center gap-0 whitespace-nowrap align-middle">
-                <SnapInlineIcon decorative />
-                {"SNAP receipts"}
-              </span>{" "}
-              · relayer covers gas
-            </p>
           </div>
         </div>
       </div>
 
       <div className="mx-4 flex flex-col gap-4 sm:gap-5">
-        <section
-          className="rounded-2xl border border-white/[0.08] bg-zinc-900/45 px-3 py-3 sm:px-4"
-          aria-labelledby="earn-hub-section"
-        >
-          <h2
-            id="earn-hub-section"
-            className="text-sm font-semibold uppercase tracking-wide text-zinc-300"
-          >
-            Hub pool (deposit / withdraw)
-          </h2>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-            Deposit MUSD and mint SNAP receipts. Withdraw burns SNAP and returns MUSD + indexed MEZO
-            rewards (minus fee).
-          </p>
-        </section>
         {hubUi ? (
           <SnapZoHubEarnPanel />
         ) : (
@@ -96,21 +73,6 @@ export function EarnView() {
             <span className="font-mono text-zinc-500">NEXT_PUBLIC_SNAPZO_HUB_UI</span>).
           </div>
         )}
-        <section
-          className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.06] px-3 py-3 sm:px-4"
-          aria-labelledby="earn-creator-rewards-section"
-        >
-          <h2
-            id="earn-creator-rewards-section"
-            className="text-sm font-semibold uppercase tracking-wide text-sky-200/90"
-          >
-            Creator rewards (SnapZoRewards)
-          </h2>
-          <p className="mt-1 text-xs leading-relaxed text-sky-100/70">
-            Separate flow: creators claim weekly Merkle-based MEZO rewards from the rewards contract.
-            This is independent from hub deposit and withdraw actions.
-          </p>
-        </section>
         <SnapZoRewardsClaimPanel />
         <EarnVaultStats />
       </div>
