@@ -119,7 +119,7 @@ export function SnapZoRewardsClaimPanel() {
     "inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-40";
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-gradient-to-b from-zinc-900/85 to-black/80 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-xl sm:p-5">
+    <section className="snapzo-card-primary p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight text-white">
           Creator rewards

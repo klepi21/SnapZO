@@ -307,10 +307,7 @@ export function EarnVaultStats() {
               : "—";
 
   return (
-    <section
-      className="rounded-[22px] border border-white/[0.08] bg-zinc-900/50 px-4 py-4 backdrop-blur-sm sm:px-5"
-      aria-label="SnapZo hub gauge position"
-    >
+    <section className="snapzo-card-primary px-4 py-4 sm:px-5" aria-label="SnapZo hub gauge position">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight text-white">Hub on-chain</h2>
         <HelpPopover label="How these stats are derived" size="sm">

@@ -32,6 +32,9 @@
 
 body {
   font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes snapzo-toast-in {
@@ -47,4 +50,49 @@ body {
 
 .snapzo-toast-enter {
   animation: snapzo-toast-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Shared mobile surface styles for consistent app-like hierarchy. */
+.snapzo-card-primary {
+  @apply overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/88 to-black/78 backdrop-blur-xl;
+  box-shadow:
+    0 16px 46px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.snapzo-card-compact {
+  @apply rounded-2xl border border-white/[0.06] bg-black/30;
+}
+
+.snapzo-pressable {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    opacity 180ms ease;
+}
+
+.snapzo-pressable:active {
+  transform: scale(0.98);
+}
+
+.snapzo-title-tight {
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
+.snapzo-micro-label {
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snapzo-pressable,
+  .snapzo-card-primary,
+  .snapzo-card-compact {
+    transition: none !important;
+    animation: none !important;
+  }
 }

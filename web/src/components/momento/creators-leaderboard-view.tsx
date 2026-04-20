@@ -88,12 +88,12 @@ export function CreatorsLeaderboardView() {
         </p>
       </div>
 
-      <section className="mx-4 mt-4 rounded-3xl border border-white/[0.08] bg-zinc-900/45 p-3 backdrop-blur-xl">
+      <section className="snapzo-card-primary mx-4 mt-4 p-3">
         <ol className="space-y-2">
           {rows.map((row, idx) => (
             <li
               key={row.address}
-              className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-black/30 px-3 py-2.5"
+              className="flex items-center gap-3 rounded-2xl border border-white/[0.05] bg-black/26 px-3 py-2.5"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] text-xs font-semibold text-zinc-200">
                 {idx === 0 ? <Crown className="h-4 w-4 text-amber-300" /> : idx + 1}

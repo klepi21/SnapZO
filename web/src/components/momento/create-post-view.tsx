@@ -219,7 +219,7 @@ export function CreatePostView() {
       <div className="mb-4 flex items-center gap-2 px-4">
         <Link
           href="/feed"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.12] bg-black/25 text-white backdrop-blur-md transition hover:bg-white/10"
+          className="snapzo-pressable flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.12] bg-black/25 text-white backdrop-blur-md hover:bg-white/10"
           aria-label="Back to feed"
         >
           <ChevronLeft className="h-5 w-5" strokeWidth={2} />
@@ -232,7 +232,7 @@ export function CreatePostView() {
         </div>
       </div>
 
-      <div className="mx-4 overflow-hidden rounded-[28px] border border-white/[0.1] bg-white/[0.045] shadow-[0_20px_56px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+      <div className="snapzo-card-primary mx-4">
         <div className="border-b border-white/[0.08] px-4 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
             Photo
@@ -251,7 +251,7 @@ export function CreatePostView() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-[22px] border border-dashed border-white/15 bg-black/20 py-10 text-zinc-400 transition hover:border-indigo-400/35 hover:bg-white/[0.04] hover:text-zinc-200"
+            className="snapzo-pressable mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-[22px] border border-dashed border-white/15 bg-black/20 py-10 text-zinc-400 hover:border-indigo-400/35 hover:bg-white/[0.04] hover:text-zinc-200"
           >
             {previewUrl ? (
               <div className="relative mx-auto aspect-[4/5] w-full max-w-[280px] overflow-hidden rounded-[18px] ring-1 ring-white/10">
@@ -274,7 +274,7 @@ export function CreatePostView() {
             <button
               type="button"
               onClick={() => onPickFile(null)}
-              className="mt-2 w-full text-center text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+            className="snapzo-pressable mt-2 w-full text-center text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
             >
               Remove photo
             </button>
@@ -375,7 +375,7 @@ export function CreatePostView() {
             type="button"
             disabled={submitting}
             onClick={() => void handleSubmit()}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/35 to-sky-500/25 py-3.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.18)] transition hover:border-indigo-300/55 hover:from-indigo-500/45 disabled:cursor-not-allowed disabled:opacity-45"
+            className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/35 to-sky-500/25 py-3.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.18)] hover:border-indigo-300/55 hover:from-indigo-500/45 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {submitting ? (
               <>
@@ -393,7 +393,7 @@ export function CreatePostView() {
         </div>
       </div>
 
-      <div className="mx-4 mt-5 flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-[#0c1018]/90 px-4 py-3">
+      <div className="snapzo-card-compact mx-4 mt-5 flex items-start gap-3 bg-[#0c1018]/90 px-4 py-3">
         <div className="relative mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-full ring-2 ring-indigo-500/30">
           {isConnected && address ? (
             <NextImage

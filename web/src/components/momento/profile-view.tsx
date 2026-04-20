@@ -166,7 +166,7 @@ export function ProfileView() {
                 </h2>
                 <button
                   type="button"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
+                  className="snapzo-pressable flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 hover:bg-white/[0.08] hover:text-white"
                   aria-label="Close"
                   onClick={() => setEditOpen(false)}
                 >
@@ -215,7 +215,7 @@ export function ProfileView() {
                     <button
                       type="button"
                       onClick={() => fileRef.current?.click()}
-                      className="text-sm font-semibold text-[#0095f6] transition hover:text-[#47b8ff]"
+                      className="snapzo-pressable text-sm font-semibold text-[#0095f6] hover:text-[#47b8ff]"
                     >
                       Change photo
                     </button>
@@ -225,7 +225,7 @@ export function ProfileView() {
                     {draft.avatarDataUrl ? (
                       <button
                         type="button"
-                        className="mt-2 text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+                        className="snapzo-pressable mt-2 text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
                         onClick={() =>
                           setDraft((d) => ({ ...d, avatarDataUrl: null }))
                         }
@@ -310,7 +310,7 @@ export function ProfileView() {
                 <button
                   type="button"
                   onClick={saveEdit}
-                  className="w-full rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/35 to-sky-500/25 py-3.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.18)] transition hover:border-indigo-300/55 hover:from-indigo-500/45"
+                  className="snapzo-pressable w-full rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/35 to-sky-500/25 py-3.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.18)] hover:border-indigo-300/55 hover:from-indigo-500/45"
                 >
                   Save
                 </button>
@@ -336,7 +336,7 @@ export function ProfileView() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#060814] via-transparent to-black/30" />
         <Link
           href="/feed"
-          className="absolute left-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition hover:bg-black/55"
+          className="snapzo-pressable absolute left-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md hover:bg-black/55"
           aria-label="Back to feed"
         >
           <ChevronLeft className="h-5 w-5" strokeWidth={2} />
@@ -344,14 +344,14 @@ export function ProfileView() {
         <div className="absolute right-3 top-3 z-20 flex gap-2">
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-md"
+            className="snapzo-pressable flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-md"
             aria-label="Share profile"
           >
             <Share2 className="h-4 w-4" />
           </button>
           <button
             type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-md"
+            className="snapzo-pressable flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-md"
             aria-label="Settings"
           >
             <Settings className="h-4 w-4" />
@@ -397,7 +397,7 @@ export function ProfileView() {
           </p>
         ) : null}
 
-        <div className="mt-6 grid w-full max-w-sm grid-cols-3 gap-2 rounded-2xl border border-white/[0.06] bg-[#0c1018] px-2 py-4">
+        <div className="snapzo-card-compact mt-6 grid w-full max-w-sm grid-cols-3 gap-2 bg-[#0c1018] px-2 py-4">
           <div className="text-center">
             <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
               Likes
@@ -430,7 +430,7 @@ export function ProfileView() {
           <button
             type="button"
             onClick={openEdit}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#3b82f6] to-[#2563eb] py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20"
+            className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-full border border-sky-400/40 bg-gradient-to-r from-[#3b82f6] to-[#2563eb] py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20"
           >
             <UserPen className="h-4 w-4" />
             Edit profile
@@ -443,7 +443,7 @@ export function ProfileView() {
         <p className="mt-0.5 text-xs text-zinc-500">No posts yet</p>
       </div>
 
-      <div className="mx-4 mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#0a0e17] px-6 py-10 text-center">
+      <div className="snapzo-card-compact mx-4 mt-4 flex flex-col items-center justify-center border-dashed bg-[#0a0e17] px-6 py-10 text-center">
         <p className="text-sm text-zinc-400">Share your first post to fill this space.</p>
       </div>
     </div>

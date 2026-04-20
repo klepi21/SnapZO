@@ -780,7 +780,7 @@ export function SnapZoHubEarnPanel() {
   const explorer = mezoTestnet.blockExplorers.default.url;
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-gradient-to-b from-zinc-900/90 to-black/80 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-5">
+    <section className="snapzo-card-primary p-4 sm:p-5 transition-transform duration-300 ease-out hover:-translate-y-0.5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 gap-y-1">
@@ -812,7 +812,7 @@ export function SnapZoHubEarnPanel() {
           <button
             type="button"
             onClick={() => void addSnapToWallet()}
-            className="shrink-0 self-start rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-100 sm:self-auto"
+            className="snapzo-pressable shrink-0 self-start rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-100 sm:self-auto"
           >
             <span className="inline-flex items-center gap-0">
               <SnapInlineIcon decorative />
@@ -829,7 +829,7 @@ export function SnapZoHubEarnPanel() {
           </p>
           <button
             type="button"
-            className="rounded-lg bg-amber-400 px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-300"
+            className="snapzo-pressable rounded-lg bg-amber-400 px-3 py-2 text-sm font-semibold text-zinc-950 hover:bg-amber-300"
             onClick={() => switchChain?.({ chainId: mezoTestnet.id })}
           >
             Switch network
@@ -892,7 +892,7 @@ export function SnapZoHubEarnPanel() {
           type="button"
           role="tab"
           aria-selected={hubMode === "deposit"}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-semibold transition ${
+          className={`snapzo-pressable flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-semibold ${
             hubMode === "deposit"
               ? "bg-emerald-500/20 text-emerald-100 shadow-sm"
               : "text-zinc-500 hover:text-zinc-300"
@@ -906,7 +906,7 @@ export function SnapZoHubEarnPanel() {
           type="button"
           role="tab"
           aria-selected={hubMode === "withdraw"}
-          className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition ${
+          className={`snapzo-pressable flex-1 rounded-lg py-2.5 text-sm font-semibold ${
             hubMode === "withdraw"
               ? "bg-amber-500/20 text-amber-100 shadow-sm"
               : "text-zinc-500 hover:text-zinc-300"
@@ -929,7 +929,7 @@ export function SnapZoHubEarnPanel() {
         />
         <button
           type="button"
-          className="my-2 shrink-0 self-center rounded-lg border border-sky-500/35 bg-sky-500/[0.12] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-200 transition hover:bg-sky-500/25"
+          className="snapzo-pressable my-2 shrink-0 self-center rounded-lg border border-sky-500/35 bg-sky-500/[0.12] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-200 hover:bg-sky-500/25"
           onClick={onMax}
         >
           Max
@@ -1063,7 +1063,7 @@ export function SnapZoHubEarnPanel() {
           }
           void primaryAction();
         }}
-        className={`mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-white transition disabled:opacity-40 ${
+        className={`snapzo-pressable mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-40 ${
           hubMode === "deposit"
             ? "bg-emerald-600 hover:bg-emerald-500"
             : "border border-amber-400/35 bg-amber-600/90 hover:bg-amber-500"

@@ -20,13 +20,15 @@ const items: NavItem[] = [
 function IgCreateIcon({ active }: { active: boolean }) {
   return (
     <span
-      className={`flex h-[26px] w-[26px] items-center justify-center rounded-[5px] border-[2.25px] transition-colors ${
-        active ? "border-white" : "border-zinc-500"
+      className={`snapzo-pressable flex h-[28px] w-[28px] items-center justify-center rounded-[6px] border-[2.25px] ${
+        active
+          ? "border-sky-200/95 bg-sky-300/[0.12] shadow-[0_0_0_1px_rgba(125,211,252,0.24),0_0_16px_rgba(56,189,248,0.32)]"
+          : "border-zinc-500/90 bg-transparent"
       }`}
       aria-hidden
     >
       <Plus
-        className={`h-[15px] w-[15px] ${active ? "text-white" : "text-zinc-400"}`}
+        className={`h-[15px] w-[15px] ${active ? "text-sky-100" : "text-zinc-400"}`}
         strokeWidth={2.75}
       />
     </span>
@@ -42,6 +44,7 @@ export function BottomNav() {
         aria-label="Main navigation"
         className="pointer-events-auto mx-auto w-full max-w-[430px] overflow-hidden rounded-t-3xl border border-white/[0.08] border-b-0 bg-[#080d16]/92 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#080d16]/78"
       >
+        <div className="pointer-events-none h-px w-full bg-gradient-to-r from-transparent via-sky-300/35 to-transparent" />
         <ul className="grid h-12 w-full grid-cols-5 place-items-center px-1 sm:px-2">
           {items.map((item) => {
             const active =
@@ -52,17 +55,37 @@ export function BottomNav() {
               "isCreate" in item && item.isCreate ? (
                 <IgCreateIcon active={active} />
               ) : (
+                (() => {
+                  const iconSize =
+                    item.href === "/profile"
+                      ? "h-[25px] w-[25px]"
+                      : item.href === "/earn"
+                        ? "h-[24px] w-[24px]"
+                        : "h-[26px] w-[26px]";
+                  const iconStroke =
+                    item.href === "/profile" ? (active ? 2.25 : 1.95) : active ? 2.35 : 2;
+                  return (
                 <item.Icon
-                  className={`h-[26px] w-[26px] shrink-0 transition-colors ${
-                    active ? "text-white" : "text-zinc-500"
+                  className={`${iconSize} shrink-0 transition-all ${
+                    active
+                      ? "scale-[1.04] text-sky-100 drop-shadow-[0_0_10px_rgba(56,189,248,0.52)]"
+                      : "text-zinc-500"
                   }`}
-                  strokeWidth={active ? 2.35 : 2}
+                  strokeWidth={iconStroke}
                   fill={item.href === "/feed" && active ? "currentColor" : "none"}
                 />
+                  );
+                })()
               );
 
             const hit = (
-              <span className="flex h-full w-full max-w-[72px] items-center justify-center active:opacity-80">
+              <span
+                className={`snapzo-pressable flex h-full w-full max-w-[72px] items-center justify-center rounded-xl active:opacity-80 ${
+                  active
+                    ? "bg-gradient-to-b from-sky-300/[0.2] to-sky-500/[0.06] shadow-[inset_0_1px_0_rgba(186,230,253,0.22),0_0_16px_rgba(56,189,248,0.2)]"
+                    : "bg-transparent"
+                }`}
+              >
                 {inner}
               </span>
             );

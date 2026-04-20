@@ -463,9 +463,9 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <article className="mx-4 mb-5 overflow-hidden rounded-[28px] border border-white/[0.1] bg-white/[0.045] shadow-[0_20px_56px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+    <article className="snapzo-card-primary mx-4 mb-5 transition-transform duration-300 ease-out hover:-translate-y-0.5">
       <div className="flex items-center gap-3 px-4 pb-3 pt-4">
-        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-indigo-500/35 ring-offset-2 ring-offset-[rgba(8,12,22,0.65)]">
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-indigo-400/35 ring-offset-1 ring-offset-[rgba(8,12,22,0.65)]">
           <Image
             src={picsumAvatar(post.avatarSeed, 128)}
             alt=""
@@ -482,7 +482,7 @@ export function PostCard({ post }: PostCardProps) {
         </div>
         <button
           type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.1] bg-black/20 text-zinc-500 transition hover:border-white/18 hover:bg-white/[0.06] hover:text-white active:scale-[0.96]"
+          className="snapzo-pressable flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.1] bg-black/20 text-zinc-500 hover:border-white/18 hover:bg-white/[0.06] hover:text-white active:scale-[0.96]"
           aria-label="Post menu"
         >
           <Ellipsis className="h-[18px] w-[18px]" strokeWidth={1.5} />
@@ -490,7 +490,7 @@ export function PostCard({ post }: PostCardProps) {
       </div>
 
       <div
-        className="relative mx-3 aspect-[4/5] touch-manipulation overflow-hidden rounded-[22px] bg-zinc-900/80 ring-1 ring-white/[0.06]"
+        className="relative mx-3 aspect-[4/5] touch-manipulation overflow-hidden rounded-[22px] bg-zinc-900/80 ring-1 ring-white/[0.04]"
         onDoubleClick={(e) => {
           e.preventDefault();
           handleMediaDoubleLike();
@@ -503,14 +503,14 @@ export function PostCard({ post }: PostCardProps) {
           src={src}
           alt=""
           fill
-          className={`object-cover transition-[filter,transform] duration-300 ${
+          className={`object-cover transition-[filter,transform] duration-500 ease-out ${
             showLockOverlay ? "scale-[1.04] blur-2xl" : "blur-0"
           }`}
           sizes="(max-width: 430px) 100vw, 382px"
           priority={post.id === "1"}
         />
         {showLockOverlay ? (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/75 via-black/45 to-black/30 px-6 text-center">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/70 via-black/38 to-black/22 px-6 text-center">
             <Lock className="h-9 w-9 text-white/90" strokeWidth={1.5} aria-hidden />
             <div>
               <p className="text-sm font-semibold text-white">Hidden content</p>
@@ -531,7 +531,7 @@ export function PostCard({ post }: PostCardProps) {
               type="button"
               disabled={isBusy || unlockSnapWei === undefined}
               onClick={handleUnlock}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/30 to-sky-500/20 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.2)] transition hover:border-indigo-300/60 hover:from-indigo-500/40 disabled:opacity-50"
+              className="snapzo-pressable inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-400/36 bg-gradient-to-br from-indigo-500/24 to-sky-500/16 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_18px_rgba(99,102,241,0.16)] hover:border-indigo-300/55 hover:from-indigo-500/34 disabled:opacity-50"
             >
               <span>
                 Unlock · {unlockMusdLabel}{" "}
@@ -547,7 +547,7 @@ export function PostCard({ post }: PostCardProps) {
           <div className="flex min-w-0 flex-1 items-center gap-5">
             <button
               type="button"
-              className={`flex items-center gap-2 border-0 bg-transparent p-0 transition hover:opacity-90 active:opacity-75 disabled:pointer-events-none disabled:opacity-35 ${likedUi ? "text-red-500" : "text-white"}`}
+              className={`snapzo-pressable flex items-center gap-2 border-0 bg-transparent p-0 hover:opacity-90 active:opacity-75 disabled:pointer-events-none disabled:opacity-35 ${likedUi ? "text-red-500" : "text-white"}`}
               aria-label={
                 hasTipped ? "Already tipped" : "Like — tip 0.01 MUSD worth of SNAP"
               }
@@ -564,7 +564,7 @@ export function PostCard({ post }: PostCardProps) {
             </button>
             <button
               type="button"
-              className="flex items-center gap-2 border-0 bg-transparent p-0 text-white transition hover:opacity-85 active:opacity-70 disabled:pointer-events-none disabled:opacity-35"
+              className="snapzo-pressable flex items-center gap-2 border-0 bg-transparent p-0 text-white hover:opacity-85 active:opacity-70 disabled:pointer-events-none disabled:opacity-35"
               aria-label="Comments"
               disabled={isBusy}
               onClick={() => setCommentOpen(true)}
@@ -705,7 +705,7 @@ export function PostCard({ post }: PostCardProps) {
                     <button
                       type="button"
                       disabled={isBusy}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/[0.08] hover:text-white"
+                      className="snapzo-pressable flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-white/[0.08] hover:text-white"
                       aria-label="Close comments"
                       onClick={() => setCommentOpen(false)}
                     >
@@ -799,7 +799,7 @@ export function PostCard({ post }: PostCardProps) {
                       type="button"
                       disabled={isBusy || !commentDraft.trim() || tipSnapWei === undefined}
                       onClick={handleSubmitComment}
-                      className="mb-1 shrink-0 px-2 py-1.5 text-sm font-semibold text-[#0095f6] transition enabled:hover:text-[#47b8ff] disabled:cursor-not-allowed disabled:opacity-35"
+                      className="snapzo-pressable mb-1 shrink-0 px-2 py-1.5 text-sm font-semibold text-[#0095f6] enabled:hover:text-[#47b8ff] disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       Post
                     </button>
