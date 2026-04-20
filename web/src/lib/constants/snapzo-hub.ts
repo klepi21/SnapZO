@@ -3,7 +3,7 @@ import type { Address } from "viem";
 /**
  * Mezo testnet (31611) — latest deploy from `contracts/README.md`.
  * Override with `NEXT_PUBLIC_SNAPZO_HUB_ADDRESS` / `NEXT_PUBLIC_SNAP_TOKEN_ADDRESS` /
- * `NEXT_PUBLIC_SNAPZO_SOCIAL_ADDRESS` for other envs.
+ * `NEXT_PUBLIC_SNAPZO_SOCIAL_ADDRESS` / `NEXT_PUBLIC_SNAPZO_REWARDS_ADDRESS` for other envs.
  */
 const HUB_MEZO_TESTNET =
   "0x9Cd1C98aC5C4F68881dcC63Ded54Ddb239033BfD" as const;
@@ -12,6 +12,9 @@ const SNAP_MEZO_TESTNET =
 /** `SnapZoSocial` UUPS proxy — Part F (`contracts/src/SnapZoSocial.sol`). */
 const SOCIAL_MEZO_TESTNET =
   "0xee3294D7B254066E172F820B0389e8a39E59D56A" as const;
+/** `SnapZoRewards` — Merkle rewards distributor (`contracts/src/SnapZoRewards.sol`). */
+const REWARDS_MEZO_TESTNET =
+  "0x66884173243B2C9Bc056753376B714b402A7E801" as const;
 
 function pickAddr(env: string | undefined, fallback: string): Address {
   const t = (env ?? "").trim();
@@ -50,6 +53,13 @@ export const SNAPZO_SOCIAL_ADDRESS = pickAddr(
   SOCIAL_MEZO_TESTNET,
 );
 
+/** Merkle rewards distributor for creator MEZO rewards (10% fee share path). */
+export const SNAPZO_REWARDS_ADDRESS = pickAddr(
+  process.env.NEXT_PUBLIC_SNAPZO_REWARDS_ADDRESS ??
+    process.env.NEXT_PUBLIC_SNAPZO_REWARDS_PROXY,
+  REWARDS_MEZO_TESTNET,
+);
+
 /** SNAP uses 18 decimals on-chain (1:1 wei with sMUSD minted to the hub on deposit). */
 export const SNAP_DECIMALS = 18;
 
@@ -69,6 +79,11 @@ export function isSnapZoHubConfigured(): boolean {
 /** True when a valid-looking SnapZoSocial proxy address is available (for future UI / relay). */
 export function isSnapZoSocialConfigured(): boolean {
   return SNAPZO_SOCIAL_ADDRESS.length === 42 && SNAPZO_SOCIAL_ADDRESS.startsWith("0x");
+}
+
+/** True when a valid-looking SnapZoRewards contract address is available. */
+export function isSnapZoRewardsConfigured(): boolean {
+  return SNAPZO_REWARDS_ADDRESS.length === 42 && SNAPZO_REWARDS_ADDRESS.startsWith("0x");
 }
 
 export const snapZoHubAbi = [

@@ -7,6 +7,7 @@ import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { EarnVaultStats } from "@/components/momento/earn-vault-stats";
 import { SnapZoHubEarnPanel } from "@/components/momento/snapzo-hub-earn-panel";
+import { SnapZoRewardsClaimPanel } from "@/components/momento/snapzo-rewards-claim-panel";
 import { HelpPopover } from "@/components/ui/help-popover";
 import { isSnapZoHubConfigured } from "@/lib/constants/snapzo-hub";
 
@@ -80,6 +81,7 @@ export function EarnView() {
             <span className="font-mono text-zinc-500">NEXT_PUBLIC_SNAPZO_HUB_UI</span>).
           </div>
         )}
+        <SnapZoRewardsClaimPanel />
         <EarnVaultStats />
       </div>
     </main>

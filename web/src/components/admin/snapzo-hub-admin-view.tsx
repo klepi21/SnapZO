@@ -38,19 +38,23 @@ import {
   MUSD_DECIMALS,
 } from "@/lib/constants/musd";
 import { snapZoHubAdminAbi } from "@/lib/constants/snapzo-hub-admin-abi";
+import { snapZoRewardsAbi } from "@/lib/constants/snapzo-rewards-abi";
 import { snapZoSocialAdminAbi } from "@/lib/constants/snapzo-social-admin-abi";
 import {
   isSnapZoHubConfigured,
+  isSnapZoRewardsConfigured,
   isSnapZoSocialConfigured,
   SNAP_DECIMALS,
   SNAPZO_HUB_ADDRESS,
   SNAPZO_HUB_DEPLOY_BLOCK,
+  SNAPZO_REWARDS_ADDRESS,
   SNAPZO_SOCIAL_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
 import { fetchHubRelayerRows } from "@/lib/snapzo/hub-relayers-from-chain";
 
 const hub = SNAPZO_HUB_ADDRESS;
 const social = SNAPZO_SOCIAL_ADDRESS;
+const rewards = SNAPZO_REWARDS_ADDRESS;
 
 /** Mezo MUSD vault shares (sMUSD) use 18 decimals. */
 const SMUSD_DECIMALS = 18;
@@ -113,6 +117,7 @@ export function SnapZoHubAdminView() {
 
   const hubOk = isSnapZoHubConfigured();
   const socialOk = isSnapZoSocialConfigured();
+  const rewardsOk = isSnapZoRewardsConfigured();
 
   const relayersListQuery = useQuery({
     queryKey: ["snapzoHubRelayers", hub, String(SNAPZO_HUB_DEPLOY_BLOCK)] as const,
@@ -147,6 +152,12 @@ export function SnapZoHubAdminView() {
   const [replyStakeIn, setReplyStakeIn] = useState("");
   const [socialRelayerIn, setSocialRelayerIn] = useState("");
   const [socialRelayerAllowed, setSocialRelayerAllowed] = useState(true);
+  const [hubRewardContractIn, setHubRewardContractIn] = useState("");
+  const [rewardsRelayerIn, setRewardsRelayerIn] = useState("");
+  const [rewardsCycleIn, setRewardsCycleIn] = useState("");
+  const [rewardsRootIn, setRewardsRootIn] = useState("");
+  const [withdrawUnclaimedIn, setWithdrawUnclaimedIn] = useState("");
+  const [rootQueryCycleIn, setRootQueryCycleIn] = useState("");
 
   const wrongChain = isConnected && chainId !== mezoTestnet.id;
 
@@ -161,6 +172,7 @@ export function SnapZoHubAdminView() {
       { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "gauge" },
       { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "router" },
       { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "rewardToken" },
+      { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "rewardContract" },
       { chainId: mezoTestnet.id, address: hub, abi: snapZoHubAdminAbi, functionName: "snapToken" },
     ],
     query: {
@@ -188,6 +200,40 @@ export function SnapZoHubAdminView() {
     },
   });
 
+  const rootQueryCycle = useMemo(() => {
+    const t = rootQueryCycleIn.trim();
+    if (!/^\d+$/.test(t)) return undefined;
+    return BigInt(t);
+  }, [rootQueryCycleIn]);
+
+  const rewardsReads = useReadContracts({
+    contracts: [
+      { chainId: mezoTestnet.id, address: rewards, abi: snapZoRewardsAbi, functionName: "owner" },
+      { chainId: mezoTestnet.id, address: rewards, abi: snapZoRewardsAbi, functionName: "paused" },
+      { chainId: mezoTestnet.id, address: rewards, abi: snapZoRewardsAbi, functionName: "relayer" },
+      { chainId: mezoTestnet.id, address: rewards, abi: snapZoRewardsAbi, functionName: "rewardToken" },
+      {
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "lastUpdateTimestamp",
+      },
+      {
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "roots",
+        args: rootQueryCycle !== undefined ? [rootQueryCycle] : undefined,
+      },
+    ],
+    query: {
+      enabled: rewardsOk,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
   const owner = hubReads.data?.[0]?.status === "success" ? hubReads.data[0].result : undefined;
   const paused = hubReads.data?.[1]?.status === "success" ? hubReads.data[1].result : undefined;
   const feeBps = hubReads.data?.[2]?.status === "success" ? hubReads.data[2].result : undefined;
@@ -198,6 +244,8 @@ export function SnapZoHubAdminView() {
     hubReads.data?.[6]?.status === "success" ? hubReads.data[6].result : undefined;
   const rewardTokenAddr =
     hubReads.data?.[8]?.status === "success" ? hubReads.data[8].result : undefined;
+  const rewardContractAddr =
+    hubReads.data?.[9]?.status === "success" ? hubReads.data[9].result : undefined;
 
   const socialOwner =
     socialReads.data?.[0]?.status === "success" ? socialReads.data[0].result : undefined;
@@ -211,6 +259,19 @@ export function SnapZoHubAdminView() {
     socialReads.data?.[4]?.status === "success" ? socialReads.data[4].result : undefined;
   const replyWindowSec =
     socialReads.data?.[5]?.status === "success" ? socialReads.data[5].result : undefined;
+
+  const rewardsOwner =
+    rewardsReads.data?.[0]?.status === "success" ? rewardsReads.data[0].result : undefined;
+  const rewardsPaused =
+    rewardsReads.data?.[1]?.status === "success" ? rewardsReads.data[1].result : undefined;
+  const rewardsRelayer =
+    rewardsReads.data?.[2]?.status === "success" ? rewardsReads.data[2].result : undefined;
+  const rewardsTokenAddr =
+    rewardsReads.data?.[3]?.status === "success" ? rewardsReads.data[3].result : undefined;
+  const rewardsLastUpdateTs =
+    rewardsReads.data?.[4]?.status === "success" ? rewardsReads.data[4].result : undefined;
+  const rewardsRootQueryValue =
+    rewardsReads.data?.[5]?.status === "success" ? rewardsReads.data[5].result : undefined;
 
   const smusdShareReads = useReadContracts({
     contracts: [
@@ -254,6 +315,10 @@ export function SnapZoHubAdminView() {
     Boolean(address && socialOwner) &&
     getAddress(address as `0x${string}`) === getAddress(socialOwner as `0x${string}`);
 
+  const isRewardsOwner =
+    Boolean(address && rewardsOwner) &&
+    getAddress(address as `0x${string}`) === getAddress(rewardsOwner as `0x${string}`);
+
   const secondaryReads = useReadContracts({
     contracts: [
       {
@@ -285,9 +350,18 @@ export function SnapZoHubAdminView() {
         functionName: "balanceOf",
         args: hubOk ? [hub] : undefined,
       },
+      {
+        chainId: mezoTestnet.id,
+        address: (rewardsTokenAddr ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+        abi: erc20BalanceAbi,
+        functionName: "balanceOf",
+        args: rewardsOk && rewardsTokenAddr ? [rewards] : undefined,
+      },
     ],
     query: {
-      enabled: Boolean(hubOk && gaugeAddr && rewardTokenAddr && feeReceiver),
+      enabled: Boolean(
+        (hubOk && gaugeAddr && rewardTokenAddr && feeReceiver) || (rewardsOk && rewardsTokenAddr),
+      ),
       staleTime: 0,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
@@ -299,6 +373,8 @@ export function SnapZoHubAdminView() {
   const rewardOnFeeReceiver =
     secondaryReads.data?.[2]?.status === "success" ? secondaryReads.data[2].result : undefined;
   const musdOnHub = secondaryReads.data?.[3]?.status === "success" ? secondaryReads.data[3].result : undefined;
+  const rewardOnRewardsContract =
+    secondaryReads.data?.[4]?.status === "success" ? secondaryReads.data[4].result : undefined;
 
   const injectParsed = useMemo(() => {
     const t = injectIn.trim().replace(",", ".");
@@ -337,11 +413,20 @@ export function SnapZoHubAdminView() {
   const refetchAll = useCallback(async () => {
     await hubReads.refetch();
     await socialReads.refetch();
+    await rewardsReads.refetch();
     await smusdShareReads.refetch();
     await secondaryReads.refetch();
     await injectAllowance.refetch();
     await queryClient.invalidateQueries({ queryKey: ["snapzoHubRelayers"] });
-  }, [hubReads, injectAllowance, queryClient, secondaryReads, smusdShareReads, socialReads]);
+  }, [
+    hubReads,
+    injectAllowance,
+    queryClient,
+    rewardsReads,
+    secondaryReads,
+    smusdShareReads,
+    socialReads,
+  ]);
 
   const runHubWrite = useCallback(
     async (label: string, fn: () => Promise<`0x${string}`>) => {
@@ -414,6 +499,46 @@ export function SnapZoHubAdminView() {
     [
       isConnected,
       isSocialOwner,
+      openConnectModal,
+      publicClient,
+      refetchAll,
+      switchChain,
+      toast,
+      wrongChain,
+    ],
+  );
+
+  const runRewardsWrite = useCallback(
+    async (label: string, fn: () => Promise<`0x${string}`>) => {
+      if (!isConnected) {
+        openConnectModal?.();
+        return;
+      }
+      if (wrongChain) {
+        switchChain?.({ chainId: mezoTestnet.id });
+        return;
+      }
+      if (!isRewardsOwner) {
+        toast("Connect the SnapZoRewards owner wallet.", "error");
+        return;
+      }
+      setBusy(true);
+      try {
+        const h = await fn();
+        if (publicClient) {
+          await publicClient.waitForTransactionReceipt({ hash: h });
+        }
+        toast(label);
+        await refetchAll();
+      } catch (e) {
+        toast(formatTxError(e), "error");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [
+      isConnected,
+      isRewardsOwner,
       openConnectModal,
       publicClient,
       refetchAll,
@@ -506,6 +631,22 @@ export function SnapZoHubAdminView() {
         abi: snapZoHubAdminAbi,
         functionName: "setFee",
         args: [b, recv],
+      }),
+    );
+  };
+
+  const onSetHubRewardContract = () => {
+    if (!isAddress(hubRewardContractIn.trim())) {
+      toast("Invalid rewards contract address.", "error");
+      return;
+    }
+    void runHubWrite("Hub reward contract updated", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: hub,
+        abi: snapZoHubAdminAbi,
+        functionName: "setRewardContract",
+        args: [getAddress(hubRewardContractIn.trim() as `0x${string}`)],
       }),
     );
   };
@@ -764,6 +905,88 @@ export function SnapZoHubAdminView() {
     );
   };
 
+  const onRewardsSetRelayer = () => {
+    if (!isAddress(rewardsRelayerIn.trim())) {
+      toast("Invalid rewards relayer address.", "error");
+      return;
+    }
+    void runRewardsWrite("Rewards relayer updated", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "setRelayer",
+        args: [getAddress(rewardsRelayerIn.trim() as `0x${string}`)],
+      }),
+    );
+  };
+
+  const onRewardsUpdateRoot = () => {
+    const cycleRaw = rewardsCycleIn.trim();
+    if (!/^\d+$/.test(cycleRaw)) {
+      toast("Cycle must be an integer (e.g. 1).", "error");
+      return;
+    }
+    const rootRaw = rewardsRootIn.trim();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(rootRaw)) {
+      toast("Root must be 0x + 64 hex chars.", "error");
+      return;
+    }
+    void runRewardsWrite("Rewards root updated", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "updateRoot",
+        args: [BigInt(cycleRaw), rootRaw as `0x${string}`],
+      }),
+    );
+  };
+
+  const onRewardsPause = () =>
+    void runRewardsWrite("SnapZoRewards paused", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "pause",
+      }),
+    );
+
+  const onRewardsUnpause = () =>
+    void runRewardsWrite("SnapZoRewards unpaused", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "unpause",
+      }),
+    );
+
+  const onRewardsWithdrawUnclaimed = () => {
+    const t = withdrawUnclaimedIn.trim().replace(",", ".");
+    if (!t) {
+      toast("Enter amount for withdrawUnclaimed.", "error");
+      return;
+    }
+    let amt: bigint;
+    try {
+      amt = parseUnits(t, MUSD_DECIMALS);
+    } catch {
+      toast("Invalid amount.", "error");
+      return;
+    }
+    void runRewardsWrite("Unclaimed rewards withdrawn", () =>
+      writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: rewards,
+        abi: snapZoRewardsAbi,
+        functionName: "withdrawUnclaimed",
+        args: [amt],
+      }),
+    );
+  };
+
   const onTreasuryTransferOut = async () => {
     if (!isConnected) {
       openConnectModal?.();
@@ -823,6 +1046,9 @@ export function SnapZoHubAdminView() {
   const canAct = isConnected && !wrongChain && !busy && !isWritePending && isHubOwner;
   const canActSocial =
     isConnected && !wrongChain && !busy && !isWritePending && isSocialOwner;
+  const canActRewards =
+    isConnected && !wrongChain && !busy && !isWritePending && isRewardsOwner;
+  const explorerBase = mezoTestnet.blockExplorers.default.url;
   const treasuryCan =
     isConnected &&
     !wrongChain &&
@@ -842,12 +1068,30 @@ export function SnapZoHubAdminView() {
     "inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-500/40 bg-red-500/15 px-4 text-sm font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-40";
   const btnMuted =
     "inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-semibold text-zinc-100 transition hover:bg-white/10 disabled:opacity-40";
+  const miniAction =
+    "rounded-md border border-white/15 px-2 py-1 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/10";
 
-  if (!hubOk && !socialOk) {
+  const copyAddress = useCallback(
+    async (value: string | undefined, labelText: string) => {
+      if (!value || !isAddress(value)) {
+        toast(`No valid ${labelText} address to copy.`, "error");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(value);
+        toast(`${labelText} copied.`);
+      } catch {
+        toast("Clipboard write failed.", "error");
+      }
+    },
+    [toast],
+  );
+
+  if (!hubOk && !socialOk && !rewardsOk) {
     return (
       <main className="px-4 pb-32 pt-5">
         <p className="text-sm text-zinc-400">
-          SnapZo hub and SnapZoSocial are not configured (set env addresses).
+          SnapZo hub, social, and rewards contracts are not configured (set env addresses).
         </p>
       </main>
     );
@@ -903,6 +1147,13 @@ export function SnapZoHubAdminView() {
         <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100">
           Connected wallet is not the SnapZoSocial owner ({String(socialOwner).slice(0, 6)}…). Social
           admin actions are disabled.
+        </div>
+      ) : null}
+
+      {isConnected && rewardsOk && rewardsOwner && !isRewardsOwner ? (
+        <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-sm text-sky-100">
+          Connected wallet is not the SnapZoRewards owner ({String(rewardsOwner).slice(0, 6)}…).
+          Rewards admin actions are disabled.
         </div>
       ) : null}
 
@@ -1047,6 +1298,173 @@ export function SnapZoHubAdminView() {
           </section>
         ) : null}
 
+        {rewardsOk ? (
+          <section className={card}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-white">SnapZoRewards</h2>
+              <button
+                type="button"
+                className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 transition hover:bg-white/10"
+                onClick={() => void rewardsReads.refetch()}
+              >
+                Refresh
+              </button>
+            </div>
+            <p className="mb-3 text-[10px] leading-relaxed text-zinc-600">
+              Merkle MEZO distributor (<span className="font-mono">{rewards}</span>) used by the hub
+              fee split path when <span className="font-mono">rewardContract</span> is configured.
+            </p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={miniAction}
+                onClick={() => void copyAddress(rewards, "Rewards contract")}
+              >
+                Copy rewards
+              </button>
+              <a
+                className={miniAction}
+                href={`${explorerBase}/address/${rewards}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Rewards on explorer
+              </a>
+            </div>
+            <dl className="mb-4 grid gap-2 text-xs">
+              <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">Paused</dt>
+                <dd className="font-medium text-zinc-200">
+                  {rewardsPaused === undefined ? "…" : rewardsPaused ? "Yes" : "No"}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-zinc-500">Relayer</dt>
+                <dd className="break-all font-mono text-[10px] text-zinc-300">
+                  {rewardsRelayer ?? "…"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">Last root update</dt>
+                <dd className="font-mono text-zinc-200">
+                  {rewardsLastUpdateTs === undefined
+                    ? "…"
+                    : new Date(Number(rewardsLastUpdateTs) * 1000).toLocaleString()}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">Reward token on rewards contract</dt>
+                <dd
+                  className="font-mono text-zinc-200"
+                  title={fmtBalTitle(rewardOnRewardsContract)}
+                >
+                  {fmtBalShort(rewardOnRewardsContract)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">Hub linkage</dt>
+                <dd
+                  className={
+                    rewardContractAddr &&
+                    rewards &&
+                    getAddress(rewardContractAddr as `0x${string}`) ===
+                      getAddress(rewards as `0x${string}`)
+                      ? "font-medium text-emerald-300"
+                      : "font-medium text-amber-200"
+                  }
+                >
+                  {rewardContractAddr &&
+                  getAddress(rewardContractAddr as `0x${string}`) ===
+                    getAddress(rewards as `0x${string}`)
+                    ? "Hub → rewards linked"
+                    : "Hub rewardContract mismatch"}
+                </dd>
+              </div>
+            </dl>
+            <p className={label}>Query cycle root</p>
+            <input
+              className={`${input} mb-2`}
+              placeholder="Cycle (e.g. 1)"
+              value={rootQueryCycleIn}
+              onChange={(e) => setRootQueryCycleIn(e.target.value)}
+            />
+            <div className="mb-4 break-all rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2 font-mono text-[10px] text-zinc-300">
+              {rootQueryCycleIn.trim() === ""
+                ? "Enter cycle to read roots(cycle)."
+                : rewardsRootQueryValue ?? "…"}
+            </div>
+            <p className={label}>Set rewards relayer</p>
+            <input
+              className={`${input} mb-2`}
+              placeholder="Relayer 0x…"
+              value={rewardsRelayerIn}
+              onChange={(e) => setRewardsRelayerIn(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${btnMuted} mb-4 w-full`}
+              disabled={!canActRewards}
+              onClick={onRewardsSetRelayer}
+            >
+              setRelayer (rewards)
+            </button>
+            <p className={label}>Update Merkle root</p>
+            <input
+              className={`${input} mb-2`}
+              placeholder="Cycle (uint256)"
+              value={rewardsCycleIn}
+              onChange={(e) => setRewardsCycleIn(e.target.value)}
+            />
+            <input
+              className={input}
+              placeholder="Root 0x + 64 hex chars"
+              value={rewardsRootIn}
+              onChange={(e) => setRewardsRootIn(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${btnPrimary} mt-2 mb-4 w-full`}
+              disabled={!canActRewards}
+              onClick={onRewardsUpdateRoot}
+            >
+              updateRoot
+            </button>
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!canActRewards || rewardsPaused === true}
+                className={btnDanger}
+                onClick={onRewardsPause}
+              >
+                Pause rewards
+              </button>
+              <button
+                type="button"
+                disabled={!canActRewards || rewardsPaused === false}
+                className={btnPrimary}
+                onClick={onRewardsUnpause}
+              >
+                Unpause rewards
+              </button>
+            </div>
+            <p className={label}>withdrawUnclaimed (owner, after 60 days inactivity)</p>
+            <input
+              className={input}
+              placeholder="Amount (MEZO, 18 dp)"
+              value={withdrawUnclaimedIn}
+              onChange={(e) => setWithdrawUnclaimedIn(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${btnDanger} mt-2 w-full`}
+              disabled={!canActRewards}
+              onClick={onRewardsWithdrawUnclaimed}
+            >
+              withdrawUnclaimed
+            </button>
+          </section>
+        ) : null}
+
         {hubOk ? (
           <>
           <section className={card}>
@@ -1059,6 +1477,57 @@ export function SnapZoHubAdminView() {
             >
               Refresh
             </button>
+          </div>
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={miniAction}
+              onClick={() => void copyAddress(hub, "Hub")}
+            >
+              Copy hub
+            </button>
+            <a
+              className={miniAction}
+              href={`${explorerBase}/address/${hub}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Hub on explorer
+            </a>
+            <button
+              type="button"
+              className={miniAction}
+              onClick={() => void copyAddress(rewardTokenAddr, "Reward token")}
+            >
+              Copy reward token
+            </button>
+            <button
+              type="button"
+              className={miniAction}
+              onClick={() => void copyAddress(rewardContractAddr, "Hub reward contract")}
+            >
+              Copy hub rewardContract
+            </button>
+            {rewardTokenAddr && isAddress(rewardTokenAddr) ? (
+              <a
+                className={miniAction}
+                href={`${explorerBase}/address/${rewardTokenAddr}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Reward token on explorer
+              </a>
+            ) : null}
+            {rewardContractAddr && isAddress(rewardContractAddr) ? (
+              <a
+                className={miniAction}
+                href={`${explorerBase}/address/${rewardContractAddr}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Hub rewardContract on explorer
+              </a>
+            ) : null}
           </div>
           <dl className="grid gap-2 text-xs">
             <div className="flex justify-between gap-2">
@@ -1073,6 +1542,12 @@ export function SnapZoHubAdminView() {
               <dt className="text-zinc-500">Fee recipient</dt>
               <dd className="break-all font-mono text-[10px] text-zinc-300">
                 {feeReceiver ?? "…"}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-zinc-500">Reward contract</dt>
+              <dd className="break-all font-mono text-[10px] text-zinc-300">
+                {rewardContractAddr ?? "…"}
               </dd>
             </div>
             <div className="flex flex-col gap-0.5">
@@ -1365,6 +1840,27 @@ export function SnapZoHubAdminView() {
           >
             setFee
           </button>
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            <p className={label}>Rewards contract link (hub)</p>
+            <p className="mb-2 text-[10px] text-zinc-600">
+              Set <span className="font-mono">hub.rewardContract</span>. When configured, withdraw
+              fee is forced to 20% and split 10% treasury / 10% rewards contract.
+            </p>
+            <input
+              className={input}
+              placeholder="SnapZoRewards 0x…"
+              value={hubRewardContractIn}
+              onChange={(e) => setHubRewardContractIn(e.target.value)}
+            />
+            <button
+              type="button"
+              className={`${btnMuted} mt-2 w-full`}
+              disabled={!canAct}
+              onClick={onSetHubRewardContract}
+            >
+              setRewardContract
+            </button>
+          </div>
         </section>
 
         <section className={card}>

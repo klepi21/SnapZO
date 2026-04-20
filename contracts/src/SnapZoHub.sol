@@ -51,6 +51,8 @@ contract SnapZoHub is
     mapping(address => uint256) public nonces;
     mapping(address => bool) public isRelayer;
     bytes private _restakeRoutes;
+    /// @notice Destination for creator rewards (Merkle distributor).
+    address public rewardContract;
 
     /// @notice Cumulative MEZO per SNAP (scaled by REWARD_PRECISION). Updated when gauge rewards hit the hub.
     uint256 public rewardPerTokenStored;
@@ -81,6 +83,7 @@ contract SnapZoHub is
     event Harvest(uint256 rewardClaimed);
     event Restake(uint256 musdRestaked, bool swapSkipped);
     event RelayerUpdated(address indexed relayer, bool allowed);
+    event RewardContractUpdated(address indexed rewardContract);
     event IntegrationsUpdated(address musd, address vault, address gauge, address router, address rewardToken);
     event RestakeRoutesUpdated(uint256 routeBytesLen);
     event RewardTokenRecovered(address indexed to, uint256 amount);
@@ -164,11 +167,17 @@ contract SnapZoHub is
 
     /// @notice `feeBps` applies to **MEZO** paid out on withdraw (not MUSD).
     function setFee(uint16 feeBps_, address feeReceiver_) external onlyOwner {
-        if (feeBps_ > MAX_FEE_BPS) revert SnapZoHub__FeeTooHigh();
+        if (feeBps_ > 2000) revert SnapZoHub__FeeTooHigh();
         feeBps = feeBps_;
         if (feeReceiver_ != address(0)) {
             feeReceiver = feeReceiver_;
         }
+    }
+
+    function setRewardContract(address rewardContract_) external onlyOwner {
+        if (rewardContract_ == address(0)) revert SnapZoHub__ZeroAddress();
+        rewardContract = rewardContract_;
+        emit RewardContractUpdated(rewardContract_);
     }
 
     function setIntegrations(
@@ -457,11 +466,24 @@ contract SnapZoHub is
 
         uint256 mezoOut;
         if (mezoGross > 0) {
-            uint256 fee = (mezoGross * uint256(feeBps)) / BPS;
-            mezoOut = mezoGross - fee;
-            rewardToken.safeTransfer(user, mezoOut);
-            if (fee > 0) {
-                rewardToken.safeTransfer(feeReceiver, fee);
+            // Force 20% fee if rewardContract is configured, else use feeBps
+            uint256 currentFeeBps = rewardContract != address(0) ? 2000 : uint256(feeBps);
+            uint256 totalFee = (mezoGross * currentFeeBps) / BPS;
+            
+            if (rewardContract != address(0) && currentFeeBps == 2000) {
+                uint256 treasuryFee = totalFee / 2; // 10%
+                uint256 rewardsFee = totalFee - treasuryFee; // 10%
+                mezoOut = mezoGross - totalFee;
+                
+                rewardToken.safeTransfer(user, mezoOut);
+                rewardToken.safeTransfer(feeReceiver, treasuryFee);
+                rewardToken.safeTransfer(rewardContract, rewardsFee);
+            } else {
+                mezoOut = mezoGross - totalFee;
+                rewardToken.safeTransfer(user, mezoOut);
+                if (totalFee > 0) {
+                    rewardToken.safeTransfer(feeReceiver, totalFee);
+                }
             }
         }
 

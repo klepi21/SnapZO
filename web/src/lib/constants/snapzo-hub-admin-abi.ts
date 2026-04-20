@@ -12,6 +12,7 @@ export const snapZoHubAdminAbi = [
   { type: "function", name: "gauge", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "router", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "rewardToken", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "rewardContract", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "snapToken", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   {
     type: "function",
@@ -28,6 +29,13 @@ export const snapZoHubAdminAbi = [
       { name: "relayer", type: "address" },
       { name: "allowed", type: "bool" },
     ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setRewardContract",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "rewardContract_", type: "address" }],
     outputs: [],
   },
   {
