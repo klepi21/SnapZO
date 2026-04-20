@@ -48,8 +48,10 @@ import {
   SNAPZO_HUB_ADDRESS,
   SNAPZO_HUB_DEPLOY_BLOCK,
   SNAPZO_REWARDS_ADDRESS,
+  SNAPZO_SNAP_TOKEN_ADDRESS,
   SNAPZO_SOCIAL_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
+import { SnapZoRewardsClaimPanel } from "@/components/momento/snapzo-rewards-claim-panel";
 import { fetchHubRelayerRows } from "@/lib/snapzo/hub-relayers-from-chain";
 
 const hub = SNAPZO_HUB_ADDRESS;
@@ -616,8 +618,8 @@ export function SnapZoHubAdminView() {
 
   const onSetFee = () => {
     const b = Number(feeBpsIn.trim());
-    if (!Number.isFinite(b) || b < 0 || b > 1000) {
-      toast("feeBps must be 0–1000 (MAX_FEE_BPS on hub).", "error");
+    if (!Number.isFinite(b) || b < 0 || b > 2000) {
+      toast("feeBps must be 0–2000.", "error");
       return;
     }
     const recv =
@@ -1465,6 +1467,12 @@ export function SnapZoHubAdminView() {
           </section>
         ) : null}
 
+        {rewardsOk ? (
+          <div className="mb-6">
+            <SnapZoRewardsClaimPanel />
+          </div>
+        ) : null}
+
         {hubOk ? (
           <>
           <section className={card}>
@@ -1549,6 +1557,19 @@ export function SnapZoHubAdminView() {
               <dd className="break-all font-mono text-[10px] text-zinc-300">
                 {rewardContractAddr ?? "…"}
               </dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-zinc-500">Snap token (hub state)</dt>
+              <dd className="break-all font-mono text-[10px] text-zinc-300">
+                {hubReads.data?.[10]?.status === "success" ? String(hubReads.data[10].result) : "…"}
+              </dd>
+              <p className="text-[10px] leading-snug text-zinc-600">
+                Matches env:{" "}
+                {hubReads.data?.[10]?.status === "success" &&
+                getAddress(String(hubReads.data[10].result)) === getAddress(SNAPZO_SNAP_TOKEN_ADDRESS)
+                  ? "✓"
+                  : "Mismatch!"}
+              </p>
             </div>
             <div className="flex flex-col gap-0.5">
               <div className="flex justify-between gap-2">
@@ -1822,7 +1843,7 @@ export function SnapZoHubAdminView() {
           <h2 className="mb-3 text-sm font-semibold text-white">Fee config</h2>
           <input
             className={`${input} mb-2`}
-            placeholder="feeBps (0–1000)"
+            placeholder="feeBps (0–2000)"
             value={feeBpsIn}
             onChange={(e) => setFeeBpsIn(e.target.value)}
           />

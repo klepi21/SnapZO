@@ -95,7 +95,7 @@ type HubMode = "deposit" | "withdraw";
 
 function formatUnitsMax2dp(value: bigint | undefined, decimals: number): string {
   if (value === undefined) {
-    return "…";
+    return "0.00";
   }
   const full = formatUnits(value, decimals);
   const dot = full.indexOf(".");
@@ -226,20 +226,6 @@ export function SnapZoHubEarnPanel() {
     },
   });
 
-  /** Gauge MEZO indexed to this wallet’s SNAP; gross of withdraw `feeBps` (same 18 dp as on-chain). */
-  const hubEarnedMezo = useReadContract({
-    chainId: mezoTestnet.id,
-    address: SNAPZO_HUB_ADDRESS,
-    abi: snapZoHubAbi,
-    functionName: "earned",
-    args: address ? [address] : undefined,
-    query: {
-      enabled: Boolean(
-        configured && isConnected && address && chainId === mezoTestnet.id,
-      ),
-    },
-  });
-
   const hubFeeBps = useReadContract({
     chainId: mezoTestnet.id,
     address: SNAPZO_HUB_ADDRESS,
@@ -247,6 +233,18 @@ export function SnapZoHubEarnPanel() {
     functionName: "feeBps",
     query: {
       enabled: Boolean(configured && chainId === mezoTestnet.id),
+      staleTime: 60_000,
+    },
+  });
+
+  const hubRewardContract = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_HUB_ADDRESS,
+    abi: snapZoHubAbi,
+    functionName: "rewardContract",
+    query: {
+      enabled: Boolean(configured && chainId === mezoTestnet.id),
+      staleTime: 60_000,
     },
   });
 
@@ -320,7 +318,33 @@ export function SnapZoHubEarnPanel() {
         abi: erc20TotalSupplyAbi,
         functionName: "totalSupply",
       },
-    ],
+      // [3] hub.earned(user) — harvested MEZO indexed to this user's SNAP
+      ...(address
+        ? [
+            {
+              chainId: mezoTestnet.id,
+              address: SNAPZO_HUB_ADDRESS,
+              abi: snapZoHubAbi,
+              functionName: "earned" as const,
+              args: [address] as readonly [typeof address],
+            },
+          ]
+        : []),
+      {
+        chainId: mezoTestnet.id,
+        address: MEZO_SMUSD_GAUGE,
+        abi: mezoSmusdGaugeAbi,
+        functionName: "earned",
+        args: [SNAPZO_HUB_ADDRESS],
+      },
+      // [address ? 5 : 4] hub.rewardContract()
+      {
+        chainId: mezoTestnet.id,
+        address: SNAPZO_HUB_ADDRESS,
+        abi: snapZoHubAbi,
+        functionName: "rewardContract",
+      },
+    ] as any,
     query: {
       enabled: configured,
       staleTime: 15_000,
@@ -328,18 +352,71 @@ export function SnapZoHubEarnPanel() {
     },
   });
 
+  const hubWithdrawPositionData = hubWithdrawPositionReads.data;
+  const hubWithdrawPositionPending = hubWithdrawPositionReads.isPending;
+
+  // Verify that the data array length matches what we expect for the current address state
+  // to avoid index mismatch during transitions.
+  const expectedLength = address ? 6 : 5;
+  const isDataStale = !hubWithdrawPositionData || hubWithdrawPositionData.length !== expectedLength;
+
   const smusdStakedOnHub =
-    hubWithdrawPositionReads.data?.[0]?.status === "success"
-      ? hubWithdrawPositionReads.data[0].result
+    !isDataStale && hubWithdrawPositionData[0]?.status === "success"
+      ? (hubWithdrawPositionData[0].result as bigint)
       : undefined;
   const smusdIdleOnHub =
-    hubWithdrawPositionReads.data?.[1]?.status === "success"
-      ? hubWithdrawPositionReads.data[1].result
+    !isDataStale && hubWithdrawPositionData[1]?.status === "success"
+      ? (hubWithdrawPositionData[1].result as bigint)
       : undefined;
   const snapTotalSupply =
-    hubWithdrawPositionReads.data?.[2]?.status === "success"
-      ? hubWithdrawPositionReads.data[2].result
+    !isDataStale && hubWithdrawPositionData[2]?.status === "success"
+      ? (hubWithdrawPositionData[2].result as bigint)
       : undefined;
+
+  // When address is connected, items shift: [3]=hub.earned(user), [4]=gauge.earned(hub), [5]=hub.rewardContract()
+  // When not connected, there's no item [3]: [3]=gauge.earned(hub), [4]=hub.rewardContract()
+  const hubEarnedIdx = address ? 3 : -1;
+  const gaugeEarnedIdx = address ? 4 : 3;
+
+  const hubEarnedMezoData =
+    !isDataStale && hubEarnedIdx >= 0 &&
+    hubWithdrawPositionData[hubEarnedIdx]?.status === "success"
+      ? (hubWithdrawPositionData[hubEarnedIdx].result as bigint)
+      : undefined;
+  const gaugeEarnedForHubData =
+    !isDataStale && hubWithdrawPositionData[gaugeEarnedIdx]?.status === "success"
+      ? (hubWithdrawPositionData[gaugeEarnedIdx].result as bigint)
+      : undefined;
+
+  /**
+   * Real-time MEZO for the connected user from the hub (gauge emissions only).
+   * Combines:
+   * 1. `hub.earned(user)` — already harvested & indexed via rewardPerTokenStored
+   * 2. Pro-rata share of `gauge.earned(hub)` — pending unharvested gauge emissions
+   * Note: this is separate from SnapZoRewards (creator Merkle rewards).
+   */
+  const userTotalMezoWei = useMemo(() => {
+    // If hub.earned(user) is not available (reverted or not connected), fall back to just gauge share
+    const indexed = hubEarnedMezoData ?? ZERO;
+    const pendingGauge = gaugeEarnedForHubData ?? ZERO;
+    const userBal = snapBal.data;
+    const totalSnap = snapTotalSupply;
+    // If we have neither hub earned nor any gauge data, show nothing
+    if (hubEarnedMezoData === undefined && gaugeEarnedForHubData === undefined) {
+      return undefined;
+    }
+    if (
+      pendingGauge <= ZERO ||
+      userBal === undefined ||
+      userBal <= ZERO ||
+      totalSnap === undefined ||
+      totalSnap <= ZERO
+    ) {
+      return indexed;
+    }
+    const userShareOfPending = (pendingGauge * userBal) / totalSnap;
+    return indexed + userShareOfPending;
+  }, [hubEarnedMezoData, gaugeEarnedForHubData, snapBal.data, snapTotalSupply]);
 
   const hubTotalSmusdWei = useMemo(() => {
     if (smusdStakedOnHub === undefined || smusdIdleOnHub === undefined) {
@@ -396,18 +473,33 @@ export function SnapZoHubEarnPanel() {
       snapBal.data === undefined ||
       snapBal.data <= ZERO ||
       hubWithdrawParsed > snapBal.data ||
-      hubEarnedMezo.data === undefined ||
-      hubFeeBps.data === undefined
+      userTotalMezoWei === undefined
     ) {
       return undefined;
     }
+
+    /**
+     * If rewardContract is set, hub takes 20% (10% treasury, 10% Merkle creator rewards).
+     * Otherwise it uses the base hub feeBps.
+     */
+    const activeFeeBps =
+      hubRewardContract.data && hubRewardContract.data !== "0x0000000000000000000000000000000000000000"
+        ? BigInt(2000)
+        : hubFeeBps.data !== undefined
+          ? BigInt(hubFeeBps.data)
+          : undefined;
+
+    if (activeFeeBps === undefined) {
+      return undefined;
+    }
+
     return previewWithdrawMezoWei({
-      earnedWei: hubEarnedMezo.data,
+      earnedWei: userTotalMezoWei,
       snapBalanceWei: snapBal.data,
       withdrawSnapWei: hubWithdrawParsed,
-      feeBps: BigInt(hubFeeBps.data),
+      feeBps: activeFeeBps,
     });
-  }, [hubEarnedMezo.data, hubFeeBps.data, hubWithdrawParsed, snapBal.data]);
+  }, [userTotalMezoWei, hubFeeBps.data, hubRewardContract.data, hubWithdrawParsed, snapBal.data]);
 
   const withdrawPoolReady = useMemo(
     () =>
@@ -445,8 +537,8 @@ export function SnapZoHubEarnPanel() {
     await musdBal.refetch();
     await snapBal.refetch();
     await hubNonce.refetch();
-    await hubEarnedMezo.refetch();
     await hubFeeBps.refetch();
+    await hubRewardContract.refetch();
     await musdAllowHub.refetch();
     await depositPreviewSnap.refetch();
     await hubWithdrawPositionReads.refetch();
@@ -454,8 +546,8 @@ export function SnapZoHubEarnPanel() {
     await vaultSharesPerOneMusdQuery.refetch();
   }, [
     depositPreviewSnap,
-    hubEarnedMezo,
     hubFeeBps,
+    hubRewardContract,
     hubNonce,
     hubWithdrawPositionReads,
     musdAllowHub,
@@ -815,7 +907,9 @@ export function SnapZoHubEarnPanel() {
           </div>
           <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-sky-200/95 sm:text-base">
             {isConnected && !wrongChain
-              ? formatUnitsMax2dp(hubEarnedMezo.data, MUSD_DECIMALS)
+              ? hubWithdrawPositionPending || isDataStale
+                ? "…" 
+                : formatUnitsMax2dp(userTotalMezoWei, MUSD_DECIMALS)
               : "—"}
           </p>
         </div>

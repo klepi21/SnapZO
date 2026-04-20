@@ -148,6 +148,13 @@ export const snapZoHubAbi = [
     inputs: [],
     outputs: [{ name: "", type: "uint16" }],
   },
+  {
+    type: "function",
+    name: "rewardContract",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
 ] as const;
 
 /** Hub `Withdraw` log — realized MUSD + net MEZO (after withdraw fee) per burn. */

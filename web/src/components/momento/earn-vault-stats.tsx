@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatUnits } from "viem";
-import { useReadContracts } from "wagmi";
+import { useAccount, useReadContracts } from "wagmi";
 import { getPublicClient } from "wagmi/actions";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
@@ -26,6 +26,7 @@ import {
   erc20TotalSupplyAbi,
   SNAP_DECIMALS,
   SNAPZO_HUB_ADDRESS,
+  SNAPZO_REWARDS_ADDRESS,
   SNAPZO_SNAP_TOKEN_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
 import { SNAP_ONE_IN_BASE_UNITS } from "@/lib/snapzo/musd-snap-quote";
@@ -167,6 +168,7 @@ async function fetchMusdPerOneSmusd(): Promise<SmusdMusdRateResult> {
 }
 
 export function EarnVaultStats() {
+  const { address, isConnected } = useAccount();
   const hub = SNAPZO_HUB_ADDRESS;
 
   const { data, isPending, isError } = useReadContracts({
@@ -198,8 +200,23 @@ export function EarnVaultStats() {
         abi: erc20TotalSupplyAbi,
         functionName: "totalSupply",
       },
+      {
+        chainId: mezoTestnet.id,
+        address: SNAPZO_REWARDS_ADDRESS,
+        functionName: "balanceOf",
+        args: [SNAPZO_REWARDS_ADDRESS],
+      },
+      // [5] user.snapBalance
+      {
+        chainId: mezoTestnet.id,
+        address: SNAPZO_SNAP_TOKEN_ADDRESS,
+        abi: erc20BalanceAbi,
+        functionName: "balanceOf",
+        args: address ? [address] : undefined,
+      },
     ],
     query: {
+      enabled: true,
       staleTime: 30_000,
     },
   });
@@ -208,6 +225,24 @@ export function EarnVaultStats() {
   const pendingRewards = data?.[1]?.status === "success" ? data[1].result : undefined;
   const stIdle = data?.[2]?.status === "success" ? data[2].result : undefined;
   const snapSupply = data?.[3]?.status === "success" ? data[3].result : undefined;
+  const rewardsPoolBal = data?.[4]?.status === "success" ? data[4].result : undefined;
+  const userSnapBal = data?.[5]?.status === "success" ? data[5].result : undefined;
+
+  const userPortionOfHubMezo = useMemo(() => {
+    if (
+      !isConnected ||
+      !address ||
+      userSnapBal === undefined ||
+      snapSupply === undefined ||
+      snapSupply === z ||
+      pendingRewards === undefined
+    ) {
+      return undefined;
+    }
+    // Simplistic estimate of user's share of the hub's pending gauge rewards.
+    // This matches the userTotalMezoWei logic in the Hub panel.
+    return (pendingRewards * userSnapBal) / snapSupply;
+  }, [address, isConnected, pendingRewards, snapSupply, userSnapBal]);
 
   const totalSmusdWei = useMemo(() => {
     if (stStaked === undefined || stIdle === undefined) {
@@ -331,27 +366,49 @@ export function EarnVaultStats() {
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
               <dt className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
                 <MezoInlineIcon decorative />
-                MEZO Rewards
+                MEZO Pending (Hub)
               </dt>
-              <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-amber-100/90">
-                {loading ? "…" : formatUnitsMax2dp(pendingRewards, MUSD_DECIMALS)}
+              <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-amber-100/90" title="Unclaimed gauge emissions owed to the hub">
+                {loading ? "…" : formatUnitsMax2dp(pendingRewards as bigint | undefined, MUSD_DECIMALS)}
               </dd>
             </div>
             <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
-              <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                <span className="inline-flex items-center gap-0">
-                  <SnapInlineIcon decorative />
-                  {"SNAP total supply"}
-                </span>
+              <dt className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                <MezoInlineIcon decorative />
+                Rewards Pool
               </dt>
-              <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-zinc-200">
-                {loading || snapSupply === undefined
-                  ? "…"
-                  : formatBigintFixed(snapSupply, SNAP_DECIMALS, 4)}
+              <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-sky-200/90" title="MEZO held in SnapZoRewards for creators">
+                {loading ? "…" : formatUnitsMax2dp(rewardsPoolBal as bigint | undefined, MUSD_DECIMALS)}
               </dd>
             </div>
           </div>
+          <div className="rounded-xl border border-white/[0.06] bg-black/30 px-3 py-3">
+            <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              <span className="inline-flex items-center gap-0">
+                <SnapInlineIcon decorative />
+                {"SNAP total supply"}
+              </span>
+            </dt>
+            <dd className="mt-1 font-mono text-base font-semibold tabular-nums text-zinc-200">
+              {loading || snapSupply === undefined
+                ? "…"
+                : formatBigintFixed(snapSupply, SNAP_DECIMALS, 4)}
+            </dd>
+          </div>
 
+          {isConnected && userPortionOfHubMezo !== undefined && (
+            <div className="rounded-xl border border-sky-500/15 bg-sky-500/[0.06] px-3 py-3">
+              <dt className="text-[10px] font-semibold uppercase tracking-wider text-sky-400/90">
+                Your share of Hub rewards
+              </dt>
+              <dd className="mt-1 font-mono text-sm font-bold tabular-nums text-sky-50">
+                {formatUnitsMax2dp(userPortionOfHubMezo, MUSD_DECIMALS)} MEZO
+              </dd>
+              <p className="mt-1 text-[10px] text-sky-300/60 leading-tight">
+                Calculated pro-rata from your SNAP balance relative to total supply.
+              </p>
+            </div>
+          )}
         </dl>
       )}
     </section>
