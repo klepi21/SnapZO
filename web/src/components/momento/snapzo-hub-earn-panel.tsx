@@ -318,33 +318,33 @@ export function SnapZoHubEarnPanel() {
         abi: erc20TotalSupplyAbi,
         functionName: "totalSupply",
       },
-      // [3] hub.earned(user) — harvested MEZO indexed to this user's SNAP
-      ...(address
-        ? [
-            {
-              chainId: mezoTestnet.id,
-              address: SNAPZO_HUB_ADDRESS,
-              abi: snapZoHubAbi,
-              functionName: "earned" as const,
-              args: [address] as readonly [typeof address],
-            },
-          ]
-        : []),
-      {
-        chainId: mezoTestnet.id,
-        address: MEZO_SMUSD_GAUGE,
-        abi: mezoSmusdGaugeAbi,
-        functionName: "earned",
-        args: [SNAPZO_HUB_ADDRESS],
-      },
-      // [address ? 5 : 4] hub.rewardContract()
-      {
-        chainId: mezoTestnet.id,
-        address: SNAPZO_HUB_ADDRESS,
-        abi: snapZoHubAbi,
-        functionName: "rewardContract",
-      },
-    ] as any,
+    ],
+    query: {
+      enabled: configured,
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+    },
+  });
+
+  const hubEarnedForUser = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_HUB_ADDRESS,
+    abi: snapZoHubAbi,
+    functionName: "earned",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(configured && address),
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+    },
+  });
+
+  const gaugeEarnedForHub = useReadContract({
+    chainId: mezoTestnet.id,
+    address: MEZO_SMUSD_GAUGE,
+    abi: mezoSmusdGaugeAbi,
+    functionName: "earned",
+    args: [SNAPZO_HUB_ADDRESS],
     query: {
       enabled: configured,
       staleTime: 15_000,
@@ -357,7 +357,7 @@ export function SnapZoHubEarnPanel() {
 
   // Verify that the data array length matches what we expect for the current address state
   // to avoid index mismatch during transitions.
-  const expectedLength = address ? 6 : 5;
+  const expectedLength = 3;
   const isDataStale = !hubWithdrawPositionData || hubWithdrawPositionData.length !== expectedLength;
 
   const smusdStakedOnHub =
@@ -373,20 +373,8 @@ export function SnapZoHubEarnPanel() {
       ? (hubWithdrawPositionData[2].result as bigint)
       : undefined;
 
-  // When address is connected, items shift: [3]=hub.earned(user), [4]=gauge.earned(hub), [5]=hub.rewardContract()
-  // When not connected, there's no item [3]: [3]=gauge.earned(hub), [4]=hub.rewardContract()
-  const hubEarnedIdx = address ? 3 : -1;
-  const gaugeEarnedIdx = address ? 4 : 3;
-
-  const hubEarnedMezoData =
-    !isDataStale && hubEarnedIdx >= 0 &&
-    hubWithdrawPositionData[hubEarnedIdx]?.status === "success"
-      ? (hubWithdrawPositionData[hubEarnedIdx].result as bigint)
-      : undefined;
-  const gaugeEarnedForHubData =
-    !isDataStale && hubWithdrawPositionData[gaugeEarnedIdx]?.status === "success"
-      ? (hubWithdrawPositionData[gaugeEarnedIdx].result as bigint)
-      : undefined;
+  const hubEarnedMezoData = hubEarnedForUser.data;
+  const gaugeEarnedForHubData = gaugeEarnedForHub.data;
 
   /**
    * Real-time MEZO for the connected user from the hub (gauge emissions only).
@@ -539,6 +527,8 @@ export function SnapZoHubEarnPanel() {
     await hubNonce.refetch();
     await hubFeeBps.refetch();
     await hubRewardContract.refetch();
+    await hubEarnedForUser.refetch();
+    await gaugeEarnedForHub.refetch();
     await musdAllowHub.refetch();
     await depositPreviewSnap.refetch();
     await hubWithdrawPositionReads.refetch();
@@ -547,9 +537,11 @@ export function SnapZoHubEarnPanel() {
   }, [
     depositPreviewSnap,
     hubFeeBps,
+    hubEarnedForUser,
     hubRewardContract,
     hubNonce,
     hubWithdrawPositionReads,
+    gaugeEarnedForHub,
     musdAllowHub,
     musdBal,
     queryClient,
