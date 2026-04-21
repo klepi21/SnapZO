@@ -70,8 +70,8 @@ const DEADLINE_SECS = BigInt(3600);
 const ONE_MUSD_WEI = parseUnits("1", MUSD_DECIMALS);
 
 /**
- * Mirrors `SnapZoHub._withdraw` MEZO leg before an extra `getReward` in the same tx:
- * gross = floor(earned × withdrawSnap ÷ balance), fee on gross, net = gross − fee.
+ * Mirrors `SnapZoHub._withdraw` MEZO leg:
+ * gross = floor(earned × withdrawSnap ÷ balance). Fees are handled at indexing time.
  */
 function previewWithdrawMezoWei(args: {
   earnedWei: bigint;
@@ -379,7 +379,7 @@ export function SnapZoHubEarnPanel() {
   /**
    * Real-time MEZO for the connected user from the hub (gauge emissions only).
    * Combines:
-   * 1. `hub.earned(user)` — already harvested & indexed via rewardPerTokenStored
+   * 1. `hub.earned(user)` — already harvested & indexed via rewardPerTokenStored (after index-time fee)
    * 2. Pro-rata share of `gauge.earned(hub)` — pending unharvested gauge emissions
    * Note: this is separate from SnapZoRewards (creator Merkle rewards).
    */
@@ -466,28 +466,13 @@ export function SnapZoHubEarnPanel() {
       return undefined;
     }
 
-    /**
-     * If rewardContract is set, hub takes 20% (10% treasury, 10% Merkle creator rewards).
-     * Otherwise it uses the base hub feeBps.
-     */
-    const activeFeeBps =
-      hubRewardContract.data && hubRewardContract.data !== "0x0000000000000000000000000000000000000000"
-        ? BigInt(2000)
-        : hubFeeBps.data !== undefined
-          ? BigInt(hubFeeBps.data)
-          : undefined;
-
-    if (activeFeeBps === undefined) {
-      return undefined;
-    }
-
     return previewWithdrawMezoWei({
       earnedWei: userTotalMezoWei,
       snapBalanceWei: snapBal.data,
       withdrawSnapWei: hubWithdrawParsed,
-      feeBps: activeFeeBps,
+      feeBps: BigInt(0),
     });
-  }, [userTotalMezoWei, hubFeeBps.data, hubRewardContract.data, hubWithdrawParsed, snapBal.data]);
+  }, [userTotalMezoWei, hubWithdrawParsed, snapBal.data]);
 
   const withdrawPoolReady = useMemo(
     () =>
@@ -795,8 +780,7 @@ export function SnapZoHubEarnPanel() {
               </p>
               <p>
                 <strong>Withdraw.</strong> Burning SNAP returns MUSD from the hub position. Gauge
-                MEZO is indexed to SNAP; you receive MEZO on the same withdrawal, and the hub fee
-                applies only to that MEZO portion.
+                MEZO is indexed to SNAP; you receive your indexed MEZO on the same withdrawal.
               </p>
             </HelpPopover>
           </div>
@@ -804,7 +788,7 @@ export function SnapZoHubEarnPanel() {
             {hubMode === "deposit" ? (
               <>Send MUSD → receive SNAP.</>
             ) : (
-              <>Burn SNAP → MUSD + MEZO (fee on MEZO only).</>
+              <>Burn SNAP → MUSD + indexed MEZO.</>
             )}
           </p>
         </div>
@@ -869,7 +853,7 @@ export function SnapZoHubEarnPanel() {
             <HelpPopover label="MEZO rewards" size="sm">
               <p>
                 Gauge emissions are claimed into the hub and indexed to SNAP. This number is what
-                you could claim on a full exit right now (before the withdraw fee on MEZO).
+                you could claim on a full exit right now.
               </p>
             </HelpPopover>
           </div>
@@ -1010,15 +994,11 @@ export function SnapZoHubEarnPanel() {
                     <div className="flex flex-col gap-1 rounded-xl bg-sky-500/[0.08] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-200/85">
                         <MezoInlineIcon decorative />
-                        MEZO net (approx.)
+                        MEZO (approx.)
                       </span>
                       <div className="text-right">
                         <span className="font-mono text-sm font-semibold text-sky-50">
                           ~{formatUnitsMax2dp(withdrawMezoPreview.netWei, MUSD_DECIMALS)}
-                        </span>
-                        <span className="mt-0.5 block text-[10px] text-sky-300/75 sm:mt-0 sm:ml-2 sm:inline">
-                          fee {formatUnitsMax2dp(withdrawMezoPreview.feeWei, MUSD_DECIMALS)} on{" "}
-                          {formatUnitsMax2dp(withdrawMezoPreview.grossWei, MUSD_DECIMALS)} gross
                         </span>
                       </div>
                     </div>
@@ -1035,15 +1015,11 @@ export function SnapZoHubEarnPanel() {
                   <div className="flex flex-col gap-1 rounded-xl bg-sky-500/[0.08] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-200/85">
                       <MezoInlineIcon decorative />
-                      MEZO net (approx.)
+                      MEZO (approx.)
                     </span>
                     <div className="text-right">
                       <span className="font-mono text-sm font-semibold text-sky-50">
                         ~{formatUnitsMax2dp(withdrawMezoPreview.netWei, MUSD_DECIMALS)}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-sky-300/75 sm:mt-0 sm:ml-2 sm:inline">
-                        fee {formatUnitsMax2dp(withdrawMezoPreview.feeWei, MUSD_DECIMALS)} on{" "}
-                        {formatUnitsMax2dp(withdrawMezoPreview.grossWei, MUSD_DECIMALS)} gross
                       </span>
                     </div>
                   </div>

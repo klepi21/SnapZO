@@ -112,7 +112,7 @@ contract SnapZoHubTest is Test {
         assertEq(musd.balanceOf(alice), 100 ether);
     }
 
-    function testHarvest_indexesRewardToHub_noHarvestFee() public {
+    function testHarvest_indexesRewardToHub_withIndexFee() public {
         reward.mint(address(gauge), 10 ether);
 
         uint256 assets = 5 ether;
@@ -123,12 +123,12 @@ contract SnapZoHubTest is Test {
         vm.prank(relayer);
         hub.harvest();
 
-        assertEq(reward.balanceOf(address(hub)), 10 ether, "all MEZO stays on hub for indexing");
-        assertEq(reward.balanceOf(owner), 0, "fee applies on MEZO withdraw only");
-        assertEq(hub.earned(alice), 10 ether);
+        assertEq(reward.balanceOf(address(hub)), 9 ether, "net MEZO stays on hub for indexing");
+        assertEq(reward.balanceOf(owner), 1 ether, "10% index fee to feeReceiver");
+        assertEq(hub.earned(alice), 9 ether);
     }
 
-    function testWithdraw_appliesFeeOnlyToMezo() public {
+    function testWithdraw_paysIndexedMezoWithoutExtraFee() public {
         reward.mint(address(gauge), 10 ether);
 
         uint256 assets = 5 ether;
@@ -144,8 +144,8 @@ contract SnapZoHubTest is Test {
         vm.prank(relayer);
         hub.withdrawWithSig(alice, snap, 1, d2, _signWithdraw(alice, alicePk, snap, 1, d2));
 
-        assertEq(reward.balanceOf(alice), 9 ether, "90% MEZO to user (10% fee)");
-        assertEq(reward.balanceOf(owner), 1 ether, "10% MEZO fee to feeReceiver");
+        assertEq(reward.balanceOf(alice), 9 ether, "user receives full indexed MEZO (no withdraw fee)");
+        assertEq(reward.balanceOf(owner), 1 ether, "index fee already sent to feeReceiver");
         assertEq(musd.balanceOf(alice), 100 ether, "full MUSD principal back");
     }
 
@@ -172,7 +172,7 @@ contract SnapZoHubTest is Test {
         hub.depositWithSig(bob, 5 ether, 0, d2, _signDeposit(bob, bobPk, 5 ether, 0, d2));
 
         assertEq(hub.earned(bob), 0);
-        assertEq(hub.earned(alice), 10 ether);
+        assertEq(hub.earned(alice), 9 ether);
     }
 
     function testSnapTransfer_updatesRewardDebt() public {
@@ -193,7 +193,7 @@ contract SnapZoHubTest is Test {
         hub.snapToken().transfer(bob, half);
         vm.stopPrank();
 
-        assertApproxEqAbs(hub.earned(alice) + hub.earned(bob), 10 ether, 3);
+        assertApproxEqAbs(hub.earned(alice) + hub.earned(bob), 9 ether, 3);
     }
 
     function testRestake_depositsIdleMusd() public {

@@ -236,6 +236,7 @@ export function SnapZoHubAdminView() {
         abi: snapZoRewardsAbi,
         functionName: "lastUpdateTimestamp",
       },
+      { chainId: mezoTestnet.id, address: rewards, abi: snapZoRewardsAbi, functionName: "MAX_BPS" },
     ],
     query: {
       enabled: rewardsOk,
@@ -281,6 +282,9 @@ export function SnapZoHubAdminView() {
     rewardsReads.data?.[3]?.status === "success" ? rewardsReads.data[3].result : undefined;
   const rewardsLastUpdateTs =
     rewardsReads.data?.[4]?.status === "success" ? rewardsReads.data[4].result : undefined;
+  const rewardsMaxBps =
+    rewardsReads.data?.[5]?.status === "success" ? rewardsReads.data[5].result : undefined;
+  const rewardsIsCreatorsContract = rewardsMaxBps === BigInt(10_000);
   const rewardsPreviewClaimable = useReadContract({
     chainId: mezoTestnet.id,
     address: rewards,
@@ -875,6 +879,10 @@ export function SnapZoHubAdminView() {
   };
 
   const onRewardsSetAllocations = () => {
+    if (!rewardsIsCreatorsContract) {
+      toast("This rewards address is legacy Merkle contract. Set SnapZoCreators address first.", "error");
+      return;
+    }
     const users = parseCsvAddresses(rewardsUsersIn);
     if (!users?.length) {
       toast("Users must be valid addresses (comma/newline separated).", "error");
@@ -909,6 +917,10 @@ export function SnapZoHubAdminView() {
   };
 
   const onRewardsSetAllocationsByBps = () => {
+    if (!rewardsIsCreatorsContract) {
+      toast("This rewards address is legacy Merkle contract. Set SnapZoCreators address first.", "error");
+      return;
+    }
     const users = parseCsvAddresses(rewardsUsersIn);
     if (!users?.length) {
       toast("Users must be valid addresses (comma/newline separated).", "error");
@@ -1518,6 +1530,12 @@ export function SnapZoHubAdminView() {
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
+                <dt className="text-zinc-500">Contract mode</dt>
+                <dd className={rewardsIsCreatorsContract ? "font-medium text-emerald-300" : "font-medium text-amber-200"}>
+                  {rewardsIsCreatorsContract ? "SnapZoCreators (claimable mapping)" : "Legacy Merkle rewards"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
                 <dt className="text-zinc-500">Hub linkage</dt>
                 <dd
                   className={
@@ -1537,6 +1555,14 @@ export function SnapZoHubAdminView() {
                 </dd>
               </div>
             </dl>
+            {!rewardsIsCreatorsContract ? (
+              <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+                Connected rewards contract does not expose <span className="font-mono">MAX_BPS</span> /{" "}
+                <span className="font-mono">setAllocations</span>. Point{" "}
+                <span className="font-mono">NEXT_PUBLIC_SNAPZO_REWARDS_ADDRESS</span> and hub{" "}
+                <span className="font-mono">rewardContract</span> to the SnapZoCreators deployment.
+              </div>
+            ) : null}
             <p className={label}>Preview claimable for user</p>
             <input
               className={`${input} mb-2`}
@@ -1589,7 +1615,7 @@ export function SnapZoHubAdminView() {
             <button
               type="button"
               className={`${btnPrimary} mt-2 mb-4 w-full`}
-              disabled={!canActRewards}
+              disabled={!canActRewards || !rewardsIsCreatorsContract}
               onClick={onRewardsSetAllocations}
             >
               setAllocations
@@ -1611,7 +1637,7 @@ export function SnapZoHubAdminView() {
             <button
               type="button"
               className={`${btnMuted} mb-4 w-full`}
-              disabled={!canActRewards}
+              disabled={!canActRewards || !rewardsIsCreatorsContract}
               onClick={onRewardsSetAllocationsByBps}
             >
               setAllocationsByBps

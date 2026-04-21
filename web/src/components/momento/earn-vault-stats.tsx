@@ -14,6 +14,7 @@ import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import {
   MEZO_MUSD_VAULT,
   MEZO_SMUSD_GAUGE,
+  MEZO_SMUSD_GAUGE_REWARD_TOKEN,
   mezoMusdVaultAbi,
   mezoSmusdGaugeAbi,
 } from "@/lib/constants/mezo-earn";
@@ -202,7 +203,7 @@ export function EarnVaultStats() {
       },
       {
         chainId: mezoTestnet.id,
-        address: SNAPZO_REWARDS_ADDRESS,
+        address: MEZO_SMUSD_GAUGE_REWARD_TOKEN,
         abi: erc20BalanceAbi,
         functionName: "balanceOf",
         args: [SNAPZO_REWARDS_ADDRESS],

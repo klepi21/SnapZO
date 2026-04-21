@@ -18,7 +18,7 @@ import {ISnapZoHubHook} from "./interfaces/ISnapZoHubHook.sol";
 
 /// @title SnapZoHub
 /// @notice Pooled MUSD → vault → gauge strategy with SNAP receipt shares; relayer-gated EIP-712 deposit/withdraw.
-/// @dev Gauge MEZO is claimed into the hub, indexed to SNAP (reward-per-token). Fee applies to MEZO only on withdraw.
+/// @dev Gauge MEZO is claimed into the hub, fee is taken at indexing time, and net rewards are indexed to SNAP.
 contract SnapZoHub is
     Initializable,
     OwnableUpgradeable,
@@ -175,7 +175,7 @@ contract SnapZoHub is
         emit RelayerUpdated(relayer, allowed);
     }
 
-    /// @notice `feeBps` applies to **MEZO** paid out on withdraw (not MUSD).
+    /// @notice `feeBps` applies to newly indexed MEZO (not MUSD principal).
     function setFee(uint16 feeBps_, address feeReceiver_) external onlyOwner {
         if (feeBps_ > 2000) revert SnapZoHub__FeeTooHigh();
         feeBps = feeBps_;
@@ -352,7 +352,9 @@ contract SnapZoHub is
         if (ts == 0) revert SnapZoHub__ZeroShares();
         uint256 bal = rewardToken.balanceOf(address(this));
         if (amount > bal) revert SnapZoHub__InsufficientRewardBalance();
-        rewardPerTokenStored += (amount * REWARD_PRECISION) / ts;
+        uint256 net = _netAfterIndexFee(amount);
+        if (net == 0) revert SnapZoHub__ZeroAmount();
+        rewardPerTokenStored += (net * REWARD_PRECISION) / ts;
         emit ExistingRewardsIndexed(amount);
     }
 
@@ -526,27 +528,9 @@ contract SnapZoHub is
         uint256 musdOut = musd.balanceOf(address(this)) - musdBefore;
         musd.safeTransfer(user, musdOut);
 
-        uint256 mezoOut;
-        if (mezoGross > 0) {
-            // Force 20% fee if rewardContract is configured, else use feeBps
-            uint256 currentFeeBps = rewardContract != address(0) ? 2000 : uint256(feeBps);
-            uint256 totalFee = (mezoGross * currentFeeBps) / BPS;
-            
-            if (rewardContract != address(0) && currentFeeBps == 2000) {
-                uint256 treasuryFee = totalFee / 2; // 10%
-                uint256 rewardsFee = totalFee - treasuryFee; // 10%
-                mezoOut = mezoGross - totalFee;
-                
-                rewardToken.safeTransfer(user, mezoOut);
-                rewardToken.safeTransfer(feeReceiver, treasuryFee);
-                rewardToken.safeTransfer(rewardContract, rewardsFee);
-            } else {
-                mezoOut = mezoGross - totalFee;
-                rewardToken.safeTransfer(user, mezoOut);
-                if (totalFee > 0) {
-                    rewardToken.safeTransfer(feeReceiver, totalFee);
-                }
-            }
+        uint256 mezoOut = mezoGross;
+        if (mezoOut > 0) {
+            rewardToken.safeTransfer(user, mezoOut);
         }
 
         _updateReward(user);
@@ -558,7 +542,7 @@ contract SnapZoHub is
         ISmusdGauge(gauge).getReward(address(this));
         delta = rewardToken.balanceOf(address(this)) - beforeBal;
         uint256 u = unallocatedReward;
-        uint256 add = delta + u;
+        uint256 add = _netAfterIndexFee(delta) + u;
         if (add == 0) {
             return 0;
         }
@@ -570,6 +554,31 @@ contract SnapZoHub is
         unallocatedReward = 0;
         rewardPerTokenStored += add * REWARD_PRECISION / ts;
         return delta;
+    }
+
+    /// @dev Fee is realized when rewards are indexed (harvest/sync/manual index), not at user withdraw.
+    function _netAfterIndexFee(uint256 amount) internal returns (uint256) {
+        if (amount == 0) {
+            return 0;
+        }
+        uint256 currentFeeBps = rewardContract != address(0) ? 2000 : uint256(feeBps);
+        uint256 totalFee = (amount * currentFeeBps) / BPS;
+        if (totalFee == 0) {
+            return amount;
+        }
+        if (rewardContract != address(0) && currentFeeBps == 2000) {
+            uint256 treasuryFee = totalFee / 2; // 10%
+            uint256 creatorsFee = totalFee - treasuryFee; // 10%
+            if (treasuryFee > 0) {
+                rewardToken.safeTransfer(feeReceiver, treasuryFee);
+            }
+            if (creatorsFee > 0) {
+                rewardToken.safeTransfer(rewardContract, creatorsFee);
+            }
+        } else {
+            rewardToken.safeTransfer(feeReceiver, totalFee);
+        }
+        return amount - totalFee;
     }
 
     /// @dev If MEZO was claimed while `totalSupply()==0`, merge it on first mint once SNAP exists.

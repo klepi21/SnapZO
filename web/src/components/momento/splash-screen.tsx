@@ -29,7 +29,7 @@ export function SplashScreen() {
   return (
     <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col bg-black">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_18%,rgba(59,130,246,0.38),transparent_58%),linear-gradient(180deg,#0a1628_0%,#05070d_45%,#020203_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_16%,rgba(56,189,248,0.28),transparent_58%),radial-gradient(ellipse_72%_45%_at_50%_62%,rgba(37,99,235,0.16),transparent_68%),linear-gradient(180deg,#091327_0%,#05070d_43%,#020203_100%)]"
         aria-hidden
       />
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:24px_24px]" />
@@ -53,10 +53,13 @@ export function SplashScreen() {
           </div>
 
           <div className="relative z-10 mt-2 w-full max-w-md">
-            <h1 className="text-[2.65rem] font-bold leading-[0.95] tracking-tight text-white sm:text-[2.85rem]">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-sky-300/25 bg-sky-400/[0.08] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-100/90">
+              Built on Mezo
+            </div>
+            <h1 className="snapzo-title-tight mt-3 text-[2.75rem] font-bold text-white sm:text-[2.95rem]">
               {APP_NAME}
             </h1>
-            <p className="mx-auto mt-3 max-w-[26rem] text-pretty text-base font-semibold leading-snug tracking-tight text-zinc-100 sm:text-lg">
+            <p className="mx-auto mt-3 max-w-[26rem] text-pretty text-base font-semibold leading-snug tracking-[-0.01em] text-zinc-100 sm:text-lg">
               {APP_SPLASH_HEADLINE}
             </p>
             <p className="mx-auto mt-3 max-w-[26rem] text-pretty text-sm leading-relaxed text-zinc-400 sm:text-[0.95rem]">
@@ -71,10 +74,13 @@ export function SplashScreen() {
         <div className="relative z-10 mt-auto w-full max-w-xs pb-[env(safe-area-inset-bottom)]">
           <Link
             href={startedHref}
-            className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-[#3b82f6] via-[#2563eb] to-[#1d4ed8] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(37,99,235,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+            className="snapzo-pressable inline-flex w-full items-center justify-center rounded-full border border-sky-200/35 bg-gradient-to-r from-[#38bdf8] via-[#2563eb] to-[#1d4ed8] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.98]"
           >
             Get Started
           </Link>
+          <p className="mt-3 text-center text-[11px] text-zinc-500">
+            Gasless hub actions · Mobile-first social UX
+          </p>
         </div>
       </div>
     </div>
