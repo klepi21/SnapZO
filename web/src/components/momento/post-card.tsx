@@ -322,6 +322,7 @@ export function PostCard({ post }: PostCardProps) {
   const [dbHasTipped, setDbHasTipped] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+  const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [pendingHash, setPendingHash] = useState<`0x${string}` | undefined>();
   const [pendingKind, setPendingKind] = useState<
     "unlock" | "like" | "replyRequest" | "replyFulfill" | null
@@ -333,6 +334,9 @@ export function PostCard({ post }: PostCardProps) {
     null
   );
   const [pendingCommentId, setPendingCommentId] = useState<bigint | null>(null);
+  const [replyTargetRequestId, setReplyTargetRequestId] = useState<`0x${string}` | null>(
+    null
+  );
   /** True after user initiates like until tx fails or is superseded by storage. */
   const [likePressed, setLikePressed] = useState(false);
   const lastMediaTapRef = useRef(0);
@@ -354,6 +358,10 @@ export function PostCard({ post }: PostCardProps) {
   );
   const hasTipped = dbHasTipped;
   const comments = dbReplies;
+  const pendingDbReplies = useMemo(
+    () => dbReplies.filter((r) => r.status === "pending"),
+    [dbReplies]
+  );
 
   const src = post.imageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked;
@@ -567,6 +575,7 @@ export function PostCard({ post }: PostCardProps) {
       setPendingKind(null);
       setPendingRequestId(null);
       setPendingCommentId(null);
+      setReplyTargetRequestId(null);
     }
     void handleSuccess();
   }, [
@@ -604,6 +613,7 @@ export function PostCard({ post }: PostCardProps) {
     setPendingCommentText(null);
     setPendingRequestId(null);
     setPendingCommentId(null);
+    setReplyTargetRequestId(null);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [isError, pendingHash, pendingKind, toast]);
 
@@ -816,7 +826,10 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     if (isOwnPost) {
-      const selected = pendingSocialReplies[0];
+      const selected =
+        (replyTargetRequestId
+          ? pendingDbReplies.find((r) => r.requestId === replyTargetRequestId)
+          : undefined) ?? pendingDbReplies[0];
       if (!selected) {
         toast("No pending paid replies to fulfill for this post.", "error");
         return;
@@ -826,13 +839,14 @@ export function PostCard({ post }: PostCardProps) {
         toast("Creator nonce unavailable. Retry in a moment.", "error");
         return;
       }
+      const selectedRequestId = selected.requestId as `0x${string}`;
       const commentIdDigest = keccak256(
         stringToBytes(`${post.id}:${text}:${Date.now().toString()}`)
       );
       const commentId = BigInt(`0x${commentIdDigest.slice(2, 18)}`);
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
       setPendingCommentText(text);
-      setPendingRequestId(selected.requestId);
+      setPendingRequestId(selectedRequestId);
       setPendingCommentId(commentId);
       toast("Sign creator reply to unlock escrow…");
       const signature = await signTypedDataAsync({
@@ -846,7 +860,7 @@ export function PostCard({ post }: PostCardProps) {
         primaryType: "FulfillReply",
         message: {
           creator: address as `0x${string}`,
-          requestId: selected.requestId,
+          requestId: selectedRequestId,
           commentId,
           nonce,
           deadline,
@@ -858,7 +872,7 @@ export function PostCard({ post }: PostCardProps) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           creator: address,
-          requestId: selected.requestId,
+          requestId: selectedRequestId,
           commentId: String(commentId),
           nonce: String(nonce),
           deadline: String(deadline),
@@ -1235,7 +1249,7 @@ export function PostCard({ post }: PostCardProps) {
                     </h2>
                     {isOwnPost && pendingSocialReplies.length > 0 ? (
                       <span className="text-[11px] font-medium text-emerald-300">
-                        {pendingSocialReplies.length} pending paid repl{pendingSocialReplies.length === 1 ? "y" : "ies"}
+                        {pendingDbReplies.length} pending paid repl{pendingDbReplies.length === 1 ? "y" : "ies"}
                       </span>
                     ) : null}
                     <button
@@ -1308,6 +1322,22 @@ export function PostCard({ post }: PostCardProps) {
                               >
                                 View transaction
                               </a>
+                              {isOwnPost && c.status === "pending" ? (
+                                <>
+                                  <span aria-hidden>·</span>
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => {
+                                      setReplyTargetRequestId(c.requestId as `0x${string}`);
+                                      commentInputRef.current?.focus();
+                                    }}
+                                    className="font-semibold text-emerald-300 transition hover:text-emerald-200 disabled:opacity-40"
+                                  >
+                                    Reply
+                                  </button>
+                                </>
+                              ) : null}
                             </div>
                           </div>
                         </li>
@@ -1343,12 +1373,17 @@ export function PostCard({ post }: PostCardProps) {
                       Add a comment
                     </label>
                     <textarea
+                      ref={commentInputRef}
                       id={`snapzo-comment-${post.id}`}
                       value={commentDraft}
                       onChange={(e) => setCommentDraft(e.target.value)}
                       rows={1}
                       maxLength={500}
-                      placeholder="Add a comment…"
+                      placeholder={
+                        isOwnPost && replyTargetRequestId
+                          ? "Reply to selected paid comment…"
+                          : "Add a comment…"
+                      }
                       disabled={isBusy}
                       className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[22px] border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-sm leading-snug text-white placeholder:text-zinc-500 outline-none transition focus:border-white/20 focus:ring-1 focus:ring-white/15 disabled:opacity-50"
                     />
