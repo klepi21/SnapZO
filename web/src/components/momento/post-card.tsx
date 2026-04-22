@@ -1080,9 +1080,13 @@ export function PostCard({ post }: PostCardProps) {
               onClick={handleUnlock}
               className="snapzo-pressable inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-400/36 bg-gradient-to-br from-indigo-500/24 to-sky-500/16 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_18px_rgba(99,102,241,0.16)] hover:border-indigo-300/55 hover:from-indigo-500/34 disabled:opacity-50"
             >
-              <span>
+              <span className="inline-flex items-center gap-1">
                 Unlock · {unlockMusdLabel}{" "}
                 <MusdInlineIcon className="inline" decorative />
+                <span className="text-zinc-300">~</span>
+                {unlockSnapLabel}
+                <SnapInlineIcon decorative />
+                <span>SNAP</span>
               </span>
             </button>
           </div>
@@ -1134,6 +1138,11 @@ export function PostCard({ post }: PostCardProps) {
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
               0.01 <MusdInlineIcon decorative />
             </span>
+            <span className="text-zinc-600">{" (~"}</span>
+            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+              {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "…"} <SnapInlineIcon decorative /> SNAP
+            </span>
+            <span className="text-zinc-600">)</span>
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Reply</span>{" "}
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
@@ -1146,6 +1155,11 @@ export function PostCard({ post }: PostCardProps) {
                 <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
                   {unlockMusdLabel} <MusdInlineIcon decorative />
                 </span>
+                <span className="text-zinc-600">{" (~"}</span>
+                <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+                  {unlockSnapLabel} <SnapInlineIcon decorative /> SNAP
+                </span>
+                <span className="text-zinc-600">)</span>
               </>
             ) : null}
             </div>
