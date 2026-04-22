@@ -117,6 +117,9 @@ export interface TipItem {
   amount: number;
   txHash: string;
   createdAt: string;
+  tipperDisplayName?: string | null;
+  tipperUsername?: string | null;
+  tipperProfileImage?: string | null;
 }
 
 /**

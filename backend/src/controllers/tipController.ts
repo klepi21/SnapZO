@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
 import Post from '../models/Post';
 import Tip from '../models/Tip';
+import User from '../models/User';
 import * as web3Service from '../services/web3Service';
 import { badRequest, notFound, conflict } from '../utils/errors';
 import { requireAddress, requireTxHash, requirePositiveNumber } from '../utils/validation';
@@ -90,6 +91,11 @@ export async function getTipsForPost(req: Request, res: Response): Promise<void>
       : null;
 
   const tips = await Tip.find({ post: postObjectId }).sort({ createdAt: -1 }).lean();
+  const wallets = [...new Set(tips.map((t) => t.fromWallet.toLowerCase()))];
+  const users = await User.find({ walletAddress: { $in: wallets } })
+    .select('walletAddress displayName username profileImage')
+    .lean();
+  const userMap = new Map(users.map((u) => [u.walletAddress.toLowerCase(), u]));
   const hasViewerTipped = viewer
     ? tips.some((t) => t.fromWallet.toLowerCase() === viewer)
     : false;
@@ -101,6 +107,9 @@ export async function getTipsForPost(req: Request, res: Response): Promise<void>
       amount: t.amount,
       txHash: t.txHash,
       createdAt: t.createdAt,
+      tipperDisplayName: userMap.get(t.fromWallet.toLowerCase())?.displayName ?? null,
+      tipperUsername: userMap.get(t.fromWallet.toLowerCase())?.username ?? null,
+      tipperProfileImage: userMap.get(t.fromWallet.toLowerCase())?.profileImage ?? null,
     })),
     hasViewerTipped,
   });

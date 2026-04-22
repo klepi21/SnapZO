@@ -65,6 +65,7 @@ import {
   fetchSocialRepliesForPost,
   fulfillSocialReplyRecord,
   type SocialReplyItem,
+  type TipItem,
 } from "@/lib/snapzo-api";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { ipfsGatewayUrl } from "@/lib/snapzo-profile-local";
@@ -344,6 +345,7 @@ export function PostCard({ post }: PostCardProps) {
     PendingSocialReply[]
   >([]);
   const [dbReplies, setDbReplies] = useState<SocialReplyItem[]>([]);
+  const [dbTips, setDbTips] = useState<TipItem[]>([]);
 
   const { isLoading: isConfirming, isSuccess, isError } =
     useWaitForTransactionReceipt({
@@ -401,7 +403,10 @@ export function PostCard({ post }: PostCardProps) {
         items: [],
         hasViewerTipped: false,
       }));
-      if (!cancelled) setDbHasTipped(res.hasViewerTipped);
+      if (!cancelled) {
+        setDbTips(res.items);
+        setDbHasTipped(res.hasViewerTipped);
+      }
     }
     void loadDbTips();
     return () => {
@@ -519,6 +524,13 @@ export function PostCard({ post }: PostCardProps) {
             amount: Number(formatUnits(likeTipAmountRead.data, SNAP_DECIMALS)),
             txHash: confirmedHash,
           }).catch(() => null);
+        }
+        if (post.postObjectId) {
+          const refreshedTips = await fetchTipsForPost(post.postObjectId, address).catch(
+            () => ({ items: [], hasViewerTipped: true })
+          );
+          setDbTips(refreshedTips.items);
+          setDbHasTipped(refreshedTips.hasViewerTipped);
         }
         toast(
           tipSnapWei !== undefined
@@ -639,9 +651,9 @@ export function PostCard({ post }: PostCardProps) {
   const isBusy = isWritePending || isSignPending || isConfirming || Boolean(pendingHash);
 
   const likedUi = hasTipped || likePressed;
-  const likeCount =
-    post.likes + (hasTipped ? 1 : likePressed ? 1 : 0);
+  const likeCount = dbTips.length + (likePressed ? 1 : 0);
   const commentCount = comments.length;
+  const recentLikers = useMemo(() => dbTips.slice(0, 3), [dbTips]);
 
   const handleUnlock = async () => {
     if (!isLockedPost || mediaUnlocked) {
@@ -1140,29 +1152,42 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         </div>
 
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex shrink-0 -space-x-1.5 pl-0.5">
-            {post.likedBySeeds.map((seed, i) => (
-              <div
-                key={seed}
-                className="relative h-[18px] w-[18px] overflow-hidden rounded-full ring-[1.5px] ring-[#0c1018]"
-                style={{ zIndex: post.likedBySeeds.length - i }}
-              >
-                <Image
-                  src={picsumAvatar(seed, 48)}
-                  alt=""
-                  width={18}
-                  height={18}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            ))}
+        {recentLikers.length > 0 ? (
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex shrink-0 -space-x-1.5 pl-0.5">
+              {recentLikers.map((tip, i) => (
+                <div
+                  key={tip.id}
+                  className="relative h-[18px] w-[18px] overflow-hidden rounded-full ring-[1.5px] ring-[#0c1018]"
+                  style={{ zIndex: recentLikers.length - i }}
+                >
+                  {tip.tipperProfileImage ? (
+                    <Image
+                      src={ipfsGatewayUrl(tip.tipperProfileImage)}
+                      alt=""
+                      width={18}
+                      height={18}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-zinc-700 text-[8px] font-semibold text-zinc-100">
+                      {tip.fromWallet.slice(2, 4).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="min-w-0 text-xs leading-snug text-zinc-400">
+              <span className="font-semibold text-zinc-300">Liked by</span>{" "}
+              <span className="font-bold text-white">
+                {recentLikers[0]?.tipperDisplayName?.trim() ||
+                  recentLikers[0]?.tipperUsername?.trim() ||
+                  `${recentLikers[0]?.fromWallet.slice(0, 6)}...${recentLikers[0]?.fromWallet.slice(-4)}`}
+              </span>
+              {likeCount > 1 ? <span>{` and ${likeCount - 1} others`}</span> : null}
+            </p>
           </div>
-          <p className="min-w-0 text-xs leading-snug text-zinc-400">
-            <span className="font-semibold text-zinc-300">Liked by</span>{" "}
-            <span className="font-bold text-white">others</span>
-          </p>
-        </div>
+        ) : null}
 
         <p className="mt-3 text-sm leading-relaxed text-zinc-300">
           <span className="font-semibold text-white">{post.userName}</span>{" "}
