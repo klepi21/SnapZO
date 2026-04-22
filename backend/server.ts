@@ -27,6 +27,18 @@ import userRoutes from './src/routes/user';
 const app = express();
 const httpServer = http.createServer(app);
 
+function normalizeOrigin(origin: string): string {
+  return origin.trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function parseAllowedOrigins(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(normalizeOrigin);
+}
+
 // ---- socket.io -------------------------------------------------------------
 const io = new SocketIOServer(httpServer, {
   cors: { origin: config.corsOrigin, credentials: true },
@@ -73,10 +85,17 @@ cronService.setSocketIo(io);
 // ---- Express middleware ----------------------------------------------------
 app.use(
   cors({
-    origin:
-      config.corsOrigin === '*'
-        ? true
-        : config.corsOrigin.split(',').map((s) => s.trim()),
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin || config.corsOrigin === '*') {
+        callback(null, true);
+        return;
+      }
+
+      const requestOriginNormalized = normalizeOrigin(requestOrigin);
+      const allowedOrigins = parseAllowedOrigins(config.corsOrigin);
+      const isAllowed = allowedOrigins.includes(requestOriginNormalized);
+      callback(null, isAllowed);
+    },
     credentials: true,
   })
 );
