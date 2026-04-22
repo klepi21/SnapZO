@@ -110,6 +110,18 @@ Users must **`approve(SNAP → SnapZoSocial proxy)`** before relayers can execut
 - Impl deploy tx: [explorer](https://explorer.test.mezo.org/tx/0xb5d3ead51c0cff544b0c182fed82f75bcfffeefcf22903021eac11cc49a57fbf)  
 - Block: **12430314**
 
+### Deployed `SnapZoSocial` (Mezo testnet, chain 31611 — 2026-04-22)
+
+| Role | Address |
+|------|---------|
+| **Social (proxy — tips / unlocks / reply escrow)** | `0x30200f8ee05a34a3062CAbFe42c18f7b894239C4` |
+| **Implementation** | `0x443A2fa7dD443ea6f6036e4424bD8722c8372FF6` |
+| **SNAP token used by social** | `0x26410f213EA670B9D24c7F7a8c7b8Ab1Ecdc0B0E` |
+
+- Proxy deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x1ccc42d3ee6556f3d591590921292d21f46c7d38e6164d09b1ffc47ffe945c6b)  
+- Impl deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x36b59a8f7a54aaad8d502dbe5911dd2285b387c5567bfeb7cf9f8bfecf67adb0)  
+- Block: **12538413** / **12538412**
+
 After deploy: **whitelist relayer addresses** on the hub (`setRelayer`), have users **approve MUSD → hub** (and optionally use **MUSD `permit`** in the same tx via `depositWithSigAndPermit`), and **`encode` restake router routes** when liquidity exists (`setRestakeRoutes` while **paused**).
 
 ### Web app (`web/`)

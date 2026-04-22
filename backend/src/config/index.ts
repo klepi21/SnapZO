@@ -64,7 +64,7 @@ const config: AppConfig = {
     musdDecimals: toInt(process.env.MUSD_DECIMALS, 18),
     socialContractAddress: required(
       'SOCIAL_CONTRACT_ADDRESS',
-      '0xee3294D7B254066E172F820B0389e8a39E59D56A'
+      '0x30200f8ee05a34a3062CAbFe42c18f7b894239C4'
     ),
     escrowAddress: required('ESCROW_WALLET_ADDRESS', ''),
     escrowPrivateKey: required('ESCROW_PRIVATE_KEY', ''),

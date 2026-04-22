@@ -11,7 +11,7 @@ const SNAP_MEZO_TESTNET =
   "0xCA1A5C01c533dDE957f0eFC79b25906b0187039D" as const;
 /** `SnapZoSocial` UUPS proxy — Part F (`contracts/src/SnapZoSocial.sol`). */
 const SOCIAL_MEZO_TESTNET =
-  "0xee3294D7B254066E172F820B0389e8a39E59D56A" as const;
+  "0x30200f8ee05a34a3062CAbFe42c18f7b894239C4" as const;
 /** `SnapZoRewards` — Merkle rewards distributor (`contracts/src/SnapZoRewards.sol`). */
 const REWARDS_MEZO_TESTNET =
   "0x66884173243B2C9Bc056753376B714b402A7E801" as const;
