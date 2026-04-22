@@ -122,7 +122,7 @@ export interface TipItem {
   tipperProfileImage?: string | null;
 }
 
-export type AdminActivityTable = "likes" | "replies" | "unlocks" | "users" | "activity";
+export type AdminActivityTable = "likes" | "replies" | "unlocks" | "users" | "activity" | "posts";
 
 export interface AdminActivityResponse {
   table: AdminActivityTable;
@@ -313,4 +313,18 @@ export async function fetchAdminActivityTable(
     );
   }
   return (await res.json()) as AdminActivityResponse;
+}
+
+export async function deleteAdminPost(postObjectId: string): Promise<{
+  ok: boolean;
+  removed: Record<string, number>;
+}> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/admin/posts/${postObjectId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`deleteAdminPost failed (${res.status}): ${text || res.statusText}`);
+  }
+  return (await res.json()) as { ok: boolean; removed: Record<string, number> };
 }

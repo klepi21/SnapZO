@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
-import { fetchAdminActivityTable, type AdminActivityTable } from "@/lib/snapzo-api";
+import {
+  deleteAdminPost,
+  fetchAdminActivityTable,
+  type AdminActivityTable,
+} from "@/lib/snapzo-api";
 import { ipfsGatewayUrl } from "@/lib/snapzo-profile-local";
 import Image from "next/image";
 
@@ -13,6 +17,7 @@ const TABLES: Array<{ key: AdminActivityTable; label: string }> = [
   { key: "likes", label: "Likes" },
   { key: "replies", label: "Replies" },
   { key: "unlocks", label: "Unlocks" },
+  { key: "posts", label: "Posts" },
   { key: "users", label: "Users" },
 ];
 
@@ -32,6 +37,7 @@ function formatDate(value: unknown): string {
 export function SnapZoAnalyticsAdminView() {
   const [table, setTable] = useState<AdminActivityTable>("activity");
   const [page, setPage] = useState(1);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const pageSize = 20;
 
   const query = useQuery({
@@ -43,6 +49,23 @@ export function SnapZoAnalyticsAdminView() {
   const items = query.data?.items ?? [];
   const totalPages = query.data?.totalPages ?? 1;
   const summary = query.data?.summary;
+
+  async function handleDeletePost(postObjectId: string, postId: string) {
+    const ok = window.confirm(
+      `Delete post ${postId}?\n\nThis removes post row plus related tips/replies/unlocks from DB.`
+    );
+    if (!ok) return;
+    setDeletingPostId(postObjectId);
+    try {
+      await deleteAdminPost(postObjectId);
+      await query.refetch();
+    } catch (e) {
+      // eslint-disable-next-line no-alert
+      alert(e instanceof Error ? e.message : "Failed to delete post");
+    } finally {
+      setDeletingPostId(null);
+    }
+  }
 
   const tableRows = useMemo(() => {
     if (table === "likes")
@@ -75,6 +98,29 @@ export function SnapZoAnalyticsAdminView() {
           <td className="px-3 py-2 font-mono text-zinc-300">{asString(raw.postId)}</td>
           <td className="px-3 py-2 text-zinc-300">{asString(raw.source)}</td>
           <td className="px-3 py-2 font-mono text-zinc-400">{asString(raw.txHash).slice(0, 12)}…</td>
+        </tr>
+      ));
+
+    if (table === "posts")
+      return items.map((raw) => (
+        <tr key={asString(raw.id)} className="border-b border-white/[0.06]">
+          <td className="px-3 py-2 text-zinc-200">{formatDate(raw.createdAt)}</td>
+          <td className="px-3 py-2 font-mono text-zinc-300">{asString(raw.postId)}</td>
+          <td className="px-3 py-2 text-zinc-100">{asString(raw.creatorLabel)}</td>
+          <td className="px-3 py-2 text-zinc-300">{asString(raw.likes)}</td>
+          <td className="px-3 py-2 text-zinc-300">{asString(raw.replies)}</td>
+          <td className="px-3 py-2 text-zinc-300">{asString(raw.unlocks)}</td>
+          <td className="px-3 py-2 text-zinc-300">{asString(raw.isLocked) === "true" ? "Locked" : "Public"}</td>
+          <td className="px-3 py-2">
+            <button
+              type="button"
+              onClick={() => void handleDeletePost(asString(raw.id), asString(raw.postId))}
+              disabled={deletingPostId === asString(raw.id)}
+              className="rounded-lg border border-red-500/35 bg-red-500/15 px-2 py-1 text-[11px] font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-40"
+            >
+              {deletingPostId === asString(raw.id) ? "Deleting…" : "Delete"}
+            </button>
+          </td>
         </tr>
       ));
 
@@ -114,12 +160,13 @@ export function SnapZoAnalyticsAdminView() {
         <td className="max-w-[360px] truncate px-3 py-2 text-zinc-400">{asString(raw.summary)}</td>
       </tr>
     ));
-  }, [items, table]);
+  }, [deletingPostId, items, table]);
 
   const headers = useMemo(() => {
     if (table === "likes") return ["At", "Liker", "Post", "Amount", "Tx"];
     if (table === "replies") return ["At", "Requester", "Creator", "Status", "Comment"];
     if (table === "unlocks") return ["At", "User", "Post", "Source", "Tx"];
+    if (table === "posts") return ["At", "Post", "Creator", "Likes", "Replies", "Unlocks", "Visibility", "Actions"];
     if (table === "users") return ["User", "Wallet", "Posts", "Likes", "Replies", "Unlocks"];
     return ["At", "Type", "User", "Post", "Summary"];
   }, [table]);

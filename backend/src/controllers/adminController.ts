@@ -8,7 +8,7 @@ import Unlock from '../models/Unlock';
 import User from '../models/User';
 import { badRequest } from '../utils/errors';
 
-type AdminTableKey = 'likes' | 'replies' | 'unlocks' | 'users' | 'activity';
+type AdminTableKey = 'likes' | 'replies' | 'unlocks' | 'users' | 'activity' | 'posts';
 
 interface PaginationResult<T> {
   items: T[];
@@ -219,6 +219,67 @@ async function getUsersPage(skip: number, pageSize: number): Promise<PaginationR
   };
 }
 
+async function getPostsPage(skip: number, pageSize: number): Promise<PaginationResult<Record<string, unknown>>> {
+  const [posts, total] = await Promise.all([
+    Post.find().sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
+    Post.countDocuments(),
+  ]);
+  const postIds = posts.map((p) => p._id);
+  const creatorWallets = [...new Set(posts.map((p) => p.creatorWallet.toLowerCase()))];
+  const [users, tipCounts, socialReplyCounts, replyCounts, socialUnlockCounts, unlockCounts] = await Promise.all([
+    User.find({ walletAddress: { $in: creatorWallets } })
+      .select('walletAddress displayName username')
+      .lean(),
+    Tip.aggregate<{ _id: string; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
+    SocialReply.aggregate<{ _id: string; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
+    Reply.aggregate<{ _id: string; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
+    SocialUnlock.aggregate<{ _id: string; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
+    Unlock.aggregate<{ _id: string; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
+  ]);
+  const userMap = new Map(users.map((u) => [u.walletAddress.toLowerCase(), u]));
+  const tipMap = new Map(tipCounts.map((r) => [String(r._id), r.count]));
+  const socialReplyMap = new Map(socialReplyCounts.map((r) => [String(r._id), r.count]));
+  const replyMap = new Map(replyCounts.map((r) => [String(r._id), r.count]));
+  const socialUnlockMap = new Map(socialUnlockCounts.map((r) => [String(r._id), r.count]));
+  const unlockMap = new Map(unlockCounts.map((r) => [String(r._id), r.count]));
+  return {
+    total,
+    items: posts.map((post) => {
+      const creator = userMap.get(post.creatorWallet.toLowerCase());
+      const id = String(post._id);
+      return {
+        id,
+        postId: post.postId,
+        createdAt: post.createdAt,
+        isLocked: post.isLocked,
+        unlockPrice: post.unlockPrice,
+        totalTipsAmount: post.totalTips,
+        creatorWallet: post.creatorWallet,
+        creatorLabel: creator?.displayName || creator?.username || shortWallet(post.creatorWallet),
+        likes: tipMap.get(id) ?? 0,
+        replies: (socialReplyMap.get(id) ?? 0) + (replyMap.get(id) ?? 0),
+        unlocks: (socialUnlockMap.get(id) ?? 0) + (unlockMap.get(id) ?? 0),
+        contentPreview: (post.content ?? '').slice(0, 120),
+      };
+    }),
+  };
+}
+
 async function getActivityPage(page: number, pageSize: number): Promise<PaginationResult<Record<string, unknown>>> {
   const start = (page - 1) * pageSize;
   const windowLimit = page * pageSize;
@@ -300,7 +361,7 @@ async function getActivityPage(page: number, pageSize: number): Promise<Paginati
 
 export async function getAdminActivityTable(req: Request, res: Response): Promise<void> {
   const table = String(req.query.table ?? 'activity') as AdminTableKey;
-  const allowed: AdminTableKey[] = ['likes', 'replies', 'unlocks', 'users', 'activity'];
+  const allowed: AdminTableKey[] = ['likes', 'replies', 'unlocks', 'users', 'activity', 'posts'];
   if (!allowed.includes(table)) {
     throw badRequest(`table must be one of: ${allowed.join(', ')}`);
   }
@@ -317,6 +378,8 @@ export async function getAdminActivityTable(req: Request, res: Response): Promis
     result = await getUnlocksPage(page, pageSize);
   } else if (table === 'users') {
     result = await getUsersPage(skip, pageSize);
+  } else if (table === 'posts') {
+    result = await getPostsPage(skip, pageSize);
   } else {
     result = await getActivityPage(page, pageSize);
   }
@@ -343,5 +406,35 @@ export async function getAdminActivityTable(req: Request, res: Response): Promis
       posts: postsCount,
     },
     items: result.items,
+  });
+}
+
+export async function deleteAdminPost(req: Request, res: Response): Promise<void> {
+  const postObjectId = String(req.params.postObjectId ?? '').trim();
+  if (!/^[0-9a-fA-F]{24}$/.test(postObjectId)) {
+    throw badRequest('postObjectId must be a valid post object id');
+  }
+  const post = await Post.findById(postObjectId).lean();
+  if (!post) {
+    throw badRequest('Post not found');
+  }
+  const [tips, socialReplies, replies, socialUnlocks, unlocks] = await Promise.all([
+    Tip.deleteMany({ post: post._id }),
+    SocialReply.deleteMany({ post: post._id }),
+    Reply.deleteMany({ post: post._id }),
+    SocialUnlock.deleteMany({ post: post._id }),
+    Unlock.deleteMany({ post: post._id }),
+  ]);
+  await Post.deleteOne({ _id: post._id });
+  res.json({
+    ok: true,
+    removed: {
+      post: 1,
+      tips: tips.deletedCount ?? 0,
+      socialReplies: socialReplies.deletedCount ?? 0,
+      replies: replies.deletedCount ?? 0,
+      socialUnlocks: socialUnlocks.deletedCount ?? 0,
+      unlocks: unlocks.deletedCount ?? 0,
+    },
   });
 }
