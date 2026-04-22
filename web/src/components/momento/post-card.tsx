@@ -39,7 +39,7 @@ import {
   UserRejectedRequestError,
 } from "viem";
 import type { FeedPost } from "@/lib/dummy/social";
-import { picsumAvatar, picsumPost } from "@/lib/dummy/social";
+import { picsumAvatar } from "@/lib/dummy/social";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
@@ -188,6 +188,23 @@ export function PostCard({ post }: PostCardProps) {
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address && socialConfigured), staleTime: 10_000 },
   });
+  const socialSnapTokenRead = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_SOCIAL_ADDRESS,
+    abi: [
+      {
+        type: "function",
+        name: "snapToken",
+        stateMutability: "view",
+        inputs: [],
+        outputs: [{ type: "address" }],
+      },
+    ] as const,
+    functionName: "snapToken",
+    query: { enabled: socialConfigured, staleTime: 60_000 },
+  });
+  const socialSnapTokenAddress =
+    socialSnapTokenRead.data ?? SNAPZO_SNAP_TOKEN_ADDRESS;
   const likeTipAmountRead = useReadContract({
     chainId: mezoTestnet.id,
     address: SNAPZO_SOCIAL_ADDRESS,
@@ -197,12 +214,31 @@ export function PostCard({ post }: PostCardProps) {
   });
   const allowanceRead = useReadContract({
     chainId: mezoTestnet.id,
-    address: SNAPZO_SNAP_TOKEN_ADDRESS,
+    address: socialSnapTokenAddress,
     abi: erc20AllowanceAbi,
     functionName: "allowance",
     args: address ? [address, SNAPZO_SOCIAL_ADDRESS] : undefined,
     query: { enabled: Boolean(address && socialConfigured), staleTime: 10_000 },
   });
+  const socialTokenBalanceRead = useReadContract({
+    chainId: mezoTestnet.id,
+    address: socialSnapTokenAddress,
+    abi: [
+      {
+        type: "function",
+        name: "balanceOf",
+        stateMutability: "view",
+        inputs: [{ name: "account", type: "address" }],
+        outputs: [{ type: "uint256" }],
+      },
+    ] as const,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address && socialConfigured), staleTime: 10_000 },
+  });
+  const allowanceValue = allowanceRead.data ?? BigInt(0);
+  const refetchAllowance = allowanceRead.refetch;
+  const socialTokenBalance = socialTokenBalanceRead.data ?? BigInt(0);
 
   const unlockMusdWei = useMemo(() => unlockMusdWeiFromPost(post), [post]);
   const unlockMusdLabel = useMemo(
@@ -430,23 +466,38 @@ export function PostCard({ post }: PostCardProps) {
     }
     const nonce = socialNonceRead.data;
     const likeTipAmount = likeTipAmountRead.data;
-    if (!socialConfigured || nonce === undefined || likeTipAmount === undefined) {
+    if (
+      !socialConfigured ||
+      nonce === undefined ||
+      likeTipAmount === undefined
+    ) {
       toast("Social tip config unavailable. Retry in a moment.", "error");
+      return;
+    }
+    if (socialSnapTokenAddress === undefined) {
+      toast("Social token address unavailable. Retry in a moment.", "error");
       return;
     }
     setLikePressed(true);
     try {
-      const allowance = allowanceRead.data ?? BigInt(0);
-      if (allowance < likeTipAmount) {
+      if (socialTokenBalance < likeTipAmount) {
+        throw new Error(
+          `Insufficient SNAP for social tip. Need ${formatUnits(
+            likeTipAmount,
+            SNAP_DECIMALS
+          )} SNAP.`
+        );
+      }
+      if (allowanceValue < likeTipAmount) {
         toast("Approve SNAP for SnapZoSocial…");
         await writeContractAsync({
-          address: SNAPZO_SNAP_TOKEN_ADDRESS,
+          address: socialSnapTokenAddress,
           abi: erc20ApproveAbi,
           functionName: "approve",
           args: [SNAPZO_SOCIAL_ADDRESS, maxUint256],
           chainId: mezoTestnet.id,
         });
-        await allowanceRead.refetch();
+        await refetchAllowance();
       }
 
       const postIdDigest = keccak256(stringToBytes(post.id));
@@ -503,17 +554,17 @@ export function PostCard({ post }: PostCardProps) {
     hasTipped,
     likePressed,
     isOwnPost,
-    hubConfigured,
     socialConfigured,
+    socialSnapTokenAddress,
     post.tipRecipient,
     post.id,
     socialNonceRead.data,
     likeTipAmountRead.data,
-    allowanceRead.data,
-    allowanceRead.refetch,
+    socialTokenBalance,
+    allowanceValue,
+    refetchAllowance,
     address,
     signTypedDataAsync,
-    tipSnapLabel,
     toast,
     writeContractAsync,
   ]);
