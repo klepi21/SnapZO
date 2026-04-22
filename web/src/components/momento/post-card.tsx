@@ -41,7 +41,6 @@ import {
 } from "viem";
 import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar } from "@/lib/dummy/social";
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
 import {
@@ -1063,15 +1062,11 @@ export function PostCard({ post }: PostCardProps) {
               <p className="text-sm font-semibold text-white">Hidden content</p>
               <p className="mt-2 max-w-[280px] text-xs leading-relaxed text-zinc-400">
                 Pay{" "}
-                <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-200">
-                  {unlockMusdLabel} <MusdInlineIcon decorative />
-                </span>{" "}
-                {"(~"}
                 <span className="inline-flex items-center gap-0 font-semibold text-violet-200">
                   {unlockSnapLabel}
                   <SnapInlineIcon decorative />
-                  {"SNAP"}
-                </span>).
+                </span>{" "}
+                to unlock.
               </p>
             </div>
             <button
@@ -1081,12 +1076,9 @@ export function PostCard({ post }: PostCardProps) {
               className="snapzo-pressable inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-400/36 bg-gradient-to-br from-indigo-500/24 to-sky-500/16 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_18px_rgba(99,102,241,0.16)] hover:border-indigo-300/55 hover:from-indigo-500/34 disabled:opacity-50"
             >
               <span className="inline-flex items-center gap-1">
-                Unlock · {unlockMusdLabel}{" "}
-                <MusdInlineIcon className="inline" decorative />
-                <span className="text-zinc-300">~</span>
+                Unlock ·
                 {unlockSnapLabel}
                 <SnapInlineIcon decorative />
-                <span>SNAP</span>
               </span>
             </button>
           </div>
@@ -1136,13 +1128,9 @@ export function PostCard({ post }: PostCardProps) {
             <div className="whitespace-nowrap">
             <span className="text-zinc-400">Like</span>{" "}
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              0.01 <MusdInlineIcon decorative />
+              {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "0.01"}{" "}
+              <SnapInlineIcon decorative />
             </span>
-            <span className="text-zinc-600">{" (~"}</span>
-            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "…"} <SnapInlineIcon decorative /> SNAP
-            </span>
-            <span className="text-zinc-600">)</span>
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Reply</span>{" "}
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
@@ -1153,13 +1141,8 @@ export function PostCard({ post }: PostCardProps) {
                 <span className="text-zinc-600"> · </span>
                 <span className="text-zinc-400">Unlock</span>{" "}
                 <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-                  {unlockMusdLabel} <MusdInlineIcon decorative />
+                  {unlockSnapLabel} <SnapInlineIcon decorative />
                 </span>
-                <span className="text-zinc-600">{" (~"}</span>
-                <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-                  {unlockSnapLabel} <SnapInlineIcon decorative /> SNAP
-                </span>
-                <span className="text-zinc-600">)</span>
               </>
             ) : null}
             </div>
