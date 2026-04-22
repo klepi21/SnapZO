@@ -23,6 +23,7 @@ import { createPortal } from "react-dom";
 import {
   useAccount,
   useChainId,
+  usePublicClient,
   useReadContract,
   useSignTypedData,
   useSwitchChain,
@@ -90,6 +91,24 @@ const SNAPZO_SOCIAL_REPLY_DEPOSIT_TYPES = {
     { name: "deadline", type: "uint256" },
   ],
 } as const;
+const SNAPZO_SOCIAL_FULFILL_REPLY_TYPES = {
+  FulfillReply: [
+    { name: "creator", type: "address" },
+    { name: "requestId", type: "bytes32" },
+    { name: "commentId", type: "uint256" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+
+interface PendingSocialReply {
+  requestId: `0x${string}`;
+  payer: `0x${string}`;
+  amount: bigint;
+  refundNotBefore: bigint;
+}
+
+const SNAPZO_SOCIAL_REDEPLOY_BLOCK = BigInt(12_538_413);
 
 function unlockMusdWeiFromPost(post: FeedPost): bigint {
   const human = post.unlockPriceMusd;
@@ -160,6 +179,7 @@ export function PostCard({ post }: PostCardProps) {
   const { switchChain } = useSwitchChain();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
   const { signTypedDataAsync, isPending: isSignPending } = useSignTypedData();
+  const publicClient = usePublicClient({ chainId: mezoTestnet.id });
   const toast = useSnapzoToast();
 
   const hubConfigured = isSnapZoHubConfigured();
@@ -306,7 +326,7 @@ export function PostCard({ post }: PostCardProps) {
   const [commentDraft, setCommentDraft] = useState("");
   const [pendingHash, setPendingHash] = useState<`0x${string}` | undefined>();
   const [pendingKind, setPendingKind] = useState<
-    "unlock" | "like" | "comment" | null
+    "unlock" | "like" | "replyRequest" | "replyFulfill" | null
   >(null);
   const [pendingCommentText, setPendingCommentText] = useState<string | null>(
     null,
@@ -314,6 +334,9 @@ export function PostCard({ post }: PostCardProps) {
   /** True after user initiates like until tx fails or is superseded by storage. */
   const [likePressed, setLikePressed] = useState(false);
   const lastMediaTapRef = useRef(0);
+  const [pendingSocialReplies, setPendingSocialReplies] = useState<
+    PendingSocialReply[]
+  >([]);
 
   const { isLoading: isConfirming, isSuccess, isError } =
     useWaitForTransactionReceipt({
@@ -334,6 +357,10 @@ export function PostCard({ post }: PostCardProps) {
 
   const src = post.imageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked;
+  const socialPostId = useMemo(() => {
+    const postIdDigest = keccak256(stringToBytes(post.id));
+    return BigInt(`0x${postIdDigest.slice(2, 18)}`);
+  }, [post.id]);
 
   useEffect(() => {
     if (commentOpen) {
@@ -344,6 +371,85 @@ export function PostCard({ post }: PostCardProps) {
       };
     }
   }, [commentOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPendingSocialReplies() {
+      if (!publicClient || !socialConfigured || !address || !isOwnPost) {
+        if (!cancelled) setPendingSocialReplies([]);
+        return;
+      }
+      const creator = address.toLowerCase() as `0x${string}`;
+      const logs = await publicClient
+        .getLogs({
+          address: SNAPZO_SOCIAL_ADDRESS,
+          event: {
+            type: "event",
+            name: "ReplyDeposited",
+            inputs: [
+              { name: "requestId", type: "bytes32", indexed: true },
+              { name: "payer", type: "address", indexed: true },
+              { name: "creator", type: "address", indexed: true },
+              { name: "postId", type: "uint256", indexed: false },
+              { name: "amount", type: "uint256", indexed: false },
+              { name: "refundNotBefore", type: "uint48", indexed: false },
+              { name: "relayer", type: "address", indexed: false },
+            ],
+          },
+          args: { creator },
+          fromBlock: SNAPZO_SOCIAL_REDEPLOY_BLOCK,
+          toBlock: "latest",
+        })
+        .catch(() => []);
+      const matched = logs.filter((log) => (log.args.postId as bigint) === socialPostId);
+      const lockChecks = await Promise.all(
+        matched.map(async (log) => {
+          const requestId = log.args.requestId as `0x${string}`;
+          const lock = await publicClient
+            .readContract({
+              address: SNAPZO_SOCIAL_ADDRESS,
+              abi: [
+                {
+                  type: "function",
+                  name: "replyLocks",
+                  stateMutability: "view",
+                  inputs: [{ name: "", type: "bytes32" }],
+                  outputs: [
+                    { name: "requester", type: "address" },
+                    { name: "creator", type: "address" },
+                    { name: "postId", type: "uint256" },
+                    { name: "amount", type: "uint256" },
+                    { name: "refundNotBefore", type: "uint48" },
+                    { name: "fulfilled", type: "bool" },
+                  ],
+                },
+              ] as const,
+              functionName: "replyLocks",
+              args: [requestId],
+            })
+            .catch(() => null);
+          if (!lock || lock[5]) return null;
+          return {
+            requestId,
+            payer: lock[0] as `0x${string}`,
+            amount: lock[3],
+            refundNotBefore: BigInt(lock[4]),
+          } satisfies PendingSocialReply;
+        })
+      );
+      if (!cancelled) {
+        setPendingSocialReplies(
+          lockChecks.filter((v): v is PendingSocialReply => v !== null)
+        );
+      }
+    }
+    void loadPendingSocialReplies();
+    const id = setInterval(() => void loadPendingSocialReplies(), 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [address, isOwnPost, publicClient, socialConfigured, socialPostId]);
 
   useEffect(() => {
     if (!pendingHash || !isSuccess || !pendingKind) {
@@ -364,7 +470,10 @@ export function PostCard({ post }: PostCardProps) {
           ? `Sent tip · 0.01 MUSD (~${formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)} SNAP)`
           : "Tip sent.",
       );
-    } else if (pendingKind === "comment" && pendingCommentText) {
+    } else if (
+      (pendingKind === "replyRequest" || pendingKind === "replyFulfill") &&
+      pendingCommentText
+    ) {
       const trimmed = pendingCommentText.trim();
       if (trimmed) {
         const row: StoredComment = {
@@ -375,7 +484,11 @@ export function PostCard({ post }: PostCardProps) {
         };
         appendCommentForPost(post.id, row);
         setCommentDraft("");
-        toast(`Reply request submitted · ${replyStakeLabel} SNAP escrowed.`);
+        if (pendingKind === "replyFulfill") {
+          toast("Reply sent · escrow released to creator.");
+        } else {
+          toast(`Reply request submitted · ${replyStakeLabel} SNAP escrowed.`);
+        }
       }
       setPendingCommentText(null);
     }
@@ -524,8 +637,6 @@ export function PostCard({ post }: PostCardProps) {
         await refetchAllowance();
       }
 
-      const postIdDigest = keccak256(stringToBytes(post.id));
-      const socialPostId = BigInt(`0x${postIdDigest.slice(2, 18)}`);
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
       toast(`Sign social tip · ${formatUnits(likeTipAmount, SNAP_DECIMALS)} SNAP…`);
       const signature = await signTypedDataAsync({
@@ -625,6 +736,67 @@ export function PostCard({ post }: PostCardProps) {
       toast("SnapZo social contract is not configured.", "error");
       return;
     }
+    if (isOwnPost) {
+      const selected = pendingSocialReplies[0];
+      if (!selected) {
+        toast("No pending paid replies to fulfill for this post.", "error");
+        return;
+      }
+      const nonce = socialNonceRead.data;
+      if (nonce === undefined) {
+        toast("Creator nonce unavailable. Retry in a moment.", "error");
+        return;
+      }
+      const commentIdDigest = keccak256(
+        stringToBytes(`${post.id}:${text}:${Date.now().toString()}`)
+      );
+      const commentId = BigInt(`0x${commentIdDigest.slice(2, 18)}`);
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
+      setPendingCommentText(text);
+      toast("Sign creator reply to unlock escrow…");
+      const signature = await signTypedDataAsync({
+        domain: {
+          name: "SnapZoSocial",
+          version: "1",
+          chainId: mezoTestnet.id,
+          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+        },
+        types: SNAPZO_SOCIAL_FULFILL_REPLY_TYPES,
+        primaryType: "FulfillReply",
+        message: {
+          creator: address as `0x${string}`,
+          requestId: selected.requestId,
+          commentId,
+          nonce,
+          deadline,
+        },
+      });
+      toast("Submitting creator fulfill through social relayer…");
+      const relayed = await fetch("/api/snapzo/social/relay-fulfill-reply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          creator: address,
+          requestId: selected.requestId,
+          commentId: String(commentId),
+          nonce: String(nonce),
+          deadline: String(deadline),
+          signature,
+        }),
+      });
+      const payload = (await relayed.json().catch(() => ({}))) as {
+        hash?: `0x${string}`;
+        error?: string;
+      };
+      if (!relayed.ok || !payload.hash) {
+        throw new Error(payload.error || "Reply fulfill relay failed");
+      }
+      setPendingKind("replyFulfill");
+      setPendingHash(payload.hash);
+      toast("Confirming on Mezo…");
+      return;
+    }
+
     const nonce = socialNonceRead.data;
     const stake = replyStakeAmountRead.data;
     if (nonce === undefined || stake === undefined || stake <= BigInt(0)) {
@@ -632,9 +804,6 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     try {
-      if (isOwnPost) {
-        throw new Error("You can't open a paid reply on your own post.");
-      }
       if (socialTokenBalance < stake) {
         throw new Error(
           `Insufficient SNAP for reply stake. Need ${formatUnits(
@@ -655,8 +824,6 @@ export function PostCard({ post }: PostCardProps) {
         await refetchAllowance();
       }
 
-      const postIdDigest = keccak256(stringToBytes(post.id));
-      const socialPostId = BigInt(`0x${postIdDigest.slice(2, 18)}`);
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
 
       setPendingCommentText(text);
@@ -698,7 +865,7 @@ export function PostCard({ post }: PostCardProps) {
       if (!relayed.ok || !payload.hash) {
         throw new Error(payload.error || "Reply relay failed");
       }
-      setPendingKind("comment");
+      setPendingKind("replyRequest");
       setPendingHash(payload.hash);
       toast("Confirming on Mezo…");
     } catch (e) {
@@ -963,6 +1130,11 @@ export function PostCard({ post }: PostCardProps) {
                         ({post.comments + comments.length})
                       </span>
                     </h2>
+                    {isOwnPost && pendingSocialReplies.length > 0 ? (
+                      <span className="text-[11px] font-medium text-emerald-300">
+                        {pendingSocialReplies.length} pending paid repl{pendingSocialReplies.length === 1 ? "y" : "ies"}
+                      </span>
+                    ) : null}
                     <button
                       type="button"
                       disabled={isBusy}
@@ -1019,13 +1191,13 @@ export function PostCard({ post }: PostCardProps) {
 
                 <div className="shrink-0 border-t border-white/[0.08] bg-[#0b0f18] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
                   <p className="mb-2 flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[10px] font-medium tracking-wide text-zinc-500">
-                    <span>Reply request escrows</span>
+                    <span>{isOwnPost ? "Creator reply unlocks" : "Reply request escrows"}</span>
                     <span className="inline-flex items-center gap-0.5 text-zinc-200">
                       {replyStakeLabel}
                       <SnapInlineIcon decorative />
                       {"SNAP"}
                     </span>
-                    <span>until creator fulfills</span>
+                    <span>{isOwnPost ? "from escrow" : "until creator fulfills"}</span>
                   </p>
                   <div className="flex items-end gap-2">
                     <div
