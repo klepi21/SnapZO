@@ -23,6 +23,8 @@ import unlockRoutes from './src/routes/unlock';
 import tipRoutes from './src/routes/tip';
 import replyRoutes from './src/routes/reply';
 import userRoutes from './src/routes/user';
+import socialReplyRoutes from './src/routes/socialReply';
+import socialUnlockRoutes from './src/routes/socialUnlock';
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -124,6 +126,8 @@ app.use('/api/feed', feedRoutes);
 app.use('/api/unlock', unlockRoutes);
 app.use('/api/tip', tipRoutes);
 app.use('/api/reply', replyRoutes);
+app.use('/api/social-reply', socialReplyRoutes);
+app.use('/api/social-unlock', socialUnlockRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/users', userRoutes);
 

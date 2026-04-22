@@ -86,6 +86,39 @@ export interface FeedResponse {
   nextCursor: string | null;
 }
 
+export interface SocialReplyItem {
+  id: string;
+  post: string;
+  requestId: string;
+  socialPostId: string;
+  requesterWallet: string;
+  creatorWallet: string;
+  stakeAmountWei: string;
+  requestTxHash: string;
+  requesterComment: string;
+  status: "pending" | "responded" | "refunded";
+  creatorReply?: string;
+  commentId?: string;
+  fulfillTxHash?: string;
+  refundTxHash?: string;
+  requesterDisplayName?: string | null;
+  requesterUsername?: string | null;
+  requesterProfileImage?: string | null;
+  creatorDisplayName?: string | null;
+  creatorUsername?: string | null;
+  creatorProfileImage?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TipItem {
+  id: string;
+  fromWallet: string;
+  amount: number;
+  txHash: string;
+  createdAt: string;
+}
+
 /**
  * PATCH /api/user/:wallet — partial profile update. Any field not in the
  * payload is left untouched. Pass `null` to clear a field.
@@ -128,4 +161,116 @@ export async function fetchFeed(
     throw new Error(`fetchFeed failed (${res.status}): ${text || res.statusText}`);
   }
   return (await res.json()) as FeedResponse;
+}
+
+export async function fetchSocialRepliesForPost(
+  postObjectId: string,
+  signal?: AbortSignal
+): Promise<{ items: SocialReplyItem[] }> {
+  const res = await fetch(
+    `${getSnapzoApiBaseUrl()}/api/social-reply/post/${postObjectId}`,
+    { signal }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `fetchSocialRepliesForPost failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as { items: SocialReplyItem[] };
+}
+
+export async function createSocialReplyRequestRecord(input: {
+  postObjectId: string;
+  requestId: string;
+  socialPostId: string;
+  requesterWallet: string;
+  creatorWallet: string;
+  stakeAmountWei: string;
+  requestTxHash: string;
+  requesterComment: string;
+}): Promise<SocialReplyItem> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/social-reply/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `createSocialReplyRequestRecord failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as SocialReplyItem;
+}
+
+export async function fulfillSocialReplyRecord(input: {
+  requestId: string;
+  creatorWallet: string;
+  creatorReply: string;
+  commentId: string;
+  fulfillTxHash: string;
+}): Promise<SocialReplyItem> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/social-reply/fulfill`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `fulfillSocialReplyRecord failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as SocialReplyItem;
+}
+
+export async function fetchTipsForPost(
+  postObjectId: string,
+  viewer?: string,
+  signal?: AbortSignal
+): Promise<{ items: TipItem[]; hasViewerTipped: boolean }> {
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/tip/post/${postObjectId}`);
+  if (viewer) url.searchParams.set("viewer", viewer);
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`fetchTipsForPost failed (${res.status}): ${text || res.statusText}`);
+  }
+  return (await res.json()) as { items: TipItem[]; hasViewerTipped: boolean };
+}
+
+export async function createTipRecord(input: {
+  postId: string;
+  fromWallet: string;
+  amount: number;
+  txHash: string;
+  message?: string;
+}): Promise<void> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/tip`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`createTipRecord failed (${res.status}): ${text || res.statusText}`);
+  }
+}
+
+export async function createSocialUnlockRecord(input: {
+  postObjectId: string;
+  userWallet: string;
+  txHash: string;
+  amountWei: string;
+}): Promise<void> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/social-unlock/record`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`createSocialUnlockRecord failed (${res.status}): ${text || res.statusText}`);
+  }
 }

@@ -17,7 +17,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -32,6 +31,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import {
+  encodeAbiParameters,
   formatUnits,
   keccak256,
   maxUint256,
@@ -58,13 +58,16 @@ import { erc20AllowanceAbi, erc20ApproveAbi } from "@/lib/constants/mezo-dex";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { musdWeiToSnapBaseUnitsCeil } from "@/lib/snapzo/musd-snap-quote";
 import {
-  appendCommentForPost,
-  isPostLikedInStorage,
-  persistPostLiked,
-  readCommentsForPost,
-  type StoredComment,
-} from "@/lib/snapzo-local";
+  createSocialUnlockRecord,
+  createTipRecord,
+  createSocialReplyRequestRecord,
+  fetchTipsForPost,
+  fetchSocialRepliesForPost,
+  fulfillSocialReplyRecord,
+  type SocialReplyItem,
+} from "@/lib/snapzo-api";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
+import { ipfsGatewayUrl } from "@/lib/snapzo-profile-local";
 
 interface PostCardProps {
   post: FeedPost;
@@ -315,13 +318,8 @@ export function PostCard({ post }: PostCardProps) {
     unlockSnapWei !== undefined ? formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS) : "…";
 
   const isLockedPost = Boolean(post.contentLocked);
-  const clientReady = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-  const [storageRev, setStorageRev] = useState(0);
-  const [sessionUnlocked, setSessionUnlocked] = useState(false);
+  const [optimisticUnlocked, setOptimisticUnlocked] = useState(false);
+  const [dbHasTipped, setDbHasTipped] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [pendingHash, setPendingHash] = useState<`0x${string}` | undefined>();
@@ -331,12 +329,17 @@ export function PostCard({ post }: PostCardProps) {
   const [pendingCommentText, setPendingCommentText] = useState<string | null>(
     null,
   );
+  const [pendingRequestId, setPendingRequestId] = useState<`0x${string}` | null>(
+    null
+  );
+  const [pendingCommentId, setPendingCommentId] = useState<bigint | null>(null);
   /** True after user initiates like until tx fails or is superseded by storage. */
   const [likePressed, setLikePressed] = useState(false);
   const lastMediaTapRef = useRef(0);
   const [pendingSocialReplies, setPendingSocialReplies] = useState<
     PendingSocialReply[]
   >([]);
+  const [dbReplies, setDbReplies] = useState<SocialReplyItem[]>([]);
 
   const { isLoading: isConfirming, isSuccess, isError } =
     useWaitForTransactionReceipt({
@@ -345,15 +348,12 @@ export function PostCard({ post }: PostCardProps) {
       query: { enabled: Boolean(pendingHash) },
     });
 
-  const mediaUnlocked = !isLockedPost || sessionUnlocked;
+  const mediaUnlocked = !isLockedPost || Boolean(post.unlockedByMe) || optimisticUnlocked;
   const isOwnPost = Boolean(
     address && post.tipRecipient.toLowerCase() === address.toLowerCase()
   );
-  const hasTipped = clientReady && isPostLikedInStorage(post.id);
-  void storageRev;
-  const comments: StoredComment[] = clientReady
-    ? readCommentsForPost(post.id)
-    : [];
+  const hasTipped = dbHasTipped;
+  const comments = dbReplies;
 
   const src = post.imageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked;
@@ -371,6 +371,35 @@ export function PostCard({ post }: PostCardProps) {
       };
     }
   }, [commentOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDbReplies() {
+      if (!post.postObjectId) return;
+      const res = await fetchSocialRepliesForPost(post.postObjectId).catch(() => ({ items: [] }));
+      if (!cancelled) setDbReplies(res.items);
+    }
+    void loadDbReplies();
+    return () => {
+      cancelled = true;
+    };
+  }, [post.postObjectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDbTips() {
+      if (!post.postObjectId) return;
+      const res = await fetchTipsForPost(post.postObjectId, address).catch(() => ({
+        items: [],
+        hasViewerTipped: false,
+      }));
+      if (!cancelled) setDbHasTipped(res.hasViewerTipped);
+    }
+    void loadDbTips();
+    return () => {
+      cancelled = true;
+    };
+  }, [post.postObjectId, address]);
 
   useEffect(() => {
     let cancelled = false;
@@ -455,62 +484,110 @@ export function PostCard({ post }: PostCardProps) {
     if (!pendingHash || !isSuccess || !pendingKind) {
       return;
     }
-    /* eslint-disable react-hooks/set-state-in-effect -- sync UI after wagmi receipt + localStorage */
-    if (pendingKind === "unlock") {
-      setSessionUnlocked(true);
-      toast(
-        unlockSnapWei !== undefined
-          ? `Unlocked · ${unlockMusdLabel} MUSD (~${formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS)} SNAP)`
-          : "Unlocked.",
-      );
-    } else if (pendingKind === "like") {
-      persistPostLiked(post.id);
-      toast(
-        tipSnapWei !== undefined
-          ? `Sent tip · 0.01 MUSD (~${formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)} SNAP)`
-          : "Tip sent.",
-      );
-    } else if (
-      (pendingKind === "replyRequest" || pendingKind === "replyFulfill") &&
-      pendingCommentText
-    ) {
-      const trimmed = pendingCommentText.trim();
-      if (trimmed) {
-        const row: StoredComment = {
-          id: crypto.randomUUID(),
-          text: trimmed,
-          txHash: pendingHash,
-          at: Date.now(),
-        };
-        appendCommentForPost(post.id, row);
-        setCommentDraft("");
-        if (pendingKind === "replyFulfill") {
-          toast("Reply sent · escrow released to creator.");
-        } else {
-          toast(`Reply request submitted · ${replyStakeLabel} SNAP escrowed.`);
+    async function handleSuccess() {
+      const confirmedHash = pendingHash;
+      if (!confirmedHash) return;
+      if (pendingKind === "unlock") {
+        setOptimisticUnlocked(true);
+        if (address && post.postObjectId && unlockSnapWei !== undefined) {
+          await createSocialUnlockRecord({
+            postObjectId: post.postObjectId,
+            userWallet: address,
+            txHash: confirmedHash,
+            amountWei: unlockSnapWei.toString(),
+          }).catch(() => null);
         }
+        toast(
+          unlockSnapWei !== undefined
+            ? `Unlocked · ${unlockMusdLabel} MUSD (~${formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS)} SNAP)`
+            : "Unlocked.",
+        );
+      } else if (pendingKind === "like") {
+        setDbHasTipped(true);
+        if (address && likeTipAmountRead.data !== undefined) {
+          await createTipRecord({
+            postId: post.id,
+            fromWallet: address,
+            amount: Number(formatUnits(likeTipAmountRead.data, SNAP_DECIMALS)),
+            txHash: confirmedHash,
+          }).catch(() => null);
+        }
+        toast(
+          tipSnapWei !== undefined
+            ? `Sent tip · 0.01 MUSD (~${formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)} SNAP)`
+            : "Tip sent.",
+        );
+      } else if (
+        (pendingKind === "replyRequest" || pendingKind === "replyFulfill") &&
+        pendingCommentText
+      ) {
+        const trimmed = pendingCommentText.trim();
+        if (trimmed) {
+          if (pendingKind === "replyRequest" && pendingRequestId && address) {
+            await createSocialReplyRequestRecord({
+              postObjectId: post.postObjectId ?? post.id,
+              requestId: pendingRequestId,
+              socialPostId: socialPostId.toString(),
+              requesterWallet: address,
+              creatorWallet: post.tipRecipient,
+              stakeAmountWei: (replyStakeAmountRead.data ?? BigInt(0)).toString(),
+              requestTxHash: confirmedHash,
+              requesterComment: trimmed,
+            }).catch(() => null);
+          }
+          if (
+            pendingKind === "replyFulfill" &&
+            address &&
+            pendingRequestId &&
+            pendingCommentId !== null
+          ) {
+            await fulfillSocialReplyRecord({
+              requestId: pendingRequestId,
+              creatorWallet: address,
+              creatorReply: trimmed,
+              commentId: pendingCommentId.toString(),
+              fulfillTxHash: confirmedHash,
+            }).catch(() => null);
+          }
+          const refreshed = await fetchSocialRepliesForPost(post.postObjectId ?? post.id).catch(() => ({ items: [] }));
+          setDbReplies(refreshed.items);
+          setCommentDraft("");
+          if (pendingKind === "replyFulfill") {
+            toast("Reply sent · escrow released to creator.");
+          } else {
+            toast(`Reply request submitted · ${replyStakeLabel} SNAP escrowed.`);
+          }
+        }
+        setPendingCommentText(null);
       }
-      setPendingCommentText(null);
+      if (pendingKind === "like") {
+        setLikePressed(false);
+      }
+      setPendingHash(undefined);
+      setPendingKind(null);
+      setPendingRequestId(null);
+      setPendingCommentId(null);
     }
-    setStorageRev((r) => r + 1);
-    if (pendingKind === "like") {
-      setLikePressed(false);
-    }
-    setPendingHash(undefined);
-    setPendingKind(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
+    void handleSuccess();
   }, [
     isSuccess,
     pendingHash,
     pendingKind,
     pendingCommentText,
+    pendingRequestId,
+    pendingCommentId,
+    address,
     post.id,
+    post.postObjectId,
+    post.tipRecipient,
+    socialPostId,
+    replyStakeAmountRead.data,
     tipSnapWei,
     replyStakeLabel,
     unlockSnapWei,
     unlockMusdLabel,
+    likeTipAmountRead.data,
     toast,
-    setSessionUnlocked,
   ]);
 
   useEffect(() => {
@@ -525,6 +602,8 @@ export function PostCard({ post }: PostCardProps) {
     setPendingHash(undefined);
     setPendingKind(null);
     setPendingCommentText(null);
+    setPendingRequestId(null);
+    setPendingCommentId(null);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [isError, pendingHash, pendingKind, toast]);
 
@@ -552,7 +631,7 @@ export function PostCard({ post }: PostCardProps) {
   const likedUi = hasTipped || likePressed;
   const likeCount =
     post.likes + (hasTipped ? 1 : likePressed ? 1 : 0);
-  const commentCount = post.comments + comments.length;
+  const commentCount = comments.length;
 
   const handleUnlock = async () => {
     if (!isLockedPost || mediaUnlocked) {
@@ -753,6 +832,8 @@ export function PostCard({ post }: PostCardProps) {
       const commentId = BigInt(`0x${commentIdDigest.slice(2, 18)}`);
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
       setPendingCommentText(text);
+      setPendingRequestId(selected.requestId);
+      setPendingCommentId(commentId);
       toast("Sign creator reply to unlock escrow…");
       const signature = await signTypedDataAsync({
         domain: {
@@ -825,8 +906,30 @@ export function PostCard({ post }: PostCardProps) {
       }
 
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
+      const requestId = keccak256(
+        encodeAbiParameters(
+          [
+            { type: "uint256" },
+            { type: "address" },
+            { type: "uint256" },
+            { type: "address" },
+            { type: "address" },
+            { type: "uint256" },
+          ],
+          [
+            BigInt(mezoTestnet.id),
+            SNAPZO_SOCIAL_ADDRESS,
+            socialPostId,
+            post.tipRecipient as `0x${string}`,
+            address as `0x${string}`,
+            nonce,
+          ]
+        )
+      ) as `0x${string}`;
 
       setPendingCommentText(text);
+      setPendingRequestId(requestId);
+      setPendingCommentId(null);
       toast(`Sign reply request · ${formatUnits(stake, SNAP_DECIMALS)} SNAP escrow…`);
       const signature = await signTypedDataAsync({
         domain: {
@@ -1127,7 +1230,7 @@ export function PostCard({ post }: PostCardProps) {
                     >
                       Comments{" "}
                       <span className="text-sm font-normal tabular-nums text-zinc-500">
-                        ({post.comments + comments.length})
+                        ({comments.length})
                       </span>
                     </h2>
                     {isOwnPost && pendingSocialReplies.length > 0 ? (
@@ -1160,22 +1263,46 @@ export function PostCard({ post }: PostCardProps) {
                     <ul className="space-y-1 pb-3">
                       {comments.map((c) => (
                         <li key={c.id} className="flex gap-3 py-2.5">
-                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/90 to-violet-600/80 text-[10px] font-bold text-white ring-1 ring-white/15">
-                            You
+                          <div className="mt-0.5 h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500/90 to-violet-600/80 ring-1 ring-white/15">
+                            {c.requesterProfileImage ? (
+                              <Image
+                                src={ipfsGatewayUrl(c.requesterProfileImage)}
+                                alt=""
+                                width={32}
+                                height={32}
+                                className="h-8 w-8 object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center text-[10px] font-bold text-white">
+                                {c.requesterWallet.slice(2, 4).toUpperCase()}
+                              </div>
+                            )}
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm leading-snug text-zinc-100">
-                              <span className="font-semibold text-white">You</span>{" "}
+                              <span className="font-semibold text-white">
+                                {c.requesterDisplayName?.trim() ||
+                                  c.requesterUsername?.trim() ||
+                                  `${c.requesterWallet.slice(0, 6)}...${c.requesterWallet.slice(-4)}`}
+                              </span>{" "}
                               <span className="font-normal text-zinc-200">
-                                {c.text}
+                                {c.requesterComment}
                               </span>
                             </p>
+                            {c.creatorReply ? (
+                              <p className="mt-1 text-sm leading-snug text-emerald-200">
+                                <span className="font-semibold text-emerald-300">
+                                  {(c.creatorDisplayName?.trim() || c.creatorUsername?.trim() || "Creator")}:
+                                </span>{" "}
+                                {c.creatorReply}
+                              </p>
+                            ) : null}
                             <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
-                              <span>{formatShortTime(c.at)}</span>
+                              <span>{c.createdAt ? formatShortTime(new Date(c.createdAt).getTime()) : "now"}</span>
                               <span aria-hidden>·</span>
                               <a
                                 className="font-medium text-zinc-400 transition hover:text-white"
-                                href={`${mezoTestnet.blockExplorers.default.url}/tx/${c.txHash}`}
+                                href={`${mezoTestnet.blockExplorers.default.url}/tx/${c.fulfillTxHash ?? c.requestTxHash}`}
                                 target="_blank"
                                 rel="noreferrer"
                               >

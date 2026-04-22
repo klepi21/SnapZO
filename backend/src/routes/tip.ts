@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import asyncHandler from '../utils/asyncHandler';
-import { createTip } from '../controllers/tipController';
+import { createTip, getTipsForPost } from '../controllers/tipController';
 
 const router = Router();
 
@@ -36,5 +36,6 @@ const router = Router();
  *         $ref: '#/components/responses/Conflict'
  */
 router.post('/', asyncHandler(createTip));
+router.get('/post/:postObjectId', asyncHandler(getTipsForPost));
 
 export default router;

@@ -8,6 +8,7 @@ export function dummyTipRecipient(postId: string): Address {
 
 export interface FeedPost {
   id: string;
+  postObjectId?: string;
   socialPostId?: number;
   userName: string;
   userHandle: string;
@@ -24,6 +25,7 @@ export interface FeedPost {
   caption: string;
   /** When true, media stays blurred until user confirms an on-chain unlock tx. */
   contentLocked?: boolean;
+  unlockedByMe?: boolean;
   /** Creator-set unlock quote in MUSD (human); on-chain settlement is SNAP at hub NAV. */
   unlockPriceMusd?: number;
   /** SNAP tip / unlock / paid-comment recipient (dummy address per post). */

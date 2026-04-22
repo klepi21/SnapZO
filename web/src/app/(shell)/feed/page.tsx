@@ -47,6 +47,7 @@ function mapFeedItemToPost(item: FeedItem): FeedPost {
 
   return {
     id: item.postId,
+    postObjectId: item.id,
     socialPostId:
       typeof item.socialPostId === "number" && Number.isFinite(item.socialPostId)
         ? item.socialPostId
@@ -65,6 +66,7 @@ function mapFeedItemToPost(item: FeedItem): FeedPost {
     likedBySeeds: [13, 27, 39],
     caption: item.content?.trim() || "Untitled post",
     contentLocked: item.isLocked,
+    unlockedByMe: item.unlockedByMe,
     unlockPriceMusd: item.unlockPrice,
     tipRecipient,
   };

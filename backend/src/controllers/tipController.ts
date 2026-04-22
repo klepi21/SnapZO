@@ -77,3 +77,31 @@ export async function createTip(req: Request, res: Response): Promise<void> {
 
   res.status(201).json(tip.toJSON());
 }
+
+/** GET /api/tip/post/:postObjectId?viewer=0x... — list tips and whether viewer tipped. */
+export async function getTipsForPost(req: Request, res: Response): Promise<void> {
+  const postObjectId = req.params.postObjectId;
+  if (!postObjectId || !/^[0-9a-fA-F]{24}$/.test(postObjectId)) {
+    throw badRequest('postObjectId must be a valid post id');
+  }
+  const viewer =
+    req.query.viewer !== undefined
+      ? requireAddress(req.query.viewer, 'viewer').toLowerCase()
+      : null;
+
+  const tips = await Tip.find({ post: postObjectId }).sort({ createdAt: -1 }).lean();
+  const hasViewerTipped = viewer
+    ? tips.some((t) => t.fromWallet.toLowerCase() === viewer)
+    : false;
+
+  res.json({
+    items: tips.map((t) => ({
+      id: String(t._id),
+      fromWallet: t.fromWallet,
+      amount: t.amount,
+      txHash: t.txHash,
+      createdAt: t.createdAt,
+    })),
+    hasViewerTipped,
+  });
+}

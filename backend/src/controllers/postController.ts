@@ -4,8 +4,10 @@ import { Types } from 'mongoose';
 import Post from '../models/Post';
 import User from '../models/User';
 import Unlock from '../models/Unlock';
+import SocialUnlock from '../models/SocialUnlock';
 import Tip from '../models/Tip';
 import Reply from '../models/Reply';
+import SocialReply from '../models/SocialReply';
 import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
@@ -113,16 +115,21 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
   }
 
   const postIds = posts.map((p) => p._id);
+  const creatorWallets = [...new Set(posts.map((p) => p.creatorWallet.toLowerCase()))];
 
   let unlockedSet = new Set<string>();
   if (viewer) {
-    const unlocks = await Unlock.find({ post: { $in: postIds }, userWallet: viewer })
-      .select('post')
-      .lean();
-    unlockedSet = new Set(unlocks.map((u) => String(u.post)));
+    const [unlocks, socialUnlocks] = await Promise.all([
+      Unlock.find({ post: { $in: postIds }, userWallet: viewer }).select('post').lean(),
+      SocialUnlock.find({ post: { $in: postIds }, userWallet: viewer }).select('post').lean(),
+    ]);
+    unlockedSet = new Set([
+      ...unlocks.map((u) => String(u.post)),
+      ...socialUnlocks.map((u) => String(u.post)),
+    ]);
   }
 
-  const [tipCounts, replyCounts] = await Promise.all([
+  const [tipCounts, replyCounts, socialReplyCounts] = await Promise.all([
     Tip.aggregate<{ _id: Types.ObjectId; count: number }>([
       { $match: { post: { $in: postIds } } },
       { $group: { _id: '$post', count: { $sum: 1 } } },
@@ -131,18 +138,31 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       { $match: { post: { $in: postIds } } },
       { $group: { _id: '$post', count: { $sum: 1 } } },
     ]),
+    SocialReply.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
   ]);
+  const creators = await User.find({ walletAddress: { $in: creatorWallets } })
+    .select('walletAddress displayName username profileImage')
+    .lean();
 
   const tipMap = new Map(tipCounts.map((t) => [String(t._id), t.count]));
   const replyMap = new Map(replyCounts.map((r) => [String(r._id), r.count]));
+  const socialReplyMap = new Map(socialReplyCounts.map((r) => [String(r._id), r.count]));
+  const creatorMap = new Map(creators.map((u) => [u.walletAddress.toLowerCase(), u]));
 
   const items = posts.map((p) => {
     const idStr = String(p._id);
     const unlockedByMe = !p.isLocked || unlockedSet.has(idStr);
+    const creator = creatorMap.get(p.creatorWallet.toLowerCase());
     return {
       id: idStr,
       postId: p.postId,
       creatorWallet: p.creatorWallet,
+      creatorDisplayName: creator?.displayName ?? null,
+      creatorUsername: creator?.username ?? null,
+      creatorProfileImage: creator?.profileImage ?? null,
       content: p.content,
       ipfsHash: unlockedByMe ? p.ipfsHash : undefined,
       isLocked: p.isLocked,
@@ -152,7 +172,8 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       createdAt: p.createdAt,
       unlockedByMe,
       tipCount: tipMap.get(idStr) ?? 0,
-      replyCount: replyMap.get(idStr) ?? 0,
+      replyCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
+      commentCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
     };
   });
 
@@ -172,14 +193,23 @@ export async function getPost(req: Request, res: Response): Promise<void> {
 
   let unlockedByMe = !post.isLocked;
   if (viewer && post.isLocked) {
-    const u = await Unlock.exists({ post: post._id, userWallet: viewer });
-    unlockedByMe = !!u;
+    const [u, su] = await Promise.all([
+      Unlock.exists({ post: post._id, userWallet: viewer }),
+      SocialUnlock.exists({ post: post._id, userWallet: viewer }),
+    ]);
+    unlockedByMe = Boolean(u || su);
   }
+  const creator = await User.findOne({ walletAddress: post.creatorWallet.toLowerCase() })
+    .select('displayName username profileImage')
+    .lean();
 
   res.json({
     id: String(post._id),
     postId: post.postId,
     creatorWallet: post.creatorWallet,
+    creatorDisplayName: creator?.displayName ?? null,
+    creatorUsername: creator?.username ?? null,
+    creatorProfileImage: creator?.profileImage ?? null,
     content: post.content,
     ipfsHash: unlockedByMe ? post.ipfsHash : undefined,
     isLocked: post.isLocked,
