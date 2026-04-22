@@ -42,7 +42,7 @@ import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar } from "@/lib/dummy/social";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
-import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
+import { MUSD_DECIMALS } from "@/lib/constants/musd";
 import {
   erc20TotalSupplyAbi,
   isSnapZoHubConfigured,
@@ -75,6 +75,15 @@ const DEFAULT_UNLOCK_MUSD = 0.1;
 const SNAPZO_SOCIAL_TIP_TYPES = {
   Tip: [
     { name: "tipper", type: "address" },
+    { name: "postId", type: "uint256" },
+    { name: "creator", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+const SNAPZO_SOCIAL_REPLY_DEPOSIT_TYPES = {
+  ReplyDeposit: [
+    { name: "payer", type: "address" },
     { name: "postId", type: "uint256" },
     { name: "creator", type: "address" },
     { name: "nonce", type: "uint256" },
@@ -212,6 +221,21 @@ export function PostCard({ post }: PostCardProps) {
     functionName: "likeTipAmount",
     query: { enabled: socialConfigured, staleTime: 10_000 },
   });
+  const replyStakeAmountRead = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_SOCIAL_ADDRESS,
+    abi: [
+      {
+        type: "function",
+        name: "replyStakeAmount",
+        stateMutability: "view",
+        inputs: [],
+        outputs: [{ type: "uint256" }],
+      },
+    ] as const,
+    functionName: "replyStakeAmount",
+    query: { enabled: socialConfigured, staleTime: 10_000 },
+  });
   const allowanceRead = useReadContract({
     chainId: mezoTestnet.id,
     address: socialSnapTokenAddress,
@@ -262,8 +286,11 @@ export function PostCard({ post }: PostCardProps) {
     return v > BigInt(0) ? v : undefined;
   }, [ta, ts, unlockMusdWei]);
 
-  const tipSnapLabel =
-    tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "…";
+  const replyStakeAmount = replyStakeAmountRead.data;
+  const replyStakeLabel =
+    replyStakeAmount !== undefined
+      ? formatUnitsMax2dp(replyStakeAmount, SNAP_DECIMALS)
+      : "…";
   const unlockSnapLabel =
     unlockSnapWei !== undefined ? formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS) : "…";
 
@@ -348,11 +375,7 @@ export function PostCard({ post }: PostCardProps) {
         };
         appendCommentForPost(post.id, row);
         setCommentDraft("");
-        toast(
-          tipSnapWei !== undefined
-            ? `Comment posted · 0.01 MUSD (~${formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)} SNAP)`
-            : "Comment posted.",
-        );
+        toast(`Reply request submitted · ${replyStakeLabel} SNAP escrowed.`);
       }
       setPendingCommentText(null);
     }
@@ -370,6 +393,7 @@ export function PostCard({ post }: PostCardProps) {
     pendingCommentText,
     post.id,
     tipSnapWei,
+    replyStakeLabel,
     unlockSnapWei,
     unlockMusdLabel,
     toast,
@@ -597,26 +621,85 @@ export function PostCard({ post }: PostCardProps) {
     if (!ensureMezo()) {
       return;
     }
-    if (!hubConfigured) {
-      toast("SnapZo hub is not configured.", "error");
+    if (!socialConfigured) {
+      toast("SnapZo social contract is not configured.", "error");
       return;
     }
-    if (tipSnapWei === undefined) {
-      toast("Pricing unavailable right now. Retry in a moment.", "error");
+    const nonce = socialNonceRead.data;
+    const stake = replyStakeAmountRead.data;
+    if (nonce === undefined || stake === undefined || stake <= BigInt(0)) {
+      toast("Reply stake config unavailable. Retry in a moment.", "error");
       return;
     }
     try {
+      if (isOwnPost) {
+        throw new Error("You can't open a paid reply on your own post.");
+      }
+      if (socialTokenBalance < stake) {
+        throw new Error(
+          `Insufficient SNAP for reply stake. Need ${formatUnits(
+            stake,
+            SNAP_DECIMALS
+          )} SNAP.`
+        );
+      }
+      if (allowanceValue < stake) {
+        toast("Approve SNAP for SnapZoSocial…");
+        await writeContractAsync({
+          address: socialSnapTokenAddress,
+          abi: erc20ApproveAbi,
+          functionName: "approve",
+          args: [SNAPZO_SOCIAL_ADDRESS, maxUint256],
+          chainId: mezoTestnet.id,
+        });
+        await refetchAllowance();
+      }
+
+      const postIdDigest = keccak256(stringToBytes(post.id));
+      const socialPostId = BigInt(`0x${postIdDigest.slice(2, 18)}`);
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
+
       setPendingCommentText(text);
-      toast(`Confirm reply fee · 0.01 MUSD (~${tipSnapLabel} SNAP)…`);
-      const hash = await writeContractAsync({
-        address: SNAPZO_SNAP_TOKEN_ADDRESS,
-        abi: erc20TransferAbi,
-        functionName: "transfer",
-        args: [post.tipRecipient, tipSnapWei],
-        chainId: mezoTestnet.id,
+      toast(`Sign reply request · ${formatUnits(stake, SNAP_DECIMALS)} SNAP escrow…`);
+      const signature = await signTypedDataAsync({
+        domain: {
+          name: "SnapZoSocial",
+          version: "1",
+          chainId: mezoTestnet.id,
+          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+        },
+        types: SNAPZO_SOCIAL_REPLY_DEPOSIT_TYPES,
+        primaryType: "ReplyDeposit",
+        message: {
+          payer: address as `0x${string}`,
+          postId: socialPostId,
+          creator: post.tipRecipient,
+          nonce,
+          deadline,
+        },
       });
+      toast("Submitting reply request through social relayer…");
+      const relayed = await fetch("/api/snapzo/social/relay-reply-deposit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          payer: address,
+          postId: String(socialPostId),
+          creator: post.tipRecipient,
+          nonce: String(nonce),
+          deadline: String(deadline),
+          signature,
+        }),
+      });
+      const payload = (await relayed.json().catch(() => ({}))) as {
+        hash?: `0x${string}`;
+        error?: string;
+      };
+      if (!relayed.ok || !payload.hash) {
+        throw new Error(payload.error || "Reply relay failed");
+      }
       setPendingKind("comment");
-      setPendingHash(hash);
+      setPendingHash(payload.hash);
       toast("Confirming on Mezo…");
     } catch (e) {
       setPendingCommentText(null);
@@ -758,7 +841,7 @@ export function PostCard({ post }: PostCardProps) {
             <span className="text-zinc-600"> · </span>
             <span className="text-zinc-400">Reply</span>{" "}
             <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              0.01 <MusdInlineIcon decorative />
+              {replyStakeLabel} <SnapInlineIcon decorative />
             </span>
             {isLockedPost ? (
               <>
@@ -936,16 +1019,13 @@ export function PostCard({ post }: PostCardProps) {
 
                 <div className="shrink-0 border-t border-white/[0.08] bg-[#0b0f18] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
                   <p className="mb-2 flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[10px] font-medium tracking-wide text-zinc-500">
-                    <span>Posting sends</span>
+                    <span>Reply request escrows</span>
                     <span className="inline-flex items-center gap-0.5 text-zinc-200">
-                      0.01 <MusdInlineIcon decorative />
-                    </span>
-                    <span className="inline-flex items-center gap-0 text-violet-200/90">
-                      (~{tipSnapLabel}
+                      {replyStakeLabel}
                       <SnapInlineIcon decorative />
-                      {"SNAP)"}
+                      {"SNAP"}
                     </span>
-                    <span>on-chain</span>
+                    <span>until creator fulfills</span>
                   </p>
                   <div className="flex items-end gap-2">
                     <div
@@ -975,7 +1055,7 @@ export function PostCard({ post }: PostCardProps) {
                     />
                     <button
                       type="button"
-                      disabled={isBusy || !commentDraft.trim() || tipSnapWei === undefined}
+                      disabled={isBusy || !commentDraft.trim() || replyStakeAmount === undefined}
                       onClick={handleSubmitComment}
                       className="snapzo-pressable mb-1 shrink-0 px-2 py-1.5 text-sm font-semibold text-[#0095f6] enabled:hover:text-[#47b8ff] disabled:cursor-not-allowed disabled:opacity-35"
                     >
