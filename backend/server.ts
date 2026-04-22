@@ -25,6 +25,7 @@ import replyRoutes from './src/routes/reply';
 import userRoutes from './src/routes/user';
 import socialReplyRoutes from './src/routes/socialReply';
 import socialUnlockRoutes from './src/routes/socialUnlock';
+import adminRoutes from './src/routes/admin';
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -128,6 +129,7 @@ app.use('/api/tip', tipRoutes);
 app.use('/api/reply', replyRoutes);
 app.use('/api/social-reply', socialReplyRoutes);
 app.use('/api/social-unlock', socialUnlockRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/users', userRoutes);
 

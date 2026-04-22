@@ -1127,6 +1127,12 @@ export function SnapZoHubAdminView() {
             Owner-only controls on the hub and SnapZoSocial proxies. All txs use your wallet (gas in
             test BTC).
           </p>
+          <Link
+            href="/admin/snapzo/analytics"
+            className="mt-2 inline-flex items-center rounded-lg border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
+          >
+            Open analytics admin view
+          </Link>
         </div>
       </div>
 

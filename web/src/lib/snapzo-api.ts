@@ -122,6 +122,24 @@ export interface TipItem {
   tipperProfileImage?: string | null;
 }
 
+export type AdminActivityTable = "likes" | "replies" | "unlocks" | "users" | "activity";
+
+export interface AdminActivityResponse {
+  table: AdminActivityTable;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  summary: {
+    likes: number;
+    replies: number;
+    unlocks: number;
+    users: number;
+    posts: number;
+  };
+  items: Array<Record<string, unknown>>;
+}
+
 /**
  * PATCH /api/user/:wallet — partial profile update. Any field not in the
  * payload is left untouched. Pass `null` to clear a field.
@@ -276,4 +294,23 @@ export async function createSocialUnlockRecord(input: {
     const text = await res.text().catch(() => "");
     throw new Error(`createSocialUnlockRecord failed (${res.status}): ${text || res.statusText}`);
   }
+}
+
+export async function fetchAdminActivityTable(
+  table: AdminActivityTable,
+  params?: { page?: number; pageSize?: number },
+  signal?: AbortSignal
+): Promise<AdminActivityResponse> {
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/admin/activity`);
+  url.searchParams.set("table", table);
+  if (params?.page) url.searchParams.set("page", String(params.page));
+  if (params?.pageSize) url.searchParams.set("pageSize", String(params.pageSize));
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `fetchAdminActivityTable failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as AdminActivityResponse;
 }
