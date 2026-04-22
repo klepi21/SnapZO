@@ -3,15 +3,50 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Coins, MessageCircleMore, ShieldCheck, Sparkles, Unlock } from "lucide-react";
-import {
-  APP_NAME,
-} from "@/lib/brand";
+import { Camera, Heart, MessageCircle, Sparkles, Unlock } from "lucide-react";
+
+import { APP_NAME } from "@/lib/brand";
 import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
 
-/** Natural asset size (PNG with alpha). Display scales up to ~2× prior hero cap via max-* below. */
+/** Natural asset size (PNG with alpha). */
 const SNAP_LOGO_WIDTH = 638;
 const SNAP_LOGO_HEIGHT = 622;
+
+const STORIES: { seed: string; label: string }[] = [
+  { seed: "snapzo-s1", label: "You" },
+  { seed: "snapzo-s2", label: "travel" },
+  { seed: "snapzo-s3", label: "studio" },
+  { seed: "snapzo-s4", label: "night" },
+  { seed: "snapzo-s5", label: "food" },
+];
+
+const HERO_POST = { seed: "snapzo-g1", w: 720, h: 1280 };
+const THUMB_POSTS = [
+  { seed: "snapzo-g2", w: 640, h: 640 },
+  { seed: "snapzo-g3", w: 640, h: 640 },
+] as const;
+
+function StoryRing({ seed, label }: { seed: string; label: string }) {
+  return (
+    <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
+      <div className="rounded-full bg-gradient-to-tr from-amber-400 via-fuchsia-500 to-sky-400 p-[2.5px] shadow-[0_0_16px_rgba(56,189,248,0.22)]">
+        <div className="h-14 w-14 overflow-hidden rounded-full border border-black/70 bg-zinc-950">
+          <Image
+            src={`https://picsum.photos/seed/${seed}/112/112`}
+            alt=""
+            width={112}
+            height={112}
+            className="h-full w-full object-cover"
+            sizes="56px"
+          />
+        </div>
+      </div>
+      <span className="max-w-full truncate text-center text-[9px] font-medium text-zinc-500">
+        {label}
+      </span>
+    </div>
+  );
+}
 
 export function SplashScreen() {
   const [startedHref, setStartedHref] = useState("/onboarding");
@@ -33,115 +68,122 @@ export function SplashScreen() {
       <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:24px_24px]" />
 
       <div className="relative z-10 flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
-        <header className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/25 bg-sky-400/[0.12] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-100">
-            <Sparkles className="h-3.5 w-3.5" />
-            Mezo Social
-          </div>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-zinc-300">
-            Gasless UX
-          </span>
-        </header>
-
-        <section className="mt-5 rounded-[28px] border border-white/[0.09] bg-gradient-to-b from-[#0d1425]/96 to-[#090d17]/92 px-4 py-5 shadow-[0_20px_56px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.08)]">
-          <div className="flex items-center gap-3">
-            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-sky-200/20 bg-[#11182a]">
+        <header className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#11182a]">
               <Image
                 src="/snap-token-logo.png"
-                alt="SnapZO logo"
+                alt=""
                 width={SNAP_LOGO_WIDTH}
                 height={SNAP_LOGO_HEIGHT}
                 priority
-                className="h-full w-full object-contain p-1.5"
-                sizes="56px"
+                className="h-full w-full object-contain p-1"
+                sizes="40px"
               />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-sky-200/85">
-                {APP_NAME}
-              </p>
-              <h1 className="mt-0.5 text-balance text-[1.5rem] font-semibold leading-[1.12] tracking-[-0.02em] text-white">
-                Get paid when people engage with your content.
-              </h1>
+              <p className="truncate text-sm font-semibold tracking-tight text-white">{APP_NAME}</p>
+              <p className="truncate text-[11px] text-zinc-500">Photo feed · Mezo testnet</p>
             </div>
           </div>
-
-          <p className="mt-4 text-sm leading-relaxed text-zinc-300">
-            Social app on Mezo where every like, unlock, and paid comment is real on-chain value in
-            SNAP.
-          </p>
-
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2.5">
-              <p className="text-[10px] uppercase tracking-[0.1em] text-zinc-500">Like</p>
-              <p className="mt-1 text-sm font-semibold text-white">0.01 SNAP</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2.5">
-              <p className="text-[10px] uppercase tracking-[0.1em] text-zinc-500">Reply</p>
-              <p className="mt-1 text-sm font-semibold text-white">0.05 SNAP</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2.5">
-              <p className="text-[10px] uppercase tracking-[0.1em] text-zinc-500">Unlock</p>
-              <p className="mt-1 text-sm font-semibold text-white">Creator set</p>
-            </div>
+          <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-300/25 bg-sky-400/[0.1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-100">
+            <Sparkles className="h-3 w-3" />
+            SNAP
           </div>
-        </section>
+        </header>
 
-        <section className="mt-3 space-y-2">
-          <div className="rounded-2xl border border-white/10 bg-black/20 px-3.5 py-3">
-            <div className="flex items-start gap-2.5">
-              <Coins className="mt-0.5 h-4.5 w-4.5 shrink-0 text-sky-300" />
-              <div>
-                <p className="text-sm font-semibold text-white">Attention becomes earnings</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                  Earn from likes, unlocks, and paid replies - no vanity engagement.
-                </p>
-              </div>
-            </div>
+        <div className="mt-4 text-center">
+          <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-zinc-400">
+            <Camera className="h-3.5 w-3.5 text-zinc-300" />
+            Photo-first · like Instagram
           </div>
-
-          <div className="rounded-2xl border border-white/10 bg-black/20 px-3.5 py-3">
-            <div className="flex items-start gap-2.5">
-              <MessageCircleMore className="mt-0.5 h-4.5 w-4.5 shrink-0 text-sky-300" />
-              <div>
-                <p className="text-sm font-semibold text-white">Paid comments, quality responses</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                  Users can pay to comment. Creators reply to unlock payouts.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-black/20 px-3.5 py-3">
-            <div className="flex items-start gap-2.5">
-              <ShieldCheck className="mt-0.5 h-4.5 w-4.5 shrink-0 text-sky-300" />
-              <div>
-                <p className="text-sm font-semibold text-white">Backed by contracts + database</p>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                  Social actions are tracked in the backend and settled through SnapZo contracts.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-400/[0.06] px-3 py-2.5 text-xs text-sky-100/90">
-          <p className="inline-flex items-center gap-1.5 font-medium">
-            <Unlock className="h-3.5 w-3.5" />
-            Creators monetize content directly with transparent on-chain flows.
-          </p>
+          <h1 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-[-0.03em] text-white">
+            Your feed,{" "}
+            <span className="bg-gradient-to-r from-sky-200 to-indigo-300 bg-clip-text text-transparent">
+              powered by SNAP
+            </span>
+          </h1>
         </div>
 
-        <div className="mt-auto pt-4">
+        <section
+          className="mt-4 overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0a0f1a]/90 shadow-[0_24px_48px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          aria-label="Preview of the photo social feed"
+        >
+          <div className="border-b border-white/[0.06] px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+              Stories
+            </p>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {STORIES.map((s) => (
+                <StoryRing key={s.seed} seed={s.seed} label={s.label} />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5 p-2">
+            <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl ring-1 ring-white/[0.06]">
+              <Image
+                src={`https://picsum.photos/seed/${HERO_POST.seed}/${HERO_POST.w}/${HERO_POST.h}`}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="(max-width: 430px) 100vw, 400px"
+                priority
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
+              <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                  <Heart className="h-3 w-3 text-red-400" fill="currentColor" />
+                  128
+                </span>
+                <span className="rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+                  Locked
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {THUMB_POSTS.map((g) => (
+                <div
+                  key={g.seed}
+                  className="relative aspect-square overflow-hidden rounded-2xl ring-1 ring-white/[0.06]"
+                >
+                  <Image
+                    src={`https://picsum.photos/seed/${g.seed}/${g.w}/${g.h}`}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 430px) 45vw, 200px"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-zinc-400">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
+            <Heart className="h-3.5 w-3.5 text-red-400" />
+            0.01
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
+            <Unlock className="h-3.5 w-3.5 text-sky-300" />
+            Unlock
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
+            <MessageCircle className="h-3.5 w-3.5 text-sky-300" />
+            0.05 reply
+          </span>
+        </div>
+
+        <div className="mt-auto pt-5">
           <Link
             href={startedHref}
             className="snapzo-pressable inline-flex w-full items-center justify-center rounded-2xl border border-sky-200/35 bg-gradient-to-r from-[#38bdf8] via-[#2563eb] to-[#1d4ed8] py-3.5 text-base font-semibold text-white shadow-[0_14px_42px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.985]"
           >
-            Enter SnapZo
+            Open feed
           </Link>
-          <p className="mt-2.5 text-center text-[11px] text-zinc-500">
-            Built for creators on Mezo testnet
-          </p>
+          <p className="mt-2 text-center text-[10px] text-zinc-600">Demo photos · not your uploads</p>
         </div>
       </div>
     </div>
