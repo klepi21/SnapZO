@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Camera, Heart, MessageCircle, Sparkles, Unlock } from "lucide-react";
+import { Camera, Heart, MessageCircle, Sparkles, TrendingUp, Unlock } from "lucide-react";
 
 import { APP_NAME } from "@/lib/brand";
 import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
@@ -103,6 +103,33 @@ export function SplashScreen() {
               powered by SNAP
             </span>
           </h1>
+          <div className="mx-auto mt-3 max-w-[22rem] space-y-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <p className="flex gap-2 text-[11px] leading-snug text-zinc-300">
+              <Heart
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pink-400"
+                strokeWidth={2}
+                aria-hidden
+              />
+              <span>
+                <span className="font-semibold text-zinc-100">Creators</span> get rewarded from
+                micro-SNAP likes, unlocks & replies—real support{" "}
+                <span className="text-sky-200/95">without heavy spending.</span>
+              </span>
+            </p>
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <p className="flex gap-2 text-[11px] leading-snug text-zinc-300">
+              <TrendingUp
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400"
+                strokeWidth={2}
+                aria-hidden
+              />
+              <span>
+                <span className="font-semibold text-zinc-100">You</span> still earn{" "}
+                <span className="text-emerald-200/95">real yield on your money</span> in the Earn
+                hub—stack MUSD, scroll the feed, stay on-chain.
+              </span>
+            </p>
+          </div>
         </div>
 
         <section
