@@ -1274,9 +1274,9 @@ export function PostCard({ post }: PostCardProps) {
                       </span>
                     </p>
                   ) : (
-                    <ul className="space-y-1 pb-3">
+                    <ul className="space-y-0.5 pb-3">
                       {comments.map((c) => (
-                        <li key={c.id} className="flex gap-3 py-2.5">
+                        <li key={c.id} className="flex gap-3 py-3">
                           <div className="mt-0.5 h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500/90 to-violet-600/80 ring-1 ring-white/15">
                             {c.requesterProfileImage ? (
                               <Image
@@ -1293,29 +1293,31 @@ export function PostCard({ post }: PostCardProps) {
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm leading-snug text-zinc-100">
-                              <span className="font-semibold text-white">
-                                {c.requesterDisplayName?.trim() ||
-                                  c.requesterUsername?.trim() ||
-                                  `${c.requesterWallet.slice(0, 6)}...${c.requesterWallet.slice(-4)}`}
-                              </span>{" "}
-                              <span className="font-normal text-zinc-200">
-                                {c.requesterComment}
-                              </span>
+                            <p className="text-sm font-semibold leading-tight text-white">
+                              {c.requesterDisplayName?.trim() ||
+                                c.requesterUsername?.trim() ||
+                                `${c.requesterWallet.slice(0, 6)}...${c.requesterWallet.slice(-4)}`}
+                            </p>
+                            <p className="mt-0.5 text-[14px] leading-[1.45] text-zinc-200">
+                              {c.requesterComment}
                             </p>
                             {c.creatorReply ? (
-                              <p className="mt-1 text-sm leading-snug text-emerald-200">
-                                <span className="font-semibold text-emerald-300">
-                                  {(c.creatorDisplayName?.trim() || c.creatorUsername?.trim() || "Creator")}:
-                                </span>{" "}
-                                {c.creatorReply}
-                              </p>
+                              <div className="mt-2 border-l border-emerald-400/35 pl-2.5">
+                                <p className="text-[13px] leading-[1.4] text-emerald-200">
+                                  <span className="font-semibold text-emerald-300">
+                                    {(c.creatorDisplayName?.trim() || c.creatorUsername?.trim() || "Creator")}
+                                  </span>
+                                </p>
+                                <p className="mt-0.5 text-[13px] leading-[1.4] text-emerald-100/95">
+                                  {c.creatorReply}
+                                </p>
+                              </div>
                             ) : null}
-                            <div className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
+                            <div className="mt-1.5 flex items-center gap-2 text-[10px] tracking-[0.01em] text-zinc-500">
                               <span>{c.createdAt ? formatShortTime(new Date(c.createdAt).getTime()) : "now"}</span>
                               <span aria-hidden>·</span>
                               <a
-                                className="font-medium text-zinc-400 transition hover:text-white"
+                                className="font-medium text-zinc-400 transition hover:text-zinc-200"
                                 href={`${mezoTestnet.blockExplorers.default.url}/tx/${c.fulfillTxHash ?? c.requestTxHash}`}
                                 target="_blank"
                                 rel="noreferrer"
