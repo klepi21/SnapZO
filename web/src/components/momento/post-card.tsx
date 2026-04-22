@@ -1094,7 +1094,7 @@ export function PostCard({ post }: PostCardProps) {
           <div className="flex min-w-0 flex-1 items-center gap-5">
             <button
               type="button"
-              className={`snapzo-pressable flex items-center gap-2 border-0 bg-transparent p-0 hover:opacity-90 active:opacity-75 disabled:pointer-events-none disabled:opacity-35 ${likedUi ? "text-red-500" : "text-white"}`}
+              className={`snapzo-pressable flex items-center gap-2 border-0 bg-transparent p-0 hover:opacity-90 active:opacity-75 disabled:pointer-events-none ${likedUi ? "text-red-500 disabled:text-red-500" : "text-white disabled:opacity-35"}`}
               aria-label={
                 hasTipped ? "Already tipped" : "Like — tip 0.01 MUSD worth of SNAP"
               }
