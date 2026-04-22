@@ -26,6 +26,24 @@ export interface LoginResponse {
   isNew: boolean;
 }
 
+export interface UserPostItem {
+  id: string;
+  postId: string;
+  creatorWallet: string;
+  content?: string;
+  ipfsHash?: string;
+  isLocked: boolean;
+  unlockPrice: number;
+  blurImage?: string;
+  totalTips?: number;
+  createdAt: string;
+}
+
+export interface UserProfileWithPostsResponse {
+  user: SnapzoBackendUser;
+  posts: UserPostItem[];
+}
+
 /**
  * Idempotent "login" — creates the user row on first call, returns the
  * existing user on subsequent calls. Never overwrites profile fields.
@@ -165,6 +183,20 @@ export async function updateProfile(
     );
   }
   return (await res.json()) as SnapzoBackendUser;
+}
+
+export async function fetchUserProfileWithPosts(
+  walletAddress: string,
+  signal?: AbortSignal
+): Promise<UserProfileWithPostsResponse> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/user/${walletAddress}`, { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `fetchUserProfileWithPosts failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as UserProfileWithPostsResponse;
 }
 
 export async function fetchFeed(

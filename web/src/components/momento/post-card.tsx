@@ -1031,7 +1031,7 @@ export function PostCard({ post }: PostCardProps) {
       </div>
 
       <div
-        className="relative mx-3 aspect-[4/5] touch-manipulation overflow-hidden rounded-[22px] bg-zinc-900/80 ring-1 ring-white/[0.04]"
+        className="relative mx-3 aspect-[9/16] touch-manipulation overflow-hidden rounded-[22px] bg-black ring-1 ring-white/[0.08]"
         onDoubleClick={(e) => {
           e.preventDefault();
           handleMediaDoubleLike();
@@ -1045,7 +1045,7 @@ export function PostCard({ post }: PostCardProps) {
             src={src}
             alt=""
             fill
-            className={`object-cover transition-[filter,transform] duration-500 ease-out ${
+            className={`object-contain transition-[filter,transform] duration-500 ease-out ${
               showLockOverlay ? "scale-[1.04] blur-2xl" : "blur-0"
             }`}
             sizes="(max-width: 430px) 100vw, 382px"

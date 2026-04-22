@@ -42,10 +42,10 @@ export function BottomNav() {
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50">
       <nav
         aria-label="Main navigation"
-        className="pointer-events-auto mx-auto w-full max-w-[430px] overflow-hidden rounded-t-3xl border border-white/[0.08] border-b-0 bg-[#080d16]/92 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#080d16]/78"
+        className="pointer-events-auto mx-auto w-full max-w-[430px] overflow-hidden rounded-t-3xl border border-white/[0.08] border-b-0 bg-[#080d16]/92 pt-2 pb-[max(0.45rem,env(safe-area-inset-bottom,0px))] shadow-[0_-12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#080d16]/78"
       >
         <div className="pointer-events-none h-px w-full bg-gradient-to-r from-transparent via-sky-300/35 to-transparent" />
-        <ul className="grid h-12 w-full grid-cols-5 place-items-center px-1 sm:px-2">
+        <ul className="grid h-[62px] w-full grid-cols-5 place-items-center px-1 sm:px-2">
           {items.map((item) => {
             const active =
               !item.disabled &&
@@ -80,13 +80,20 @@ export function BottomNav() {
 
             const hit = (
               <span
-                className={`snapzo-pressable flex h-full w-full max-w-[72px] items-center justify-center rounded-xl active:opacity-80 ${
+                className={`snapzo-pressable flex h-full w-full max-w-[72px] flex-col items-center justify-center gap-0.5 rounded-xl active:opacity-80 ${
                   active
                     ? "bg-gradient-to-b from-sky-300/[0.2] to-sky-500/[0.06] shadow-[inset_0_1px_0_rgba(186,230,253,0.22),0_0_16px_rgba(56,189,248,0.2)]"
                     : "bg-transparent"
                 }`}
               >
                 {inner}
+                <span
+                  className={`text-[10px] font-medium leading-none tracking-wide ${
+                    active ? "text-sky-100" : "text-zinc-500"
+                  }`}
+                >
+                  {item.label}
+                </span>
               </span>
             );
 

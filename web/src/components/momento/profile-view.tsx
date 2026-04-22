@@ -7,9 +7,16 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAccount } from "wagmi";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
-import { updateProfile, type UpdateProfilePayload } from "@/lib/snapzo-api";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
+import {
+  fetchUserProfileWithPosts,
+  updateProfile,
+  type UpdateProfilePayload,
+  type UserPostItem,
+} from "@/lib/snapzo-api";
 import {
   defaultSnapzoProfile,
+  ipfsGatewayUrl,
   persistSnapzoProfile,
   readSnapzoProfile,
   SNAPZO_PROFILE_HYDRATED_EVENT,
@@ -65,6 +72,8 @@ export function ProfileView() {
   const { address } = useAccount();
 
   const [profile, setProfile] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
+  const [posts, setPosts] = useState<UserPostItem[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
@@ -79,6 +88,29 @@ export function ProfileView() {
       window.removeEventListener(SNAPZO_PROFILE_HYDRATED_EVENT, reload);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMyPosts() {
+      if (!address) {
+        if (!cancelled) setPosts([]);
+        return;
+      }
+      setPostsLoading(true);
+      try {
+        const res = await fetchUserProfileWithPosts(address);
+        if (!cancelled) setPosts(res.posts ?? []);
+      } catch {
+        if (!cancelled) setPosts([]);
+      } finally {
+        if (!cancelled) setPostsLoading(false);
+      }
+    }
+    void loadMyPosts();
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   const openEdit = useCallback(() => {
     setDraft(readSnapzoProfile());
@@ -327,6 +359,10 @@ export function ProfileView() {
   const hasUsername = !!profile.username;
   const hasBio = !!profile.bio;
   const headerTitle = profile.displayName || walletShort || "Unnamed";
+  const earningsSnap = posts.reduce((sum, post) => sum + Number(post.totalTips ?? 0), 0);
+  const earningsSnapLabel = Number.isFinite(earningsSnap)
+    ? earningsSnap.toFixed(4).replace(/\.?0+$/, "")
+    : "0";
 
   return (
     <div className="pb-28">
@@ -419,9 +455,9 @@ export function ProfileView() {
               Earnings
             </p>
             <p className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold tabular-nums text-white">
-              <span>0</span>
-              <MusdInlineIcon />
-              <span className="sr-only">MUSD</span>
+              <span>{earningsSnapLabel}</span>
+              <SnapInlineIcon decorative />
+              <span className="sr-only">SNAP</span>
             </p>
           </div>
         </div>
@@ -440,12 +476,45 @@ export function ProfileView() {
 
       <div className="mt-8 px-4">
         <h2 className="text-sm font-semibold tracking-tight text-white">Posts</h2>
-        <p className="mt-0.5 text-xs text-zinc-500">No posts yet</p>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          {postsLoading ? "Loading posts…" : `${posts.length} post${posts.length === 1 ? "" : "s"}`}
+        </p>
       </div>
 
-      <div className="snapzo-card-compact mx-4 mt-4 flex flex-col items-center justify-center border-dashed bg-[#0a0e17] px-6 py-10 text-center">
-        <p className="text-sm text-zinc-400">Share your first post to fill this space.</p>
-      </div>
+      {posts.length === 0 ? (
+        <div className="snapzo-card-compact mx-4 mt-4 flex flex-col items-center justify-center border-dashed bg-[#0a0e17] px-6 py-10 text-center">
+          <p className="text-sm text-zinc-400">Share your first post to fill this space.</p>
+        </div>
+      ) : (
+        <div className="mx-4 mt-4 grid grid-cols-3 gap-2">
+          {posts.map((post) => {
+            const cid = post.ipfsHash || post.blurImage;
+            const src = cid ? ipfsGatewayUrl(cid) : null;
+            return (
+              <div
+                key={post.id}
+                className="relative aspect-square overflow-hidden rounded-xl border border-white/[0.08] bg-black"
+                title={post.content ?? ""}
+              >
+                {src ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- remote user media
+                  <img src={src} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-500">
+                    No media
+                  </div>
+                )}
+                {post.isLocked ? (
+                  <div className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[10px] text-zinc-200">
+                    Locked · {post.unlockPrice}
+                    <MusdInlineIcon className="ml-1 inline" decorative />
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

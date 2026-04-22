@@ -8,6 +8,7 @@ import { ChevronLeft, ImagePlus, Loader2, Lock } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import { getSnapzoApiBaseUrl } from "@/lib/snapzo-api";
 import { APP_CREATOR_REVENUE_EXPLAINER } from "@/lib/brand";
@@ -99,7 +100,7 @@ export function CreatePostView() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [isLocked, setIsLocked] = useState(false);
-  const [unlockMusd, setUnlockMusd] = useState("0.1");
+  const [unlockSnap, setUnlockSnap] = useState("0.1");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -145,9 +146,9 @@ export function CreatePostView() {
     }
     let price = 0;
     if (isLocked) {
-      price = Number.parseFloat(unlockMusd.replace(",", "."));
+      price = Number.parseFloat(unlockSnap.replace(",", "."));
       if (!Number.isFinite(price) || price <= 0) {
-        toast("Set an unlock price greater than 0 MUSD.", "error");
+        toast("Set an unlock price greater than 0 SNAP.", "error");
         return;
       }
     }
@@ -254,12 +255,12 @@ export function CreatePostView() {
             className="snapzo-pressable mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-[22px] border border-dashed border-white/15 bg-black/20 py-10 text-zinc-400 hover:border-indigo-400/35 hover:bg-white/[0.04] hover:text-zinc-200"
           >
             {previewUrl ? (
-              <div className="relative mx-auto aspect-[4/5] w-full max-w-[280px] overflow-hidden rounded-[18px] ring-1 ring-white/10">
+              <div className="relative mx-auto aspect-[9/16] w-full max-w-[280px] overflow-hidden rounded-[18px] bg-black ring-1 ring-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element -- blob: URLs */}
                 <img
                   src={previewUrl}
                   alt=""
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               </div>
             ) : (
@@ -343,28 +344,28 @@ export function CreatePostView() {
                 htmlFor="snapzo-unlock-price"
                 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500"
               >
-                Unlock price
+                Unlock price (SNAP)
               </label>
               <div className="mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-zinc-950/70 px-3 py-2.5">
                 <input
                   id="snapzo-unlock-price"
                   type="text"
                   inputMode="decimal"
-                  value={unlockMusd}
-                  onChange={(e) => setUnlockMusd(e.target.value)}
+                  value={unlockSnap}
+                  onChange={(e) => setUnlockSnap(e.target.value)}
                   disabled={submitting}
                   className="min-w-0 flex-1 border-0 bg-transparent text-lg font-semibold tabular-nums text-white outline-none placeholder:text-zinc-600"
                   placeholder="0.10"
                   aria-describedby="snapzo-unlock-hint"
                 />
                 <span className="inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-violet-500/15 px-2 py-1 font-mono text-xs font-semibold text-violet-200">
-                  MUSD
-                  <MusdInlineIcon className="rounded-full object-cover opacity-90" />
+                  SNAP
+                  <SnapInlineIcon className="rounded-full object-cover opacity-90" decorative />
                 </span>
               </div>
               <p id="snapzo-unlock-hint" className="mt-2 text-xs leading-relaxed text-zinc-500">
-                Shown in MUSD; fans settle in 18-decimal SNAP from the Earn hub at the live pool
-                ratio. Required when hidden mode is on.
+                SNAP is approximately 1:1 with MUSD. This value is treated as MUSD-equivalent in the
+                backend for current pricing flow. Required when hidden mode is on.
               </p>
             </div>
           ) : null}
