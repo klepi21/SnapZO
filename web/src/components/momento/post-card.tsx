@@ -42,7 +42,7 @@ import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar } from "@/lib/dummy/social";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
-import { MUSD_DECIMALS } from "@/lib/constants/musd";
+import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
 import {
   erc20TotalSupplyAbi,
   isSnapZoHubConfigured,
