@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
         hostname: "coin-images.coingecko.com",
         pathname: "/coins/images/**",
       },
+      {
+        protocol: "https",
+        hostname: "gateway.pinata.cloud",
+        pathname: "/ipfs/**",
+      },
     ],
   },
 };

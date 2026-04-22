@@ -59,6 +59,33 @@ export interface UpdateProfilePayload {
   avatarName?: string;
 }
 
+export interface FeedItem {
+  id: string;
+  postId: string;
+  socialPostId?: number | null;
+  creatorWallet: string;
+  content?: string;
+  ipfsHash?: string;
+  isLocked: boolean;
+  unlockPrice: number;
+  blurImage?: string;
+  totalTips?: number;
+  createdAt: string;
+  unlockedByMe?: boolean;
+  tipCount?: number;
+  replyCount?: number;
+  commentCount?: number;
+  latestInteractionAt?: string;
+  creatorDisplayName?: string | null;
+  creatorUsername?: string | null;
+  creatorProfileImage?: string | null;
+}
+
+export interface FeedResponse {
+  items: FeedItem[];
+  nextCursor: string | null;
+}
+
 /**
  * PATCH /api/user/:wallet — partial profile update. Any field not in the
  * payload is left untouched. Pass `null` to clear a field.
@@ -84,4 +111,21 @@ export async function updateProfile(
     );
   }
   return (await res.json()) as SnapzoBackendUser;
+}
+
+export async function fetchFeed(
+  params?: { viewer?: string; limit?: number; cursor?: string },
+  signal?: AbortSignal,
+): Promise<FeedResponse> {
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/feed`);
+  if (params?.viewer) url.searchParams.set("viewer", params.viewer);
+  if (params?.limit) url.searchParams.set("limit", String(params.limit));
+  if (params?.cursor) url.searchParams.set("cursor", params.cursor);
+
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`fetchFeed failed (${res.status}): ${text || res.statusText}`);
+  }
+  return (await res.json()) as FeedResponse;
 }

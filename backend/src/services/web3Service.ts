@@ -40,6 +40,7 @@ const HUB_ABI = [
 ];
 
 const TRANSFER_TOPIC = ethers.id('Transfer(address,address,uint256)');
+const SOCIAL_TIP_TOPIC = ethers.id('Tip(address,address,uint256,uint256,address)');
 
 let provider: JsonRpcProvider | null = null;
 let escrowWallet: Wallet | null = null;
@@ -64,6 +65,12 @@ export interface VerifyMusdTransferResult {
 export interface SendMusdRefundParams {
   to: string;
   amount: number;
+}
+
+export interface VerifySocialTipParams {
+  txHash: string;
+  tipper: string;
+  creator: string;
 }
 
 /** Initialize the provider + signer + contracts. Idempotent. */
@@ -187,6 +194,33 @@ export async function verifyMusdTransfer(
     value: expectedValue,
     blockNumber: receipt.blockNumber,
   };
+}
+
+/** Verify SnapZoSocial Tip event for expected tipper/creator. */
+export async function verifySocialTipEvent(params: VerifySocialTipParams): Promise<void> {
+  init();
+  if (!provider) throw new Error('web3 provider not configured');
+  if (!config.chain.socialContractAddress) throw new Error('SOCIAL_CONTRACT_ADDRESS not configured');
+
+  const receipt = await provider.getTransactionReceipt(params.txHash);
+  if (!receipt) throw new Error(`Transaction ${params.txHash} not found`);
+  if (receipt.status !== 1) throw new Error(`Transaction ${params.txHash} failed on-chain`);
+
+  const socialAddrLc = config.chain.socialContractAddress.toLowerCase();
+  const tipperLc = params.tipper.toLowerCase();
+  const creatorLc = params.creator.toLowerCase();
+  const found = receipt.logs.find((log) => {
+    if (log.address.toLowerCase() !== socialAddrLc) return false;
+    if (!log.topics || log.topics[0] !== SOCIAL_TIP_TOPIC || log.topics.length < 3) return false;
+    const decodedTipper = ethers.getAddress('0x' + log.topics[1].slice(26)).toLowerCase();
+    const decodedCreator = ethers.getAddress('0x' + log.topics[2].slice(26)).toLowerCase();
+    return decodedTipper === tipperLc && decodedCreator === creatorLc;
+  });
+  if (!found) {
+    throw new Error(
+      `No matching SnapZoSocial Tip event found in tx ${params.txHash} (tipper ${params.tipper}, creator ${params.creator})`
+    );
+  }
 }
 
 /**
@@ -314,6 +348,7 @@ export default {
   getProvider,
   getEscrowAddress,
   verifyMusdTransfer,
+  verifySocialTipEvent,
   sendMusdRefund,
   startListeners,
   stopListeners,

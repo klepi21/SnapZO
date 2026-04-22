@@ -35,12 +35,20 @@ export async function createTip(req: Request, res: Response): Promise<void> {
   const existing = await Tip.findOne({ txHash: hash }).lean();
   if (existing) throw conflict('txHash already used for a tip');
 
-  await web3Service.verifyMusdTransfer({
-    txHash: hash,
-    from: wallet,
-    to: post.creatorWallet,
-    amount: amt,
-  });
+  try {
+    await web3Service.verifyMusdTransfer({
+      txHash: hash,
+      from: wallet,
+      to: post.creatorWallet,
+      amount: amt,
+    });
+  } catch {
+    await web3Service.verifySocialTipEvent({
+      txHash: hash,
+      tipper: wallet,
+      creator: post.creatorWallet,
+    });
+  }
 
   const tip = await Tip.create({
     post: post._id,

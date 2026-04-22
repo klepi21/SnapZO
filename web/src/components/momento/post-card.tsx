@@ -23,12 +23,21 @@ import { createPortal } from "react-dom";
 import {
   useAccount,
   useChainId,
+  useReadContract,
+  useSignTypedData,
   useSwitchChain,
   useWaitForTransactionReceipt,
   useReadContracts,
   useWriteContract,
 } from "wagmi";
-import { formatUnits, parseUnits, UserRejectedRequestError } from "viem";
+import {
+  formatUnits,
+  keccak256,
+  maxUint256,
+  parseUnits,
+  stringToBytes,
+  UserRejectedRequestError,
+} from "viem";
 import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar, picsumPost } from "@/lib/dummy/social";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
@@ -37,11 +46,14 @@ import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
 import {
   erc20TotalSupplyAbi,
   isSnapZoHubConfigured,
+  isSnapZoSocialConfigured,
   SNAP_DECIMALS,
   SNAPZO_HUB_ADDRESS,
+  SNAPZO_SOCIAL_ADDRESS,
   SNAPZO_SNAP_TOKEN_ADDRESS,
   snapZoHubAbi,
 } from "@/lib/constants/snapzo-hub";
+import { erc20AllowanceAbi, erc20ApproveAbi } from "@/lib/constants/mezo-dex";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { musdWeiToSnapBaseUnitsCeil } from "@/lib/snapzo/musd-snap-quote";
 import {
@@ -60,6 +72,15 @@ interface PostCardProps {
 /** Fixed MUSD-quoted like/reply; unlock uses per-post `unlockPriceMusd` (default 0.1). */
 const TIP_MUSD_WEI = parseUnits("0.01", MUSD_DECIMALS);
 const DEFAULT_UNLOCK_MUSD = 0.1;
+const SNAPZO_SOCIAL_TIP_TYPES = {
+  Tip: [
+    { name: "tipper", type: "address" },
+    { name: "postId", type: "uint256" },
+    { name: "creator", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
 
 function unlockMusdWeiFromPost(post: FeedPost): bigint {
   const human = post.unlockPriceMusd;
@@ -129,9 +150,11 @@ export function PostCard({ post }: PostCardProps) {
   const { openConnectModal } = useConnectModal();
   const { switchChain } = useSwitchChain();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  const { signTypedDataAsync, isPending: isSignPending } = useSignTypedData();
   const toast = useSnapzoToast();
 
   const hubConfigured = isSnapZoHubConfigured();
+  const socialConfigured = isSnapZoSocialConfigured();
   const hubNav = useReadContracts({
     contracts: [
       {
@@ -156,6 +179,30 @@ export function PostCard({ post }: PostCardProps) {
 
   const ta = hubNav.data?.[0]?.status === "success" ? hubNav.data[0].result : undefined;
   const ts = hubNav.data?.[1]?.status === "success" ? hubNav.data[1].result : undefined;
+
+  const socialNonceRead = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_SOCIAL_ADDRESS,
+    abi: [{ type: "function", name: "nonces", stateMutability: "view", inputs: [{ name: "user", type: "address" }], outputs: [{ type: "uint256" }] }] as const,
+    functionName: "nonces",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address && socialConfigured), staleTime: 10_000 },
+  });
+  const likeTipAmountRead = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_SOCIAL_ADDRESS,
+    abi: [{ type: "function", name: "likeTipAmount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] }] as const,
+    functionName: "likeTipAmount",
+    query: { enabled: socialConfigured, staleTime: 10_000 },
+  });
+  const allowanceRead = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_SNAP_TOKEN_ADDRESS,
+    abi: erc20AllowanceAbi,
+    functionName: "allowance",
+    args: address ? [address, SNAPZO_SOCIAL_ADDRESS] : undefined,
+    query: { enabled: Boolean(address && socialConfigured), staleTime: 10_000 },
+  });
 
   const unlockMusdWei = useMemo(() => unlockMusdWeiFromPost(post), [post]);
   const unlockMusdLabel = useMemo(
@@ -213,13 +260,16 @@ export function PostCard({ post }: PostCardProps) {
     });
 
   const mediaUnlocked = !isLockedPost || sessionUnlocked;
+  const isOwnPost = Boolean(
+    address && post.tipRecipient.toLowerCase() === address.toLowerCase()
+  );
   const hasTipped = clientReady && isPostLikedInStorage(post.id);
   void storageRev;
   const comments: StoredComment[] = clientReady
     ? readCommentsForPost(post.id)
     : [];
 
-  const src = picsumPost(post.imageId, post.imageWidth, post.imageHeight);
+  const src = post.imageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked;
 
   useEffect(() => {
@@ -324,7 +374,7 @@ export function PostCard({ post }: PostCardProps) {
     return true;
   }, [address, isConnected, openConnectModal, switchChain, toast, wrongChain]);
 
-  const isBusy = isWritePending || isConfirming || Boolean(pendingHash);
+  const isBusy = isWritePending || isSignPending || isConfirming || Boolean(pendingHash);
 
   const likedUi = hasTipped || likePressed;
   const likeCount =
@@ -367,29 +417,82 @@ export function PostCard({ post }: PostCardProps) {
     if (hasTipped || likePressed) {
       return;
     }
+    if (isOwnPost) {
+      toast("You can't like your own post.", "error");
+      return;
+    }
     if (!ensureMezo()) {
       return;
     }
-    if (!hubConfigured) {
-      toast("SnapZo hub is not configured.", "error");
+    if (!socialConfigured) {
+      toast("SnapZo social contract is not configured.", "error");
       return;
     }
-    if (tipSnapWei === undefined) {
-      toast("Pricing unavailable right now. Retry in a moment.", "error");
+    const nonce = socialNonceRead.data;
+    const likeTipAmount = likeTipAmountRead.data;
+    if (!socialConfigured || nonce === undefined || likeTipAmount === undefined) {
+      toast("Social tip config unavailable. Retry in a moment.", "error");
       return;
     }
     setLikePressed(true);
     try {
-      toast(`Confirm tip · 0.01 MUSD (~${tipSnapLabel} SNAP)…`);
-      const hash = await writeContractAsync({
-        address: SNAPZO_SNAP_TOKEN_ADDRESS,
-        abi: erc20TransferAbi,
-        functionName: "transfer",
-        args: [post.tipRecipient, tipSnapWei],
-        chainId: mezoTestnet.id,
+      const allowance = allowanceRead.data ?? BigInt(0);
+      if (allowance < likeTipAmount) {
+        toast("Approve SNAP for SnapZoSocial…");
+        await writeContractAsync({
+          address: SNAPZO_SNAP_TOKEN_ADDRESS,
+          abi: erc20ApproveAbi,
+          functionName: "approve",
+          args: [SNAPZO_SOCIAL_ADDRESS, maxUint256],
+          chainId: mezoTestnet.id,
+        });
+        await allowanceRead.refetch();
+      }
+
+      const postIdDigest = keccak256(stringToBytes(post.id));
+      const socialPostId = BigInt(`0x${postIdDigest.slice(2, 18)}`);
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
+      toast(`Sign social tip · ${formatUnits(likeTipAmount, SNAP_DECIMALS)} SNAP…`);
+      const signature = await signTypedDataAsync({
+        domain: {
+          name: "SnapZoSocial",
+          version: "1",
+          chainId: mezoTestnet.id,
+          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+        },
+        types: SNAPZO_SOCIAL_TIP_TYPES,
+        primaryType: "Tip",
+        message: {
+          tipper: address as `0x${string}`,
+          postId: socialPostId,
+          creator: post.tipRecipient,
+          nonce,
+          deadline,
+        },
       });
+
+      toast("Submitting through social relayer…");
+      const relayed = await fetch("/api/snapzo/social/relay-tip", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          tipper: address,
+          postId: String(socialPostId),
+          creator: post.tipRecipient,
+          nonce: String(nonce),
+          deadline: String(deadline),
+          signature,
+        }),
+      });
+      const payload = (await relayed.json().catch(() => ({}))) as {
+        hash?: `0x${string}`;
+        error?: string;
+      };
+      if (!relayed.ok || !payload.hash) {
+        throw new Error(payload.error || "Social relay failed");
+      }
       setPendingKind("like");
-      setPendingHash(hash);
+      setPendingHash(payload.hash);
       toast("Confirming on Mezo…");
     } catch (e) {
       setLikePressed(false);
@@ -399,10 +502,18 @@ export function PostCard({ post }: PostCardProps) {
     ensureMezo,
     hasTipped,
     likePressed,
+    isOwnPost,
     hubConfigured,
+    socialConfigured,
     post.tipRecipient,
+    post.id,
+    socialNonceRead.data,
+    likeTipAmountRead.data,
+    allowanceRead.data,
+    allowanceRead.refetch,
+    address,
+    signTypedDataAsync,
     tipSnapLabel,
-    tipSnapWei,
     toast,
     writeContractAsync,
   ]);
@@ -467,7 +578,7 @@ export function PostCard({ post }: PostCardProps) {
       <div className="flex items-center gap-3 px-4 pb-3 pt-4">
         <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-indigo-400/35 ring-offset-1 ring-offset-[rgba(8,12,22,0.65)]">
           <Image
-            src={picsumAvatar(post.avatarSeed, 128)}
+            src={post.avatarUrl ?? picsumAvatar(post.avatarSeed, 128)}
             alt=""
             width={44}
             height={44}
@@ -499,16 +610,22 @@ export function PostCard({ post }: PostCardProps) {
         role="presentation"
         title={showLockOverlay ? undefined : "Double-tap or double-click to like"}
       >
-        <Image
-          src={src}
-          alt=""
-          fill
-          className={`object-cover transition-[filter,transform] duration-500 ease-out ${
-            showLockOverlay ? "scale-[1.04] blur-2xl" : "blur-0"
-          }`}
-          sizes="(max-width: 430px) 100vw, 382px"
-          priority={post.id === "1"}
-        />
+        {src ? (
+          <Image
+            src={src}
+            alt=""
+            fill
+            className={`object-cover transition-[filter,transform] duration-500 ease-out ${
+              showLockOverlay ? "scale-[1.04] blur-2xl" : "blur-0"
+            }`}
+            sizes="(max-width: 430px) 100vw, 382px"
+            priority={post.id === "1"}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-xs text-zinc-500">
+            Media unavailable
+          </div>
+        )}
         {showLockOverlay ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/70 via-black/38 to-black/22 px-6 text-center">
             <Lock className="h-9 w-9 text-white/90" strokeWidth={1.5} aria-hidden />
@@ -551,7 +668,13 @@ export function PostCard({ post }: PostCardProps) {
               aria-label={
                 hasTipped ? "Already tipped" : "Like — tip 0.01 MUSD worth of SNAP"
               }
-              disabled={isBusy || hasTipped || likePressed || tipSnapWei === undefined}
+              disabled={
+                isBusy ||
+                hasTipped ||
+                likePressed ||
+                tipSnapWei === undefined ||
+                isOwnPost
+              }
               onClick={() => void handleLikeTip()}
             >
               <Heart
@@ -665,7 +788,7 @@ export function PostCard({ post }: PostCardProps) {
                           strokeWidth={1.5}
                         />
                       </div>
-                    ) : (
+                    ) : src ? (
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10">
                         <Image
                           src={src}
@@ -675,6 +798,10 @@ export function PostCard({ post }: PostCardProps) {
                           className="h-14 w-14 object-cover"
                           sizes="56px"
                         />
+                      </div>
+                    ) : (
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-zinc-900/90 ring-1 ring-white/10 text-[10px] text-zinc-500">
+                        No media
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
