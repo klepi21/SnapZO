@@ -12,9 +12,7 @@ import {
   Heart,
   MessageCircle,
   MoreHorizontal,
-  Smile,
   Sparkles,
-  Sprout,
   TrendingUp,
   Unlock,
 } from "lucide-react";
@@ -77,29 +75,16 @@ export function SplashScreen() {
 
       <div className="relative z-10 flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
         <header className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#11182a]">
-              <Image
-                src="/snap-token-logo.png"
-                alt=""
-                width={SNAP_LOGO_WIDTH}
-                height={SNAP_LOGO_HEIGHT}
-                priority
-                className="h-full w-full object-contain p-1"
-                sizes="44px"
-              />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-lg font-bold tracking-tight text-white">
-                <span className="text-[#f4f5ff]">Snap</span>
-                <span className="bg-gradient-to-r from-[#ff2d90] to-[#a855f7] bg-clip-text text-transparent">
-                  Zo
-                </span>
-              </p>
-              <p className="truncate text-[11px] tracking-[0.22em] text-zinc-500">
-                SHARE. EARN. GROW.
-              </p>
-            </div>
+          <div className="min-w-0">
+            <Image
+              src="/snapfull.png"
+              alt={`${APP_NAME} logo`}
+              width={280}
+              height={58}
+              priority
+              className="h-auto w-[170px] max-w-full object-contain"
+              sizes="170px"
+            />
           </div>
           <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-fuchsia-300/25 bg-fuchsia-500/[0.12] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-fuchsia-100">
             <Sparkles className="h-3 w-3" />
@@ -108,28 +93,6 @@ export function SplashScreen() {
         </header>
 
         <div className="mt-4 text-center">
-          <div className="mx-auto mb-2.5 flex w-fit items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.05] px-2.5 py-2">
-            <div className="relative h-9 w-9 overflow-hidden rounded-lg border border-white/12 bg-white/[0.06]">
-              <Image
-                src="/snap-token-logo.png"
-                alt={`${APP_NAME} icon`}
-                fill
-                className="object-contain p-1"
-                sizes="36px"
-              />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-bold leading-none text-white">
-                <span className="text-[#f4f5ff]">Snap</span>
-                <span className="bg-gradient-to-r from-[#ff2d90] to-[#a855f7] bg-clip-text text-transparent">
-                  Zo
-                </span>
-              </p>
-              <p className="mt-1 text-[9px] font-semibold tracking-[0.2em] text-fuchsia-200/85">
-                WEB3 SOCIAL
-              </p>
-            </div>
-          </div>
           <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-zinc-400">
             <Camera className="h-3.5 w-3.5 text-zinc-300" />
             Photo-first · like Instagram
@@ -152,10 +115,7 @@ export function SplashScreen() {
           <p className="mt-2 text-center text-[10px] text-zinc-600">Demo photos · not your uploads</p>
         </div>
 
-        <section
-          className="mt-3 grid grid-cols-1 gap-2"
-          aria-label="Mission and personality"
-        >
+        <section className="mt-3 grid grid-cols-1 gap-2" aria-label="Mission">
           <div className="rounded-[16px] border border-white/[0.1] bg-[#111933]/80 px-3 py-2.5 shadow-[0_12px_24px_rgba(0,0,0,0.3)]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200/80">
               Our mission
@@ -163,29 +123,6 @@ export function SplashScreen() {
             <p className="mt-1 text-xs leading-relaxed text-zinc-200">
               Empower creators, reward communities, and grow wealth together.
             </p>
-          </div>
-          <div className="rounded-[16px] border border-white/[0.1] bg-[#111933]/80 px-3 py-2.5 shadow-[0_12px_24px_rgba(0,0,0,0.3)]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200/80">
-              How you feel
-            </p>
-            <div className="mt-1.5 grid grid-cols-4 gap-1.5 text-[10px] text-zinc-300">
-              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
-                <Smile className="h-3.5 w-3.5 text-pink-300" />
-                Excited
-              </span>
-              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-sky-300" />
-                Confident
-              </span>
-              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
-                <BadgeDollarSign className="h-3.5 w-3.5 text-violet-300" />
-                Rewarded
-              </span>
-              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
-                <Sprout className="h-3.5 w-3.5 text-emerald-300" />
-                Growing
-              </span>
-            </div>
           </div>
         </section>
 
