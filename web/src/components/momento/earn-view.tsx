@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { useChainId } from "wagmi";
 
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
@@ -10,9 +11,20 @@ import { SnapZoHubEarnPanel } from "@/components/momento/snapzo-hub-earn-panel";
 import { SnapZoRewardsClaimPanel } from "@/components/momento/snapzo-rewards-claim-panel";
 import { HelpPopover } from "@/components/ui/help-popover";
 import { isSnapZoHubConfigured } from "@/lib/constants/snapzo-hub";
+import { mezoTestnet } from "@/lib/chains/mezo-testnet";
+import { useMezoBalancesReadout } from "@/hooks/use-mezo-balances-readout";
 
 export function EarnView() {
   const hubUi = isSnapZoHubConfigured();
+  const chainId = useChainId();
+  const { isConnected, snapBalance } = useMezoBalancesReadout();
+  const showDetailedSections =
+    isConnected &&
+    chainId === mezoTestnet.id &&
+    !snapBalance.isPending &&
+    !snapBalance.error &&
+    snapBalance.data !== undefined &&
+    snapBalance.data > BigInt(0);
   return (
     <main className="mx-auto max-w-lg pb-32 pt-5 sm:max-w-xl">
       <div className="mb-6 px-4">
@@ -76,14 +88,18 @@ export function EarnView() {
             <span className="font-mono text-zinc-500">NEXT_PUBLIC_SNAPZO_HUB_UI</span>).
           </div>
         )}
-        <div className="space-y-2">
-          <p className="px-1 text-[11px] font-medium text-zinc-400">Creators claim indexed rewards in one tap.</p>
-          <SnapZoRewardsClaimPanel />
-        </div>
-        <div className="space-y-2">
-          <p className="px-1 text-[11px] font-medium text-zinc-400">Live hub stats pulled from on-chain reads.</p>
-          <EarnVaultStats />
-        </div>
+        {showDetailedSections ? (
+          <div className="space-y-2">
+            <p className="px-1 text-[11px] font-medium text-zinc-400">Creators claim indexed rewards in one tap.</p>
+            <SnapZoRewardsClaimPanel />
+          </div>
+        ) : null}
+        {showDetailedSections ? (
+          <div className="space-y-2">
+            <p className="px-1 text-[11px] font-medium text-zinc-400">Live hub stats pulled from on-chain reads.</p>
+            <EarnVaultStats />
+          </div>
+        ) : null}
       </div>
     </main>
   );

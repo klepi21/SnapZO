@@ -2,14 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell } from "lucide-react";
 import { APP_NAME } from "@/lib/brand";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { WalletHeaderMenu } from "@/components/wallet/wallet-header-menu";
 import { useMezoBalancesReadout } from "@/hooks/use-mezo-balances-readout";
-
-const iconGhost =
-  "snapzo-pressable flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.06] p-0 text-zinc-300 hover:border-fuchsia-300/35 hover:bg-fuchsia-400/10 hover:text-white active:scale-95";
 
 export function AppHeader() {
   const { isConnected, native, snapBalance, snapFormatted } = useMezoBalancesReadout();
@@ -58,9 +54,6 @@ export function AppHeader() {
               </span>
             </div>
           )}
-          <button type="button" className={iconGhost} aria-label="Notifications">
-            <Bell className="h-[20px] w-[20px]" strokeWidth={1.5} />
-          </button>
           <WalletHeaderMenu />
         </div>
       </div>
