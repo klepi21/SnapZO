@@ -70,9 +70,9 @@ export function OnboardingFlow() {
   }, [router]);
 
   return (
-    <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col bg-black">
+    <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col bg-[#070914]">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_18%,rgba(59,130,246,0.38),transparent_58%),linear-gradient(180deg,#0a1628_0%,#05070d_45%,#020203_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_18%,rgba(255,45,144,0.3),transparent_58%),radial-gradient(ellipse_70%_50%_at_80%_4%,rgba(124,58,237,0.22),transparent_54%),linear-gradient(180deg,#171229_0%,#0b1020_45%,#06080f_100%)]"
         aria-hidden
       />
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:24px_24px]" />
@@ -82,7 +82,7 @@ export function OnboardingFlow() {
           <button
             type="button"
             onClick={() => setIndex((i) => Math.max(0, i - 1))}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white backdrop-blur-md transition hover:bg-white/10"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white backdrop-blur-md transition hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10"
             aria-label="Previous"
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={2} />
@@ -90,7 +90,7 @@ export function OnboardingFlow() {
         ) : (
           <Link
             href="/"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/30 text-white backdrop-blur-md transition hover:bg-white/10"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white backdrop-blur-md transition hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10"
             aria-label="Back to welcome"
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={2} />
@@ -99,37 +99,49 @@ export function OnboardingFlow() {
         <button
           type="button"
           onClick={finish}
-          className="text-sm font-medium text-zinc-400 transition hover:text-white"
+          className="rounded-full border border-white/12 bg-white/[0.05] px-3 py-1 text-sm font-medium text-zinc-300 transition hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10 hover:text-white"
         >
           Skip
         </button>
       </header>
 
       <div className="relative z-10 flex flex-1 flex-col px-6 pb-10 pt-2">
+        <div className="mx-auto mb-1">
+          <img
+            src="/snapfull.png"
+            alt={`${APP_NAME} logo`}
+            className="h-auto w-[190px] max-w-full object-contain"
+          />
+        </div>
         <div className="flex justify-center gap-2 py-4" aria-hidden>
           {steps.map((_, i) => (
             <span
               key={steps[i].key}
               className={`h-1.5 rounded-full transition-all ${
                 i === index
-                  ? "w-8 bg-gradient-to-r from-blue-400 to-indigo-500"
+                  ? "w-8 bg-gradient-to-r from-fuchsia-400 to-violet-500"
                   : "w-1.5 bg-white/20"
               }`}
             />
           ))}
         </div>
 
-        <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-500/25 to-violet-600/20 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
-          <Icon className="h-11 w-11 text-indigo-200/95" strokeWidth={1.35} />
+        <div className="mx-auto mb-7 flex h-24 w-24 items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-br from-fuchsia-500/22 to-violet-600/22 shadow-[0_0_34px_rgba(217,70,239,0.24)]">
+          <Icon className="h-11 w-11 text-fuchsia-100/95" strokeWidth={1.35} />
         </div>
 
-        <h1 className="text-center text-2xl font-bold leading-tight tracking-tight text-white sm:text-[1.65rem]">
+        <h1 className="text-center text-[1.95rem] font-semibold leading-tight tracking-[-0.02em] text-white sm:text-[2.05rem]">
           {step.title}
         </h1>
 
-        <div className="mt-6 flex flex-1 flex-col gap-4 text-pretty text-center text-sm leading-relaxed text-zinc-400 sm:text-base">
+        <div className="mt-6 flex flex-1 flex-col gap-3 text-pretty text-center text-sm leading-relaxed text-zinc-300 sm:text-base">
           {step.body.map((para, pi) => (
-            <p key={pi}>{para}</p>
+            <p
+              key={pi}
+              className="rounded-2xl border border-white/[0.08] bg-[#111933]/72 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+            >
+              {para}
+            </p>
           ))}
         </div>
 
@@ -138,7 +150,7 @@ export function OnboardingFlow() {
             <button
               type="button"
               onClick={finish}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#3b82f6] via-[#2563eb] to-[#1d4ed8] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(37,99,235,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff2d90] via-[#e140b8] to-[#7c3aed] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(217,70,239,0.35)] transition hover:brightness-110 active:scale-[0.98]"
             >
               Enter {APP_NAME}
             </button>
@@ -146,7 +158,7 @@ export function OnboardingFlow() {
             <button
               type="button"
               onClick={() => setIndex((i) => i + 1)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#3b82f6] via-[#2563eb] to-[#1d4ed8] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(37,99,235,0.45)] transition hover:brightness-110 active:scale-[0.98]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff2d90] via-[#e140b8] to-[#7c3aed] py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(217,70,239,0.35)] transition hover:brightness-110 active:scale-[0.98]"
             >
               Next
               <ArrowRight className="h-5 w-5" strokeWidth={2} />
