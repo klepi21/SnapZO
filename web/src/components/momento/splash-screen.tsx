@@ -140,6 +140,27 @@ export function SplashScreen() {
           </div>
         </section>
 
+        <section
+          className="mt-2 overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0a0f1a]/80 p-2 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          aria-label="Featured post preview"
+        >
+          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-xl ring-1 ring-white/[0.06]">
+            <Image
+              src="https://picsum.photos/seed/snapzo-featured/900/420"
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 430px) 100vw, 420px"
+              priority
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
+            <div className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+              <Heart className="h-3 w-3 text-red-400" fill="currentColor" />
+              Featured creator post
+            </div>
+          </div>
+        </section>
+
         <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] text-zinc-400">
           <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
             <Heart className="h-3.5 w-3.5 text-red-400" />
