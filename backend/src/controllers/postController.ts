@@ -165,7 +165,10 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
 
   const items = posts.map((p) => {
     const idStr = String(p._id);
-    const unlockedByMe = !p.isLocked || unlockedSet.has(idStr);
+    const isCreatorViewer = Boolean(
+      viewer && p.creatorWallet.toLowerCase() === viewer.toLowerCase()
+    );
+    const unlockedByMe = !p.isLocked || isCreatorViewer || unlockedSet.has(idStr);
     const creator = creatorMap.get(p.creatorWallet.toLowerCase());
     return {
       id: idStr,
