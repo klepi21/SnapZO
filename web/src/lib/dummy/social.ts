@@ -21,6 +21,7 @@ export interface FeedPost {
   imageHeight: number;
   likes: number;
   comments: number;
+  unlockCount?: number;
   likedBySeeds: number[];
   caption: string;
   /** When true, media stays blurred until user confirms an on-chain unlock tx. */

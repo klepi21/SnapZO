@@ -35,7 +35,7 @@ import {
 import type { FeedPost } from "@/lib/dummy/social";
 import { picsumAvatar } from "@/lib/dummy/social";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
-import { erc20TransferAbi, MUSD_DECIMALS } from "@/lib/constants/musd";
+import { MUSD_DECIMALS } from "@/lib/constants/musd";
 import {
   erc20TotalSupplyAbi,
   isSnapZoHubConfigured,
@@ -74,6 +74,16 @@ const SNAPZO_SOCIAL_TIP_TYPES = {
     { name: "tipper", type: "address" },
     { name: "postId", type: "uint256" },
     { name: "creator", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+const SNAPZO_SOCIAL_UNLOCK_TYPES = {
+  Unlock: [
+    { name: "unlocker", type: "address" },
+    { name: "postId", type: "uint256" },
+    { name: "creator", type: "address" },
+    { name: "amount", type: "uint256" },
     { name: "nonce", type: "uint256" },
     { name: "deadline", type: "uint256" },
   ],
@@ -329,10 +339,10 @@ export function PostCard({ post }: PostCardProps) {
       query: { enabled: Boolean(pendingHash) },
     });
 
-  const mediaUnlocked = !isLockedPost || Boolean(post.unlockedByMe) || optimisticUnlocked;
   const isOwnPost = Boolean(
     address && post.tipRecipient.toLowerCase() === address.toLowerCase()
   );
+  const mediaUnlocked = !isLockedPost || isOwnPost || Boolean(post.unlockedByMe) || optimisticUnlocked;
   const hasTipped = dbHasTipped;
   const comments = dbReplies;
   const pendingDbReplies = useMemo(
@@ -640,12 +650,21 @@ export function PostCard({ post }: PostCardProps) {
     if (!ensureMezo()) {
       return;
     }
-    if (!hubConfigured) {
-      toast("SnapZo hub is not configured.", "error");
+    if (!socialConfigured) {
+      toast("SnapZo social contract is not configured.", "error");
       return;
     }
+    const nonce = socialNonceRead.data;
     if (unlockSnapWei === undefined) {
       toast("Pricing unavailable right now. Retry in a moment.", "error");
+      return;
+    }
+    if (nonce === undefined) {
+      toast("Unlock nonce unavailable. Retry in a moment.", "error");
+      return;
+    }
+    if (socialSnapTokenAddress === undefined) {
+      toast("Social token address unavailable. Retry in a moment.", "error");
       return;
     }
     if (socialTokenBalance <= ZERO || socialTokenBalance < unlockSnapWei) {
@@ -653,16 +672,61 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     try {
-      toast(`Confirm unlock · ${unlockSnapLabel} SNAP…`);
-      const hash = await writeContractAsync({
-        address: SNAPZO_SNAP_TOKEN_ADDRESS,
-        abi: erc20TransferAbi,
-        functionName: "transfer",
-        args: [post.tipRecipient, unlockSnapWei],
-        chainId: mezoTestnet.id,
+      if (allowanceValue < unlockSnapWei) {
+        toast("Approve SNAP for SnapZoSocial…");
+        await writeContractAsync({
+          address: socialSnapTokenAddress,
+          abi: erc20ApproveAbi,
+          functionName: "approve",
+          args: [SNAPZO_SOCIAL_ADDRESS, maxUint256],
+          chainId: mezoTestnet.id,
+        });
+        await refetchAllowance();
+      }
+
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
+      toast(`Sign unlock · ${unlockSnapLabel} SNAP…`);
+      const signature = await signTypedDataAsync({
+        domain: {
+          name: "SnapZoSocial",
+          version: "1",
+          chainId: mezoTestnet.id,
+          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+        },
+        types: SNAPZO_SOCIAL_UNLOCK_TYPES,
+        primaryType: "Unlock",
+        message: {
+          unlocker: address as `0x${string}`,
+          postId: socialPostId,
+          creator: post.tipRecipient,
+          amount: unlockSnapWei,
+          nonce,
+          deadline,
+        },
       });
+      toast("Submitting unlock through social relayer…");
+      const relayed = await fetch("/api/snapzo/social/relay-unlock", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          unlocker: address,
+          postId: String(socialPostId),
+          creator: post.tipRecipient,
+          amount: String(unlockSnapWei),
+          nonce: String(nonce),
+          deadline: String(deadline),
+          signature,
+        }),
+      });
+      const payload = (await relayed.json().catch(() => ({}))) as {
+        hash?: `0x${string}`;
+        error?: string;
+      };
+      if (!relayed.ok || !payload.hash) {
+        throw new Error(payload.error || "Unlock relay failed");
+      }
       setPendingKind("unlock");
-      setPendingHash(hash);
+      setPendingHash(payload.hash);
       toast("Confirming on Mezo…");
     } catch (e) {
       toast(formatTxError(e), "error");
@@ -1050,6 +1114,12 @@ export function PostCard({ post }: PostCardProps) {
             </button>
           </div>
         ) : null}
+        {isLockedPost && isOwnPost ? (
+          <div className="pointer-events-none absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-amber-300/35 bg-black/55 px-2 py-1 text-[10px] font-semibold text-amber-100 backdrop-blur-sm">
+            <Lock className="h-3 w-3" strokeWidth={1.8} />
+            Locked for others
+          </div>
+        ) : null}
       </div>
 
       <div className="px-4 pb-5 pt-4">
@@ -1090,33 +1160,35 @@ export function PostCard({ post }: PostCardProps) {
                 {commentCount}
               </span>
             </button>
+            <div className="inline-flex items-center gap-1 text-xs text-zinc-400">
+              <Lock className="h-3.5 w-3.5 text-zinc-500" strokeWidth={1.7} />
+              <span className="tabular-nums">{post.unlockCount ?? 0}</span>
+            </div>
           </div>
-          <div className="min-w-0 flex-1 pt-0.5 text-right text-[10px] font-normal tracking-wide text-zinc-500">
-            <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5">
-              <span className="inline-flex items-center gap-0.5">
+          <div className="min-w-0 flex-1 overflow-hidden pt-0.5">
+            <div className="flex flex-wrap justify-end gap-1">
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] leading-none">
                 <span className="text-zinc-400">Like</span>
                 <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
                   {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "0.01"}
                   <SnapInlineIcon decorative />
                 </span>
               </span>
-              <span className="text-zinc-600">·</span>
-              <span className="inline-flex items-center gap-0.5">
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] leading-none">
                 <span className="text-zinc-400">Reply</span>
                 <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-                  {replyStakeLabel} <SnapInlineIcon decorative />
+                  {replyStakeLabel}
+                  <SnapInlineIcon decorative />
                 </span>
               </span>
               {isLockedPost ? (
-                <>
-                  <span className="text-zinc-600">·</span>
-                  <span className="inline-flex items-center gap-0.5">
-                    <span className="text-zinc-400">Unlock</span>
-                    <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-                      {unlockSnapLabel} <SnapInlineIcon decorative />
-                    </span>
+                <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] leading-none">
+                  <span className="text-zinc-400">Unlock</span>
+                  <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+                    {unlockSnapLabel}
+                    <SnapInlineIcon decorative />
                   </span>
-                </>
+                </span>
               ) : null}
             </div>
           </div>

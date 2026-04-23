@@ -129,7 +129,8 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
     ]);
   }
 
-  const [tipCounts, replyCounts, socialReplyCounts] = await Promise.all([
+  const [tipCounts, replyCounts, socialReplyCounts, unlockCounts, socialUnlockCounts] =
+    await Promise.all([
     Tip.aggregate<{ _id: Types.ObjectId; count: number }>([
       { $match: { post: { $in: postIds } } },
       { $group: { _id: '$post', count: { $sum: 1 } } },
@@ -142,6 +143,14 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       { $match: { post: { $in: postIds } } },
       { $group: { _id: '$post', count: { $sum: 1 } } },
     ]),
+    Unlock.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
+    SocialUnlock.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { post: { $in: postIds } } },
+      { $group: { _id: '$post', count: { $sum: 1 } } },
+    ]),
   ]);
   const creators = await User.find({ walletAddress: { $in: creatorWallets } })
     .select('walletAddress displayName username profileImage')
@@ -150,6 +159,8 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
   const tipMap = new Map(tipCounts.map((t) => [String(t._id), t.count]));
   const replyMap = new Map(replyCounts.map((r) => [String(r._id), r.count]));
   const socialReplyMap = new Map(socialReplyCounts.map((r) => [String(r._id), r.count]));
+  const unlockMap = new Map(unlockCounts.map((u) => [String(u._id), u.count]));
+  const socialUnlockMap = new Map(socialUnlockCounts.map((u) => [String(u._id), u.count]));
   const creatorMap = new Map(creators.map((u) => [u.walletAddress.toLowerCase(), u]));
 
   const items = posts.map((p) => {
@@ -174,6 +185,7 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       tipCount: tipMap.get(idStr) ?? 0,
       replyCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
       commentCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
+      unlockCount: (unlockMap.get(idStr) ?? 0) + (socialUnlockMap.get(idStr) ?? 0),
     };
   });
 

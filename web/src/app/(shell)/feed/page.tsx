@@ -63,6 +63,7 @@ function mapFeedItemToPost(item: FeedItem): FeedPost {
     imageHeight: 1000,
     likes: item.tipCount ?? 0,
     comments: item.commentCount ?? 0,
+    unlockCount: item.unlockCount ?? 0,
     likedBySeeds: [13, 27, 39],
     caption: item.content?.trim() || "Untitled post",
     contentLocked: item.isLocked,

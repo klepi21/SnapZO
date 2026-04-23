@@ -94,6 +94,7 @@ export interface FeedItem {
   tipCount?: number;
   replyCount?: number;
   commentCount?: number;
+  unlockCount?: number;
   latestInteractionAt?: string;
   creatorDisplayName?: string | null;
   creatorUsername?: string | null;

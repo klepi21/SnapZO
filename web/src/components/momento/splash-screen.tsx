@@ -20,12 +20,6 @@ const STORIES: { seed: string; label: string }[] = [
   { seed: "snapzo-s5", label: "food" },
 ];
 
-const HERO_POST = { seed: "snapzo-g1", w: 720, h: 1280 };
-const THUMB_POSTS = [
-  { seed: "snapzo-g2", w: 640, h: 640 },
-  { seed: "snapzo-g3", w: 640, h: 640 },
-] as const;
-
 function StoryRing({ seed, label }: { seed: string; label: string }) {
   return (
     <div className="flex w-[3.25rem] shrink-0 flex-col items-center gap-1">
@@ -133,58 +127,16 @@ export function SplashScreen() {
         </div>
 
         <section
-          className="mt-3 overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0a0f1a]/90 shadow-[0_24px_48px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.06)]"
-          aria-label="Preview of the photo social feed"
+          className="mt-3 overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0a0f1a]/80 px-3 py-2.5 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          aria-label="Stories preview"
         >
-          <div className="border-b border-white/[0.06] px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-              Stories
-            </p>
-            <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {STORIES.map((s) => (
-                <StoryRing key={s.seed} seed={s.seed} label={s.label} />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5 p-2">
-            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl ring-1 ring-white/[0.06]">
-              <Image
-                src={`https://picsum.photos/seed/${HERO_POST.seed}/${HERO_POST.w}/${HERO_POST.h}`}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="(max-width: 430px) 100vw, 400px"
-                priority
-              />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
-              <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
-                  <Heart className="h-3 w-3 text-red-400" fill="currentColor" />
-                  128
-                </span>
-                <span className="rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
-                  Locked
-                </span>
-              </div>
-            </div>
-            <div className="hidden grid-cols-2 gap-1.5 min-[390px]:grid">
-              {THUMB_POSTS.map((g) => (
-                <div
-                  key={g.seed}
-                  className="relative aspect-square overflow-hidden rounded-2xl ring-1 ring-white/[0.06]"
-                >
-                  <Image
-                    src={`https://picsum.photos/seed/${g.seed}/${g.w}/${g.h}`}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 430px) 45vw, 200px"
-                  />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                </div>
-              ))}
-            </div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            Stories
+          </p>
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {STORIES.map((s) => (
+              <StoryRing key={s.seed} seed={s.seed} label={s.label} />
+            ))}
           </div>
         </section>
 
@@ -203,7 +155,7 @@ export function SplashScreen() {
           </span>
         </div>
 
-        <div className="mt-auto pt-3">
+        <div className="mt-auto pt-2">
           <Link
             href={startedHref}
             className="snapzo-pressable inline-flex w-full items-center justify-center rounded-2xl border border-sky-200/35 bg-gradient-to-r from-[#38bdf8] via-[#2563eb] to-[#1d4ed8] py-3.5 text-base font-semibold text-white shadow-[0_14px_42px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.985]"
