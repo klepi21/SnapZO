@@ -205,6 +205,7 @@ export function SnapZoHubEarnPanel() {
   const [hubMode, setHubMode] = useState<HubMode>("deposit");
   const [hubDepositIn, setHubDepositIn] = useState("");
   const [hubWithdrawIn, setHubWithdrawIn] = useState("");
+  const [starterExpanded, setStarterExpanded] = useState(false);
 
   const wrongChain = isConnected && chainId !== mezoTestnet.id;
   const canAct = isConnected && !wrongChain && !busy && !isWritePending && !isSignPending;
@@ -786,10 +787,11 @@ export function SnapZoHubEarnPanel() {
   const amountIn = hubMode === "deposit" ? hubDepositIn : hubWithdrawIn;
   const setAmountIn = hubMode === "deposit" ? setHubDepositIn : setHubWithdrawIn;
   const showStarterLayout =
-    !isConnected ||
-    (!wrongChain &&
-      snapBal.data !== undefined &&
-      snapBal.data <= ZERO);
+    !starterExpanded &&
+    (!isConnected ||
+      (!wrongChain &&
+        snapBal.data !== undefined &&
+        snapBal.data <= ZERO));
   const onMax = () => {
     if (hubMode === "deposit") {
       if (musdBal.data !== undefined) {
@@ -881,6 +883,16 @@ export function SnapZoHubEarnPanel() {
                 openConnectModal?.();
                 return;
               }
+              if (wrongChain) {
+                switchChain?.({ chainId: mezoTestnet.id });
+                return;
+              }
+              const hasMusd = musdBal.data !== undefined && musdBal.data > ZERO;
+              if (!hasMusd) {
+                toast("Add some MUSD first to start earning.", "error");
+                return;
+              }
+              setStarterExpanded(true);
               setHubMode("deposit");
             }}
             className="snapzo-pressable mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#ff2d90] to-[#f93f7d] px-4 text-sm font-semibold text-white hover:brightness-110"

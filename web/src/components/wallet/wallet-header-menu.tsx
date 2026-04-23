@@ -6,6 +6,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   ArrowLeftRight,
   Bitcoin,
+  Copy,
   ChevronDown,
   LogOut,
   PiggyBank,
@@ -30,6 +31,7 @@ function shortenAddress(address: string) {
 
 export function WalletHeaderMenu() {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const { disconnect, isPending: isDisconnecting } = useDisconnect();
   const chainId = useChainId();
@@ -61,6 +63,16 @@ export function WalletHeaderMenu() {
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [open, close]);
+
+  const copyAddress = useCallback(async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -136,6 +148,15 @@ export function WalletHeaderMenu() {
                   >
                     {account.address}
                   </p>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void copyAddress(account.address)}
+                    className="snapzo-pressable mt-2 inline-flex snapzo-hit-44 items-center gap-1.5 rounded-lg border border-white/[0.12] bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-semibold text-zinc-200 hover:bg-white/[0.08]"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? "Copied" : "Copy address"}
+                  </button>
                 </div>
 
                 {unsupported ? (
