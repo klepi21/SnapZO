@@ -185,7 +185,7 @@ export async function getUser(req: Request, res: Response): Promise<void> {
     .lean();
 
   const postIds = posts.map((p) => p._id);
-  const [unlockRows, socialUnlockRows, likeRows, replyRows, socialReplyRows, unlockAmountRows, socialUnlockAmountRows] =
+  const [unlockRows, socialUnlockRows, likeRows, replyRows, socialReplyRows, socialUnlockAmountRows] =
     postIds.length > 0
       ? await Promise.all([
           Unlock.aggregate<{ _id: unknown; count: number }>([
@@ -208,16 +208,12 @@ export async function getUser(req: Request, res: Response): Promise<void> {
             { $match: { post: { $in: postIds } } },
             { $group: { _id: '$post', count: { $sum: 1 } } },
           ]),
-          Unlock.aggregate<{ _id: unknown; total: number }>([
-            { $match: { post: { $in: postIds } } },
-            { $group: { _id: '$post', total: { $sum: '$amount' } } },
-          ]),
           SocialUnlock.find(
             { post: { $in: postIds } },
             { post: 1, amountWei: 1, _id: 0 },
           ).lean(),
         ])
-      : [[], [], [], [], [], [], []];
+      : [[], [], [], [], [], []];
   const unlockCountMap = new Map<string, number>();
   const likeCountMap = new Map<string, number>();
   const replyCountMap = new Map<string, number>();
@@ -229,9 +225,9 @@ export async function getUser(req: Request, res: Response): Promise<void> {
     const k = String(row._id);
     unlockCountMap.set(k, (unlockCountMap.get(k) ?? 0) + row.count);
   }
-  for (const row of unlockAmountRows) {
-    unlockEarningsMap.set(String(row._id), row.total);
-  }
+  // NOTE: Earnings are SNAP-denominated and should come from canonical on-chain social unlocks.
+  // Legacy Unlock.amount rows were recorded in pre-social flows with mixed quote units, so we
+  // intentionally exclude them from SNAP earnings to avoid inflated/incorrect totals.
   for (const row of socialUnlockAmountRows) {
     const k = String(row.post);
     const snapAmount = row.amountWei
