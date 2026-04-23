@@ -2,14 +2,7 @@
 
 import Image from "next/image";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import {
-  Ellipsis,
-  Heart,
-  Lock,
-  MessageCircle,
-  UserRound,
-  X,
-} from "lucide-react";
+import { Heart, Lock, MessageCircle, UserRound, X } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -1020,13 +1013,6 @@ export function PostCard({ post }: PostCardProps) {
           </p>
           <p className="text-xs text-zinc-500">{post.timeAgo}</p>
         </div>
-        <button
-          type="button"
-          className="snapzo-pressable flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.1] bg-black/20 text-zinc-500 hover:border-white/18 hover:bg-white/[0.06] hover:text-white active:scale-[0.96]"
-          aria-label="Post menu"
-        >
-          <Ellipsis className="h-[18px] w-[18px]" strokeWidth={1.5} />
-        </button>
       </div>
 
       <div
