@@ -11,6 +11,9 @@ import {
   SNAPZO_SNAP_TOKEN_ADDRESS,
 } from "@/lib/constants/snapzo-hub";
 import { formatTokenAmountDisplay } from "@/lib/format-token-amount";
+import { MEZO_SMUSD_GAUGE_REWARD_TOKEN } from "@/lib/constants/mezo-earn";
+
+const MEZO_DECIMALS = 18;
 
 export function useMezoBalancesReadout() {
   const { address, isConnected } = useAccount();
@@ -63,6 +66,25 @@ export function useMezoBalancesReadout() {
         )
       : null;
 
+  const mezoBalance = useReadContract({
+    chainId: mezoTestnet.id,
+    address: MEZO_SMUSD_GAUGE_REWARD_TOKEN,
+    abi: erc20BalanceAbi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(isConnected && address && onMezoTestnet),
+    },
+  });
+
+  const mezoFormatted =
+    mezoBalance.data !== undefined
+      ? formatTokenAmountDisplay(
+          formatUnits(mezoBalance.data, MEZO_DECIMALS),
+          2,
+        )
+      : null;
+
   const btcFormatted = native.data?.formatted
     ? formatTokenAmountDisplay(native.data.formatted, 8)
     : null;
@@ -74,9 +96,11 @@ export function useMezoBalancesReadout() {
     native,
     musdBalance,
     snapBalance,
+    mezoBalance,
     btcFormatted,
     musdFormatted,
     snapFormatted,
+    mezoFormatted,
   };
 }
 

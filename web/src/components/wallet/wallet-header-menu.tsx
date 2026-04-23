@@ -3,13 +3,22 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ArrowLeftRight, ChevronDown, LogOut, PiggyBank, Shield, Wallet } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Bitcoin,
+  ChevronDown,
+  LogOut,
+  PiggyBank,
+  Shield,
+  Wallet,
+} from "lucide-react";
 import { getAddress } from "viem";
 import { useChainId, useDisconnect } from "wagmi";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { useMezoBalancesReadout } from "@/hooks/use-mezo-balances-readout";
 import { mezoTestnet } from "@/lib/chains/mezo-testnet";
 import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
+import { MezoInlineIcon } from "@/components/icons/mezo-inline-icon";
 import { MUSD_ADDRESS_MEZO_TESTNET } from "@/lib/constants/musd";
 import { isSnapZoHubConfigured } from "@/lib/constants/snapzo-hub";
 
@@ -24,8 +33,16 @@ export function WalletHeaderMenu() {
   const rootRef = useRef<HTMLDivElement>(null);
   const { disconnect, isPending: isDisconnecting } = useDisconnect();
   const chainId = useChainId();
-  const { native, musdBalance, snapBalance, btcFormatted, musdFormatted, snapFormatted } =
-    useMezoBalancesReadout();
+  const {
+    native,
+    musdBalance,
+    snapBalance,
+    mezoBalance,
+    btcFormatted,
+    musdFormatted,
+    snapFormatted,
+    mezoFormatted,
+  } = useMezoBalancesReadout();
 
   const unsupported = chainId !== mezoTestnet.id;
   const hubAdmin = isSnapZoHubConfigured();
@@ -122,7 +139,12 @@ export function WalletHeaderMenu() {
                     <p className="snapzo-micro-label text-[10px] font-semibold uppercase text-zinc-500">Balances</p>
                     <dl className="mt-2 space-y-1.5 text-xs">
                       <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
-                        <dt className="text-zinc-500">BTC (gas)</dt>
+                        <dt className="inline-flex items-center gap-1.5 text-zinc-500">
+                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#f7931a] text-black">
+                            <Bitcoin className="h-2.5 w-2.5" strokeWidth={2.2} />
+                          </span>
+                          BTC (gas)
+                        </dt>
                         <dd className="font-mono text-zinc-100">
                           {native.isPending ? "…" : native.error ? "—" : `${btcFormatted ?? "0"}`}
                         </dd>
@@ -130,7 +152,7 @@ export function WalletHeaderMenu() {
                       <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
                         <dt className="flex items-center gap-1.5 text-zinc-500">
                           <MusdInlineIcon />
-                          <span className="sr-only">MUSD</span>
+                          MUSD
                         </dt>
                         <dd className="font-mono text-zinc-100">
                           {musdBalance.isPending
@@ -143,7 +165,7 @@ export function WalletHeaderMenu() {
                       <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
                         <dt className="flex items-center gap-1 text-zinc-500">
                           <SnapInlineIcon decorative />
-                          <span className="sr-only">SNAP</span>
+                          SNAP
                         </dt>
                         <dd className="font-mono text-zinc-100">
                           {snapBalance.isPending
@@ -151,6 +173,19 @@ export function WalletHeaderMenu() {
                             : snapBalance.error
                               ? "—"
                               : (snapFormatted ?? "0")}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
+                        <dt className="flex items-center gap-1.5 text-zinc-500">
+                          <MezoInlineIcon decorative />
+                          MEZO
+                        </dt>
+                        <dd className="font-mono text-zinc-100">
+                          {mezoBalance.isPending
+                            ? "…"
+                            : mezoBalance.error
+                              ? "—"
+                              : (mezoFormatted ?? "0")}
                         </dd>
                       </div>
                     </dl>
