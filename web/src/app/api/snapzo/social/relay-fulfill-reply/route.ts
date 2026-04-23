@@ -28,6 +28,13 @@ const snapZoSocialFulfillReplyAbi = [
     ],
     outputs: [],
   },
+  {
+    type: "function",
+    name: "nonces",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
 ] as const;
 
 export const runtime = "nodejs";
@@ -116,20 +123,43 @@ export async function POST(req: Request) {
     gas = BigInt(500_000);
   }
 
-  const hash = await client.writeContract({
-    address: SNAPZO_SOCIAL_ADDRESS,
-    abi: snapZoSocialFulfillReplyAbi,
-    functionName: "fulfillReplyWithSig",
-    args: [
-      creator as `0x${string}`,
-      requestId as `0x${string}`,
-      commentIdBi,
-      nonceBi,
-      deadlineBi,
-      signature as `0x${string}`,
-    ],
-    gas,
-  });
-
-  return NextResponse.json({ hash });
+  try {
+    const hash = await client.writeContract({
+      address: SNAPZO_SOCIAL_ADDRESS,
+      abi: snapZoSocialFulfillReplyAbi,
+      functionName: "fulfillReplyWithSig",
+      args: [
+        creator as `0x${string}`,
+        requestId as `0x${string}`,
+        commentIdBi,
+        nonceBi,
+        deadlineBi,
+        signature as `0x${string}`,
+      ],
+      gas,
+    });
+    return NextResponse.json({ hash });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Relay fulfill-reply transaction failed";
+    if (message.includes("0xcf32f3c2") || message.includes("SnapZoSocial__BadNonce")) {
+      const latestNonce = await publicClient
+        .readContract({
+          address: SNAPZO_SOCIAL_ADDRESS,
+          abi: snapZoSocialFulfillReplyAbi,
+          functionName: "nonces",
+          args: [creator as `0x${string}`],
+        })
+        .catch(() => undefined);
+      return NextResponse.json(
+        {
+          error: "Bad nonce. Please sign again with the latest social nonce.",
+          code: "BAD_NONCE",
+          latestNonce: latestNonce !== undefined ? String(latestNonce) : undefined,
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

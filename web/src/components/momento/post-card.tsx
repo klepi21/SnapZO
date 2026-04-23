@@ -107,6 +107,15 @@ const SNAPZO_SOCIAL_FULFILL_REPLY_TYPES = {
     { name: "deadline", type: "uint256" },
   ],
 } as const;
+const SNAPZO_SOCIAL_NONCES_ABI = [
+  {
+    type: "function",
+    name: "nonces",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
 
 interface PendingSocialReply {
   requestId: `0x${string}`;
@@ -211,14 +220,6 @@ export function PostCard({ post }: PostCardProps) {
   const ta = hubNav.data?.[0]?.status === "success" ? hubNav.data[0].result : undefined;
   const ts = hubNav.data?.[1]?.status === "success" ? hubNav.data[1].result : undefined;
 
-  const socialNonceRead = useReadContract({
-    chainId: mezoTestnet.id,
-    address: SNAPZO_SOCIAL_ADDRESS,
-    abi: [{ type: "function", name: "nonces", stateMutability: "view", inputs: [{ name: "user", type: "address" }], outputs: [{ type: "uint256" }] }] as const,
-    functionName: "nonces",
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && socialConfigured), staleTime: 10_000 },
-  });
   const socialSnapTokenRead = useReadContract({
     chainId: mezoTestnet.id,
     address: SNAPZO_SOCIAL_ADDRESS,
@@ -297,6 +298,13 @@ export function PostCard({ post }: PostCardProps) {
   }, [ta, ts]);
 
   const replyStakeAmount = replyStakeAmountRead.data;
+  const likeTipAmount = likeTipAmountRead.data;
+  const likeSnapLabel =
+    likeTipAmount !== undefined
+      ? formatUnitsMax2dp(likeTipAmount, SNAP_DECIMALS)
+      : tipSnapWei !== undefined
+        ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)
+        : "0.01";
   const replyStakeLabel =
     replyStakeAmount !== undefined
       ? formatUnitsMax2dp(replyStakeAmount, SNAP_DECIMALS)
@@ -649,6 +657,52 @@ export function PostCard({ post }: PostCardProps) {
     });
   }, [toast]);
 
+  const readFreshSocialNonce = useCallback(
+    async (user: `0x${string}`): Promise<bigint> => {
+      if (!publicClient) {
+        throw new Error("Social client unavailable. Retry in a moment.");
+      }
+      const chainNonce = await publicClient.readContract({
+        address: SNAPZO_SOCIAL_ADDRESS,
+        abi: SNAPZO_SOCIAL_NONCES_ABI,
+        functionName: "nonces",
+        args: [user],
+      });
+      return chainNonce;
+    },
+    [publicClient],
+  );
+
+  const relayPostJson = useCallback(
+    async (
+      url: string,
+      body: Record<string, string>,
+    ): Promise<{ hash?: `0x${string}`; error?: string; code?: string; latestNonce?: string }> => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        hash?: `0x${string}`;
+        error?: string;
+        code?: string;
+        latestNonce?: string;
+      };
+      if (!res.ok || !payload.hash) {
+        const err = new Error(payload.error || "Social relay failed") as Error & {
+          relayCode?: string;
+          relayLatestNonce?: string;
+        };
+        err.relayCode = payload.code;
+        err.relayLatestNonce = payload.latestNonce;
+        throw err;
+      }
+      return payload;
+    },
+    [],
+  );
+
   const likedUi = hasTipped || likePressed;
   const likeCount = dbTips.length + (likePressed ? 1 : 0);
   const commentCount = comments.length;
@@ -665,13 +719,8 @@ export function PostCard({ post }: PostCardProps) {
       toast("SnapZo social contract is not configured.", "error");
       return;
     }
-    const nonce = socialNonceRead.data;
     if (unlockSnapWei === undefined) {
       toast("Pricing unavailable right now. Retry in a moment.", "error");
-      return;
-    }
-    if (nonce === undefined) {
-      toast("Unlock nonce unavailable. Retry in a moment.", "error");
       return;
     }
     if (socialSnapTokenAddress === undefined) {
@@ -696,44 +745,50 @@ export function PostCard({ post }: PostCardProps) {
       }
 
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
-      toast(`Sign unlock · ${unlockSnapLabel} SNAP…`);
-      const signature = await signTypedDataAsync({
-        domain: {
-          name: "SnapZoSocial",
-          version: "1",
-          chainId: mezoTestnet.id,
-          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
-        },
-        types: SNAPZO_SOCIAL_UNLOCK_TYPES,
-        primaryType: "Unlock",
-        message: {
-          unlocker: address as `0x${string}`,
-          postId: socialPostId,
-          creator: post.tipRecipient,
-          amount: unlockSnapWei,
-          nonce,
-          deadline,
-        },
-      });
-      toast("Submitting unlock through social relayer…");
-      const relayed = await fetch("/api/snapzo/social/relay-unlock", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          unlocker: address,
+      const signAndRelayUnlock = async (nonceValue: bigint) => {
+        toast(`Sign unlock · ${unlockSnapLabel} SNAP…`);
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: "SnapZoSocial",
+            version: "1",
+            chainId: mezoTestnet.id,
+            verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+          },
+          types: SNAPZO_SOCIAL_UNLOCK_TYPES,
+          primaryType: "Unlock",
+          message: {
+            unlocker: address as `0x${string}`,
+            postId: socialPostId,
+            creator: post.tipRecipient,
+            amount: unlockSnapWei,
+            nonce: nonceValue,
+            deadline,
+          },
+        });
+        toast("Submitting unlock through social relayer…");
+        return relayPostJson("/api/snapzo/social/relay-unlock", {
+          unlocker: String(address),
           postId: String(socialPostId),
           creator: post.tipRecipient,
           amount: String(unlockSnapWei),
-          nonce: String(nonce),
+          nonce: String(nonceValue),
           deadline: String(deadline),
           signature,
-        }),
-      });
-      const payload = (await relayed.json().catch(() => ({}))) as {
-        hash?: `0x${string}`;
-        error?: string;
+        });
       };
-      if (!relayed.ok || !payload.hash) {
+
+      const freshNonce = await readFreshSocialNonce(address as `0x${string}`);
+      let payload = await signAndRelayUnlock(freshNonce).catch(async (error) => {
+        const err = error as Error & { relayCode?: string; relayLatestNonce?: string };
+        if (err.relayCode !== "BAD_NONCE") throw err;
+        const retryNonce = err.relayLatestNonce
+          ? BigInt(err.relayLatestNonce)
+          : await readFreshSocialNonce(address as `0x${string}`);
+        toast("Nonce changed on-chain. Please sign once more…");
+        return signAndRelayUnlock(retryNonce);
+      });
+
+      if (!payload.hash) {
         throw new Error(payload.error || "Unlock relay failed");
       }
       setPendingKind("unlock");
@@ -759,11 +814,9 @@ export function PostCard({ post }: PostCardProps) {
       toast("SnapZo social contract is not configured.", "error");
       return;
     }
-    const nonce = socialNonceRead.data;
     const likeTipAmount = likeTipAmountRead.data;
     if (
       !socialConfigured ||
-      nonce === undefined ||
       likeTipAmount === undefined
     ) {
       toast("Social tip config unavailable. Retry in a moment.", "error");
@@ -800,43 +853,48 @@ export function PostCard({ post }: PostCardProps) {
       }
 
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
-      toast(`Sign social tip · ${formatUnits(likeTipAmount, SNAP_DECIMALS)} SNAP…`);
-      const signature = await signTypedDataAsync({
-        domain: {
-          name: "SnapZoSocial",
-          version: "1",
-          chainId: mezoTestnet.id,
-          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
-        },
-        types: SNAPZO_SOCIAL_TIP_TYPES,
-        primaryType: "Tip",
-        message: {
-          tipper: address as `0x${string}`,
-          postId: socialPostId,
-          creator: post.tipRecipient,
-          nonce,
-          deadline,
-        },
-      });
+      const signAndRelayTip = async (nonceValue: bigint) => {
+        toast(`Sign social tip · ${formatUnits(likeTipAmount, SNAP_DECIMALS)} SNAP…`);
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: "SnapZoSocial",
+            version: "1",
+            chainId: mezoTestnet.id,
+            verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+          },
+          types: SNAPZO_SOCIAL_TIP_TYPES,
+          primaryType: "Tip",
+          message: {
+            tipper: address as `0x${string}`,
+            postId: socialPostId,
+            creator: post.tipRecipient,
+            nonce: nonceValue,
+            deadline,
+          },
+        });
 
-      toast("Submitting through social relayer…");
-      const relayed = await fetch("/api/snapzo/social/relay-tip", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          tipper: address,
+        toast("Submitting through social relayer…");
+        return relayPostJson("/api/snapzo/social/relay-tip", {
+          tipper: String(address),
           postId: String(socialPostId),
           creator: post.tipRecipient,
-          nonce: String(nonce),
+          nonce: String(nonceValue),
           deadline: String(deadline),
           signature,
-        }),
-      });
-      const payload = (await relayed.json().catch(() => ({}))) as {
-        hash?: `0x${string}`;
-        error?: string;
+        });
       };
-      if (!relayed.ok || !payload.hash) {
+
+      const freshNonce = await readFreshSocialNonce(address as `0x${string}`);
+      const payload = await signAndRelayTip(freshNonce).catch(async (error) => {
+        const err = error as Error & { relayCode?: string; relayLatestNonce?: string };
+        if (err.relayCode !== "BAD_NONCE") throw err;
+        const retryNonce = err.relayLatestNonce
+          ? BigInt(err.relayLatestNonce)
+          : await readFreshSocialNonce(address as `0x${string}`);
+        toast("Nonce changed on-chain. Please sign once more…");
+        return signAndRelayTip(retryNonce);
+      });
+      if (!payload.hash) {
         throw new Error(payload.error || "Social relay failed");
       }
       setPendingKind("like");
@@ -855,12 +913,13 @@ export function PostCard({ post }: PostCardProps) {
     socialSnapTokenAddress,
     post.tipRecipient,
     post.id,
-    socialNonceRead.data,
     likeTipAmountRead.data,
     socialTokenBalance,
     showGetSnapToast,
     allowanceValue,
     refetchAllowance,
+    readFreshSocialNonce,
+    relayPostJson,
     address,
     signTypedDataAsync,
     toast,
@@ -908,11 +967,6 @@ export function PostCard({ post }: PostCardProps) {
         toast("No pending paid replies to fulfill for this post.", "error");
         return;
       }
-      const nonce = socialNonceRead.data;
-      if (nonce === undefined) {
-        toast("Creator nonce unavailable. Retry in a moment.", "error");
-        return;
-      }
       const selectedRequestId = selected.requestId as `0x${string}`;
       const commentIdDigest = keccak256(
         stringToBytes(`${post.id}:${text}:${Date.now().toString()}`)
@@ -922,42 +976,46 @@ export function PostCard({ post }: PostCardProps) {
       setPendingCommentText(text);
       setPendingRequestId(selectedRequestId);
       setPendingCommentId(commentId);
-      toast("Sign creator reply to unlock escrow…");
-      const signature = await signTypedDataAsync({
-        domain: {
-          name: "SnapZoSocial",
-          version: "1",
-          chainId: mezoTestnet.id,
-          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
-        },
-        types: SNAPZO_SOCIAL_FULFILL_REPLY_TYPES,
-        primaryType: "FulfillReply",
-        message: {
-          creator: address as `0x${string}`,
-          requestId: selectedRequestId,
-          commentId,
-          nonce,
-          deadline,
-        },
-      });
-      toast("Submitting creator fulfill through social relayer…");
-      const relayed = await fetch("/api/snapzo/social/relay-fulfill-reply", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          creator: address,
+      const signAndRelayFulfill = async (nonceValue: bigint) => {
+        toast("Sign creator reply to unlock escrow…");
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: "SnapZoSocial",
+            version: "1",
+            chainId: mezoTestnet.id,
+            verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+          },
+          types: SNAPZO_SOCIAL_FULFILL_REPLY_TYPES,
+          primaryType: "FulfillReply",
+          message: {
+            creator: address as `0x${string}`,
+            requestId: selectedRequestId,
+            commentId,
+            nonce: nonceValue,
+            deadline,
+          },
+        });
+        toast("Submitting creator fulfill through social relayer…");
+        return relayPostJson("/api/snapzo/social/relay-fulfill-reply", {
+          creator: String(address),
           requestId: selectedRequestId,
           commentId: String(commentId),
-          nonce: String(nonce),
+          nonce: String(nonceValue),
           deadline: String(deadline),
           signature,
-        }),
-      });
-      const payload = (await relayed.json().catch(() => ({}))) as {
-        hash?: `0x${string}`;
-        error?: string;
+        });
       };
-      if (!relayed.ok || !payload.hash) {
+      const freshNonce = await readFreshSocialNonce(address as `0x${string}`);
+      const payload = await signAndRelayFulfill(freshNonce).catch(async (error) => {
+        const err = error as Error & { relayCode?: string; relayLatestNonce?: string };
+        if (err.relayCode !== "BAD_NONCE") throw err;
+        const retryNonce = err.relayLatestNonce
+          ? BigInt(err.relayLatestNonce)
+          : await readFreshSocialNonce(address as `0x${string}`);
+        toast("Nonce changed on-chain. Please sign once more…");
+        return signAndRelayFulfill(retryNonce);
+      });
+      if (!payload.hash) {
         throw new Error(payload.error || "Reply fulfill relay failed");
       }
       setPendingKind("replyFulfill");
@@ -966,9 +1024,8 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
 
-    const nonce = socialNonceRead.data;
     const stake = replyStakeAmountRead.data;
-    if (nonce === undefined || stake === undefined || stake <= BigInt(0)) {
+    if (stake === undefined || stake <= BigInt(0)) {
       toast("Reply stake config unavailable. Retry in a moment.", "error");
       return;
     }
@@ -990,6 +1047,7 @@ export function PostCard({ post }: PostCardProps) {
       }
 
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
+      const freshNonce = await readFreshSocialNonce(address as `0x${string}`);
       const requestId = keccak256(
         encodeAbiParameters(
           [
@@ -1006,7 +1064,7 @@ export function PostCard({ post }: PostCardProps) {
             socialPostId,
             post.tipRecipient as `0x${string}`,
             address as `0x${string}`,
-            nonce,
+            freshNonce,
           ]
         )
       ) as `0x${string}`;
@@ -1014,42 +1072,45 @@ export function PostCard({ post }: PostCardProps) {
       setPendingCommentText(text);
       setPendingRequestId(requestId);
       setPendingCommentId(null);
-      toast(`Sign reply request · ${formatUnits(stake, SNAP_DECIMALS)} SNAP escrow…`);
-      const signature = await signTypedDataAsync({
-        domain: {
-          name: "SnapZoSocial",
-          version: "1",
-          chainId: mezoTestnet.id,
-          verifyingContract: SNAPZO_SOCIAL_ADDRESS,
-        },
-        types: SNAPZO_SOCIAL_REPLY_DEPOSIT_TYPES,
-        primaryType: "ReplyDeposit",
-        message: {
-          payer: address as `0x${string}`,
-          postId: socialPostId,
-          creator: post.tipRecipient,
-          nonce,
-          deadline,
-        },
-      });
-      toast("Submitting reply request through social relayer…");
-      const relayed = await fetch("/api/snapzo/social/relay-reply-deposit", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          payer: address,
+      const signAndRelayReplyDeposit = async (nonceValue: bigint) => {
+        toast(`Sign reply request · ${formatUnits(stake, SNAP_DECIMALS)} SNAP escrow…`);
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: "SnapZoSocial",
+            version: "1",
+            chainId: mezoTestnet.id,
+            verifyingContract: SNAPZO_SOCIAL_ADDRESS,
+          },
+          types: SNAPZO_SOCIAL_REPLY_DEPOSIT_TYPES,
+          primaryType: "ReplyDeposit",
+          message: {
+            payer: address as `0x${string}`,
+            postId: socialPostId,
+            creator: post.tipRecipient,
+            nonce: nonceValue,
+            deadline,
+          },
+        });
+        toast("Submitting reply request through social relayer…");
+        return relayPostJson("/api/snapzo/social/relay-reply-deposit", {
+          payer: String(address),
           postId: String(socialPostId),
           creator: post.tipRecipient,
-          nonce: String(nonce),
+          nonce: String(nonceValue),
           deadline: String(deadline),
           signature,
-        }),
-      });
-      const payload = (await relayed.json().catch(() => ({}))) as {
-        hash?: `0x${string}`;
-        error?: string;
+        });
       };
-      if (!relayed.ok || !payload.hash) {
+      const payload = await signAndRelayReplyDeposit(freshNonce).catch(async (error) => {
+        const err = error as Error & { relayCode?: string; relayLatestNonce?: string };
+        if (err.relayCode !== "BAD_NONCE") throw err;
+        const retryNonce = err.relayLatestNonce
+          ? BigInt(err.relayLatestNonce)
+          : await readFreshSocialNonce(address as `0x${string}`);
+        toast("Nonce changed on-chain. Please sign once more…");
+        return signAndRelayReplyDeposit(retryNonce);
+      });
+      if (!payload.hash) {
         throw new Error(payload.error || "Reply relay failed");
       }
       setPendingKind("replyRequest");
@@ -1181,7 +1242,7 @@ export function PostCard({ post }: PostCardProps) {
               <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-fuchsia-300/18 bg-fuchsia-400/[0.08] px-2.5 py-1 text-[10px] leading-none">
                 <span className="font-medium text-zinc-300">Like</span>
                 <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-100">
-                  {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "0.01"}
+                  {likeSnapLabel}
                   <SnapInlineIcon decorative />
                 </span>
               </span>

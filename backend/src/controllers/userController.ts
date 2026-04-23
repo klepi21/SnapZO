@@ -10,7 +10,27 @@ import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
 
-const SNAP_DECIMALS = 6;
+const SNAP_DECIMALS = 18;
+
+function decimalWeiStringToTokenAmount(value: string, decimals: number): number {
+  if (!/^\d+$/.test(value)) return 0;
+  const normalized = value.replace(/^0+/, '') || '0';
+  if (normalized === '0') return 0;
+
+  if (normalized.length <= decimals) {
+    const frac = normalized.padStart(decimals, '0').replace(/0+$/, '');
+    const repr = frac ? `0.${frac}` : '0';
+    const parsed = Number(repr);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const split = normalized.length - decimals;
+  const intPart = normalized.slice(0, split);
+  const fracPart = normalized.slice(split).replace(/0+$/, '');
+  const repr = fracPart ? `${intPart}.${fracPart}` : intPart;
+  const parsed = Number(repr);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 /**
  * GET /api/users — list users with optional search + pagination.
@@ -214,8 +234,9 @@ export async function getUser(req: Request, res: Response): Promise<void> {
   }
   for (const row of socialUnlockAmountRows) {
     const k = String(row.post);
-    const wei = row.amountWei ? Number(row.amountWei) : 0;
-    const snapAmount = Number.isFinite(wei) ? wei / 10 ** SNAP_DECIMALS : 0;
+    const snapAmount = row.amountWei
+      ? decimalWeiStringToTokenAmount(row.amountWei, SNAP_DECIMALS)
+      : 0;
     unlockEarningsMap.set(k, (unlockEarningsMap.get(k) ?? 0) + snapAmount);
   }
   for (const row of likeRows) {

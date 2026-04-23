@@ -360,6 +360,7 @@ export function ProfileView() {
   const headerTitle = profile.displayName || walletShort || "Unnamed";
   const totalLikes = posts.reduce((sum, post) => sum + Number(post.likeCount ?? 0), 0);
   const totalReplies = posts.reduce((sum, post) => sum + Number(post.replyCount ?? 0), 0);
+  const totalUnlocks = posts.reduce((sum, post) => sum + Number(post.unlockCount ?? 0), 0);
   const earningsSnap = posts.reduce(
     (sum, post) =>
       sum + Number(post.totalTips ?? 0) + Number(post.unlockEarnings ?? 0),
@@ -438,7 +439,7 @@ export function ProfileView() {
           </p>
         ) : null}
 
-        <div className="snapzo-card-compact mt-6 grid w-full max-w-sm grid-cols-3 gap-2 bg-[#111a30]/85 px-2 py-4">
+        <div className="snapzo-card-compact mt-6 grid w-full max-w-sm grid-cols-4 gap-2 bg-[#111a30]/85 px-2 py-4">
           <div className="text-center">
             <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
               Likes
@@ -453,6 +454,14 @@ export function ProfileView() {
             </p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-white">
               {totalReplies}
+            </p>
+          </div>
+          <div className="border-r border-white/[0.06] text-center">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              Unlocks
+            </p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-white">
+              {totalUnlocks}
             </p>
           </div>
           <div className="text-center">
