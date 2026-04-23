@@ -786,10 +786,10 @@ export function SnapZoHubEarnPanel() {
   const amountIn = hubMode === "deposit" ? hubDepositIn : hubWithdrawIn;
   const setAmountIn = hubMode === "deposit" ? setHubDepositIn : setHubWithdrawIn;
   const showStarterLayout =
-    isConnected &&
-    !wrongChain &&
-    snapBal.data !== undefined &&
-    snapBal.data <= ZERO;
+    !isConnected ||
+    (!wrongChain &&
+      snapBal.data !== undefined &&
+      snapBal.data <= ZERO);
   const onMax = () => {
     if (hubMode === "deposit") {
       if (musdBal.data !== undefined) {
