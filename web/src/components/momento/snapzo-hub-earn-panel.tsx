@@ -320,11 +320,10 @@ export function SnapZoHubEarnPanel() {
     queryKey: ["mezoVaultApr", MEZO_MUSD_VAULT] as const,
     queryFn: async () => {
       const res = await fetch("/api/mezo/earn/vaults");
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Mezo vault API failed (${res.status}): ${text || res.statusText}`);
-      }
       const payload = (await res.json()) as MezoVaultsApiResponse;
+      if (!payload.success || !payload.data?.length) {
+        return { aprPct: undefined, emissionsAprPct: undefined };
+      }
       const row = payload.data?.find(
         (v) => v.id?.toLowerCase() === MEZO_MUSD_VAULT.toLowerCase(),
       );

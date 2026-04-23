@@ -15,14 +15,27 @@ export async function GET() {
     if (!upstream.ok) {
       const body = await upstream.text().catch(() => "");
       return NextResponse.json(
-        { error: `Upstream failed (${upstream.status})`, details: body || upstream.statusText },
-        { status: 502 },
+        {
+          success: false,
+          data: [],
+          error: `Upstream failed (${upstream.status})`,
+          details: body || upstream.statusText,
+        },
+        { status: 200 },
       );
     }
     const json = (await upstream.json()) as unknown;
     return NextResponse.json(json, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: "Failed to fetch Mezo vaults", details: message }, { status: 502 });
+    return NextResponse.json(
+      {
+        success: false,
+        data: [],
+        error: "Failed to fetch Mezo vaults",
+        details: message,
+      },
+      { status: 200 },
+    );
   }
 }
