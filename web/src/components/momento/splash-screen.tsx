@@ -3,7 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Camera, Heart, MessageCircle, Sparkles, TrendingUp, Unlock } from "lucide-react";
+import {
+  Camera,
+  CheckCircle2,
+  ChevronRight,
+  Heart,
+  MessageCircle,
+  MoreHorizontal,
+  Sparkles,
+  TrendingUp,
+  Unlock,
+} from "lucide-react";
 
 import { APP_NAME } from "@/lib/brand";
 import { isOnboardingComplete } from "@/lib/snapzo-onboarding-local";
@@ -97,42 +107,65 @@ export function SplashScreen() {
               powered by SNAP
             </span>
           </h1>
-          <div className="mx-auto mt-3 max-w-[22rem] space-y-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-            <p className="flex gap-2 text-[11px] leading-snug text-zinc-300">
-              <Heart
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pink-400"
-                strokeWidth={2}
-                aria-hidden
-              />
-              <span>
-                <span className="font-semibold text-zinc-100">Creators</span> get rewarded from
-                micro-SNAP likes, unlocks & replies—real support{" "}
-                <span className="text-sky-200/95">without heavy spending.</span>
-              </span>
-            </p>
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            <p className="flex gap-2 text-[11px] leading-snug text-zinc-300">
-              <TrendingUp
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400"
-                strokeWidth={2}
-                aria-hidden
-              />
-              <span>
-                <span className="font-semibold text-zinc-100">You</span> still earn{" "}
-                <span className="text-emerald-200/95">real yield on your money</span> in the Earn
-                hub—stack MUSD, scroll the feed, stay on-chain.
-              </span>
-            </p>
-          </div>
+          <p className="mx-auto mt-3 max-w-[24rem] text-balance text-sm leading-relaxed text-zinc-300">
+            A photo-first social experience where creators are rewarded, and you earn real yield on
+            your assets.
+          </p>
+          <Link
+            href={startedHref}
+            className="snapzo-pressable mx-auto mt-4 inline-flex w-full max-w-[220px] items-center justify-center rounded-xl border border-sky-200/35 bg-gradient-to-r from-[#1ea8f1] via-[#2d77f5] to-[#6e34f3] px-4 py-2.5 text-lg font-medium text-white shadow-[0_14px_42px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.985]"
+          >
+            Open feed
+          </Link>
+          <p className="mt-2 text-center text-[10px] text-zinc-600">Demo photos · not your uploads</p>
         </div>
 
         <section
-          className="mt-3 overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0a0f1a]/80 px-3 py-2.5 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          className="mt-4 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0a0f1a]/80 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          aria-label="Value proposition"
+        >
+          <div className="grid grid-cols-2 gap-0">
+            <div className="flex gap-2 p-3">
+              <div className="mt-0.5 rounded-xl border border-pink-300/30 bg-pink-500/[0.08] p-2">
+                <Heart className="h-4 w-4 text-pink-400" strokeWidth={2} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-zinc-100">Creators get rewarded</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-300">
+                  from micro-SNAP likes, unlocks & replies-real support without heavy spending.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 border-l border-white/[0.08] p-3">
+              <div className="mt-0.5 rounded-xl border border-emerald-300/30 bg-emerald-500/[0.08] p-2">
+                <TrendingUp className="h-4 w-4 text-emerald-400" strokeWidth={2} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-zinc-100">You still earn real yield</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-300">
+                  on your money in the Earn hub-stack MUSD, scroll the feed, stay on-chain.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="mt-2 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0a0f1a]/80 px-3 py-2.5 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
           aria-label="Stories preview"
         >
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-            Stories
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              Stories
+            </p>
+            <button
+              type="button"
+              className="snapzo-pressable inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
+            >
+              View all
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {STORIES.map((s) => (
               <StoryRing key={s.seed} seed={s.seed} label={s.label} />
@@ -141,10 +174,37 @@ export function SplashScreen() {
         </section>
 
         <section
-          className="mt-2 overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0a0f1a]/80 p-2 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          className="mt-2 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0a0f1a]/80 p-2 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
           aria-label="Featured post preview"
         >
-          <div className="relative aspect-[16/7] w-full overflow-hidden rounded-xl ring-1 ring-white/[0.06]">
+          <div className="mb-2 flex items-center justify-between px-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="h-8 w-8 overflow-hidden rounded-full ring-1 ring-white/[0.2]">
+                <Image
+                  src="https://picsum.photos/seed/snapzo-avatar/80/80"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-full w-full object-cover"
+                  sizes="32px"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-zinc-100">
+                  Featured creator post{" "}
+                  <CheckCircle2 className="mb-0.5 inline h-3.5 w-3.5 text-sky-300" />
+                </p>
+                <p className="text-[11px] text-zinc-500">2h ago</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="snapzo-pressable flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="relative aspect-[16/8] w-full overflow-hidden rounded-xl ring-1 ring-white/[0.06]">
             <Image
               src="https://picsum.photos/seed/snapzo-featured/900/420"
               alt=""
@@ -154,36 +214,41 @@ export function SplashScreen() {
               priority
             />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
-            <div className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
-              <Heart className="h-3 w-3 text-red-400" fill="currentColor" />
-              Featured creator post
+            <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex items-center justify-between">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-black/50 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                <Heart className="h-3.5 w-3.5 text-red-400" fill="currentColor" />
+                1.2K
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-lg bg-black/50 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                <MessageCircle className="h-3.5 w-3.5" />
+                128
+              </span>
             </div>
           </div>
         </section>
 
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] text-zinc-400">
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
-            <Heart className="h-3.5 w-3.5 text-red-400" />
-            0.01
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
-            <Unlock className="h-3.5 w-3.5 text-sky-300" />
-            Unlock
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
-            <MessageCircle className="h-3.5 w-3.5 text-sky-300" />
-            0.05 reply
-          </span>
-        </div>
-
-        <div className="mt-auto pt-2">
-          <Link
-            href={startedHref}
-            className="snapzo-pressable inline-flex w-full items-center justify-center rounded-2xl border border-sky-200/35 bg-gradient-to-r from-[#38bdf8] via-[#2563eb] to-[#1d4ed8] py-3.5 text-base font-semibold text-white shadow-[0_14px_42px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.985]"
-          >
-            Open feed
-          </Link>
-          <p className="mt-2 text-center text-[10px] text-zinc-600">Demo photos · not your uploads</p>
+        <div className="mt-2 grid grid-cols-3 overflow-hidden rounded-[16px] border border-white/[0.08] bg-[#0a0f1a]/80 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]">
+          <div className="px-2 py-2 text-center">
+            <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-100">
+              <Heart className="h-4 w-4 text-violet-400" />
+              12.5K
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">Likes</p>
+          </div>
+          <div className="border-x border-white/[0.08] px-2 py-2 text-center">
+            <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-100">
+              <Unlock className="h-4 w-4 text-indigo-300" />
+              3.2K
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">Unlocks</p>
+          </div>
+          <div className="px-2 py-2 text-center">
+            <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-100">
+              <MessageCircle className="h-4 w-4 text-emerald-300" />
+              8.7K
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">Replies</p>
+          </div>
         </div>
       </div>
     </div>
