@@ -127,9 +127,11 @@ function normalizeApiAprToPercent(raw: number | undefined): number | undefined {
   if (raw === undefined || !Number.isFinite(raw) || raw < 0) {
     return undefined;
   }
-  // Mezo API returns fixed-point integer APRs (e.g. 1062204 -> 10.62204%).
+  // Mezo API returns APR in basis points with 2 extra decimals:
+  // - 1062204 -> 10,622.04%
+  // - 4677 -> 46.77%
   // Keep this centralized so we can adjust quickly if upstream format changes.
-  return raw / 100_000;
+  return raw / 100;
 }
 
 function formatTxError(e: unknown): string {
