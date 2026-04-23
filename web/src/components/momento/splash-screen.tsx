@@ -28,16 +28,16 @@ const THUMB_POSTS = [
 
 function StoryRing({ seed, label }: { seed: string; label: string }) {
   return (
-    <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
+    <div className="flex w-[3.25rem] shrink-0 flex-col items-center gap-1">
       <div className="rounded-full bg-gradient-to-tr from-amber-400 via-fuchsia-500 to-sky-400 p-[2.5px] shadow-[0_0_16px_rgba(56,189,248,0.22)]">
-        <div className="h-14 w-14 overflow-hidden rounded-full border border-black/70 bg-zinc-950">
+        <div className="h-10 w-10 overflow-hidden rounded-full border border-black/70 bg-zinc-950">
           <Image
             src={`https://picsum.photos/seed/${seed}/112/112`}
             alt=""
             width={112}
             height={112}
             className="h-full w-full object-cover"
-            sizes="56px"
+            sizes="40px"
           />
         </div>
       </div>
@@ -133,7 +133,7 @@ export function SplashScreen() {
         </div>
 
         <section
-          className="mt-4 overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0a0f1a]/90 shadow-[0_24px_48px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          className="mt-3 overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0a0f1a]/90 shadow-[0_24px_48px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.06)]"
           aria-label="Preview of the photo social feed"
         >
           <div className="border-b border-white/[0.06] px-3 py-2.5">
@@ -148,7 +148,7 @@ export function SplashScreen() {
           </div>
 
           <div className="space-y-1.5 p-2">
-            <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl ring-1 ring-white/[0.06]">
+            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl ring-1 ring-white/[0.06]">
               <Image
                 src={`https://picsum.photos/seed/${HERO_POST.seed}/${HERO_POST.w}/${HERO_POST.h}`}
                 alt=""
@@ -168,7 +168,7 @@ export function SplashScreen() {
                 </span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="hidden grid-cols-2 gap-1.5 min-[390px]:grid">
               {THUMB_POSTS.map((g) => (
                 <div
                   key={g.seed}
@@ -188,7 +188,7 @@ export function SplashScreen() {
           </div>
         </section>
 
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-zinc-400">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] text-zinc-400">
           <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-medium text-zinc-200">
             <Heart className="h-3.5 w-3.5 text-red-400" />
             0.01
@@ -203,7 +203,7 @@ export function SplashScreen() {
           </span>
         </div>
 
-        <div className="mt-auto pt-5">
+        <div className="mt-auto pt-3">
           <Link
             href={startedHref}
             className="snapzo-pressable inline-flex w-full items-center justify-center rounded-2xl border border-sky-200/35 bg-gradient-to-r from-[#38bdf8] via-[#2563eb] to-[#1d4ed8] py-3.5 text-base font-semibold text-white shadow-[0_14px_42px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.985]"
