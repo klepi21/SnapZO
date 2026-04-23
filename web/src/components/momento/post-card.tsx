@@ -53,6 +53,7 @@ import {
   createSocialUnlockRecord,
   createTipRecord,
   createSocialReplyRequestRecord,
+  fetchPostByPostId,
   fetchTipsForPost,
   fetchSocialRepliesForPost,
   fulfillSocialReplyRecord,
@@ -331,6 +332,7 @@ export function PostCard({ post }: PostCardProps) {
   >([]);
   const [dbReplies, setDbReplies] = useState<SocialReplyItem[]>([]);
   const [dbTips, setDbTips] = useState<TipItem[]>([]);
+  const [displayImageUrl, setDisplayImageUrl] = useState(post.imageUrl);
 
   const { isLoading: isConfirming, isSuccess, isError } =
     useWaitForTransactionReceipt({
@@ -350,7 +352,11 @@ export function PostCard({ post }: PostCardProps) {
     [dbReplies]
   );
 
-  const src = post.imageUrl;
+  useEffect(() => {
+    setDisplayImageUrl(post.imageUrl);
+  }, [post.imageUrl, post.id]);
+
+  const src = displayImageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked;
   const socialPostId = useMemo(() => {
     const postIdDigest = keccak256(stringToBytes(post.id));
@@ -494,6 +500,11 @@ export function PostCard({ post }: PostCardProps) {
             txHash: confirmedHash,
             amountWei: unlockSnapWei.toString(),
           }).catch(() => null);
+          const refreshed = await fetchPostByPostId(post.id, { viewer: address }).catch(() => null);
+          const unlockedCid = refreshed?.ipfsHash?.trim();
+          if (unlockedCid) {
+            setDisplayImageUrl(ipfsGatewayUrl(unlockedCid));
+          }
         }
         toast(unlockSnapWei !== undefined ? `Unlocked · ${unlockSnapLabel} SNAP` : "Unlocked.");
       } else if (pendingKind === "like") {

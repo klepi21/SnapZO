@@ -106,6 +106,20 @@ export interface FeedResponse {
   nextCursor: string | null;
 }
 
+export interface PostDetailResponse {
+  id: string;
+  postId: string;
+  creatorWallet: string;
+  content?: string;
+  ipfsHash?: string;
+  isLocked: boolean;
+  unlockPrice: number;
+  blurImage?: string;
+  totalTips?: number;
+  createdAt: string;
+  unlockedByMe?: boolean;
+}
+
 export interface SocialReplyItem {
   id: string;
   post: string;
@@ -216,6 +230,21 @@ export async function fetchFeed(
     throw new Error(`fetchFeed failed (${res.status}): ${text || res.statusText}`);
   }
   return (await res.json()) as FeedResponse;
+}
+
+export async function fetchPostByPostId(
+  postId: string,
+  params?: { viewer?: string },
+  signal?: AbortSignal,
+): Promise<PostDetailResponse> {
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/posts/${postId}`);
+  if (params?.viewer) url.searchParams.set("viewer", params.viewer);
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`fetchPostByPostId failed (${res.status}): ${text || res.statusText}`);
+  }
+  return (await res.json()) as PostDetailResponse;
 }
 
 export async function fetchSocialRepliesForPost(
