@@ -358,6 +358,8 @@ export function ProfileView() {
   const hasUsername = !!profile.username;
   const hasBio = !!profile.bio;
   const headerTitle = profile.displayName || walletShort || "Unnamed";
+  const totalLikes = posts.reduce((sum, post) => sum + Number(post.likeCount ?? 0), 0);
+  const totalReplies = posts.reduce((sum, post) => sum + Number(post.replyCount ?? 0), 0);
   const earningsSnap = posts.reduce((sum, post) => sum + Number(post.totalTips ?? 0), 0);
   const earningsSnapLabel = Number.isFinite(earningsSnap)
     ? earningsSnap.toFixed(4).replace(/\.?0+$/, "")
@@ -438,7 +440,7 @@ export function ProfileView() {
               Likes
             </p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-white">
-              0
+              {totalLikes}
             </p>
           </div>
           <div className="border-x border-white/[0.06] text-center">
@@ -446,7 +448,7 @@ export function ProfileView() {
               Replies
             </p>
             <p className="mt-1 text-sm font-semibold tabular-nums text-white">
-              0
+              {totalReplies}
             </p>
           </div>
           <div className="text-center">

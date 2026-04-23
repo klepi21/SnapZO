@@ -3,6 +3,9 @@ import User from '../models/User';
 import Post from '../models/Post';
 import Unlock from '../models/Unlock';
 import SocialUnlock from '../models/SocialUnlock';
+import Tip from '../models/Tip';
+import Reply from '../models/Reply';
+import SocialReply from '../models/SocialReply';
 import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
@@ -160,7 +163,7 @@ export async function getUser(req: Request, res: Response): Promise<void> {
     .lean();
 
   const postIds = posts.map((p) => p._id);
-  const [unlockRows, socialUnlockRows] =
+  const [unlockRows, socialUnlockRows, likeRows, replyRows, socialReplyRows] =
     postIds.length > 0
       ? await Promise.all([
           Unlock.aggregate<{ _id: unknown; count: number }>([
@@ -171,15 +174,39 @@ export async function getUser(req: Request, res: Response): Promise<void> {
             { $match: { post: { $in: postIds } } },
             { $group: { _id: '$post', count: { $sum: 1 } } },
           ]),
+          Tip.aggregate<{ _id: unknown; count: number }>([
+            { $match: { post: { $in: postIds } } },
+            { $group: { _id: '$post', count: { $sum: 1 } } },
+          ]),
+          Reply.aggregate<{ _id: unknown; count: number }>([
+            { $match: { post: { $in: postIds } } },
+            { $group: { _id: '$post', count: { $sum: 1 } } },
+          ]),
+          SocialReply.aggregate<{ _id: unknown; count: number }>([
+            { $match: { post: { $in: postIds } } },
+            { $group: { _id: '$post', count: { $sum: 1 } } },
+          ]),
         ])
-      : [[], []];
+      : [[], [], [], [], []];
   const unlockCountMap = new Map<string, number>();
+  const likeCountMap = new Map<string, number>();
+  const replyCountMap = new Map<string, number>();
   for (const row of unlockRows) {
     unlockCountMap.set(String(row._id), row.count);
   }
   for (const row of socialUnlockRows) {
     const k = String(row._id);
     unlockCountMap.set(k, (unlockCountMap.get(k) ?? 0) + row.count);
+  }
+  for (const row of likeRows) {
+    likeCountMap.set(String(row._id), row.count);
+  }
+  for (const row of replyRows) {
+    replyCountMap.set(String(row._id), row.count);
+  }
+  for (const row of socialReplyRows) {
+    const k = String(row._id);
+    replyCountMap.set(k, (replyCountMap.get(k) ?? 0) + row.count);
   }
 
   res.json({
@@ -194,6 +221,8 @@ export async function getUser(req: Request, res: Response): Promise<void> {
       unlockPrice: p.unlockPrice,
       blurImage: p.blurImage,
       totalTips: p.totalTips,
+      likeCount: likeCountMap.get(String(p._id)) ?? 0,
+      replyCount: replyCountMap.get(String(p._id)) ?? 0,
       unlockCount: unlockCountMap.get(String(p._id)) ?? 0,
       createdAt: p.createdAt,
     })),

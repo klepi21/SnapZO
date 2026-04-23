@@ -36,6 +36,8 @@ export interface UserPostItem {
   unlockPrice: number;
   blurImage?: string;
   totalTips?: number;
+  likeCount?: number;
+  replyCount?: number;
   unlockCount?: number;
   createdAt: string;
 }
