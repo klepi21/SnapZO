@@ -1069,16 +1069,16 @@ export function SnapZoHubAdminView() {
     getAddress(address as `0x${string}`) === getAddress(feeReceiver as `0x${string}`);
 
   const card =
-    "rounded-xl border border-white/[0.08] bg-zinc-900/55 p-3 shadow-inner backdrop-blur-sm";
-  const label = "mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500";
+    "rounded-xl border border-white/[0.12] bg-[#101831]/88 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm";
+  const label = "mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400";
   const input =
-    "w-full rounded-xl border border-white/12 bg-black/40 px-3 py-2.5 font-mono text-sm text-white outline-none placeholder:text-zinc-600 focus:border-sky-500/40";
+    "w-full rounded-xl border border-white/14 bg-[#090d1b]/90 px-3 py-2.5 font-mono text-sm text-white outline-none placeholder:text-zinc-600 focus:border-fuchsia-300/40";
   const btnPrimary =
-    "inline-flex min-h-[44px] items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40";
+    "inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-[#ff2d90] to-[#7c3aed] px-4 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-40";
   const btnDanger =
     "inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-500/40 bg-red-500/15 px-4 text-sm font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-40";
   const btnMuted =
-    "inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-semibold text-zinc-100 transition hover:bg-white/10 disabled:opacity-40";
+    "inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-white/[0.08] px-4 text-sm font-semibold text-zinc-100 transition hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10 disabled:opacity-40";
   const miniAction =
     "rounded-md border border-white/15 px-2 py-1 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/10";
 
@@ -1113,7 +1113,7 @@ export function SnapZoHubAdminView() {
       <div className="mb-5 flex items-start gap-3">
         <Link
           href="/earn"
-          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-black/30 text-white transition hover:bg-white/10"
+          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.06] text-white transition hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10"
           aria-label="Back to earn"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -1129,7 +1129,7 @@ export function SnapZoHubAdminView() {
           </p>
           <Link
             href="/admin/snapzo/analytics"
-            className="mt-2 inline-flex items-center rounded-lg border border-cyan-400/35 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
+            className="mt-2 inline-flex items-center rounded-lg border border-fuchsia-300/35 bg-fuchsia-500/10 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-100 transition hover:bg-fuchsia-500/20"
           >
             Open analytics admin view
           </Link>

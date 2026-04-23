@@ -62,6 +62,19 @@ export function WalletHeaderMenu() {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [open, close]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        close();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, close]);
+
   return (
     <ConnectButton.Custom>
       {({ account, mounted, openConnectModal, openChainModal }) => {
@@ -79,7 +92,7 @@ export function WalletHeaderMenu() {
             <button
               type="button"
               onClick={openConnectModal}
-              className="snapzo-pressable rounded-full border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm font-semibold tracking-tight text-white hover:border-white/[0.2] hover:bg-white/[0.08] active:opacity-80"
+              className="snapzo-pressable rounded-full border border-fuchsia-300/35 bg-fuchsia-500/10 px-3 py-2 text-sm font-semibold tracking-tight text-fuchsia-50 hover:border-fuchsia-200/55 hover:bg-fuchsia-500/18 active:opacity-80"
             >
               Connect
             </button>
@@ -93,9 +106,10 @@ export function WalletHeaderMenu() {
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="snapzo-pressable flex h-10 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.04] px-2.5 py-1.5 text-left hover:border-white/[0.18] hover:bg-white/[0.08] active:opacity-80"
+              className="snapzo-pressable snapzo-hit-44 flex h-10 items-center gap-1 rounded-full border border-white/[0.15] bg-white/[0.06] px-2.5 py-1.5 text-left hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10 active:opacity-80"
               aria-expanded={open}
               aria-haspopup="menu"
+              aria-label={`Open wallet menu for ${shortenAddress(account.address)}`}
             >
               <span className="font-mono text-[11px] font-medium text-white">
                 {shortenAddress(account.address)}
@@ -108,15 +122,18 @@ export function WalletHeaderMenu() {
 
             {open ? (
               <div
-                className="absolute right-0 z-50 mt-2 w-[min(calc(100vw-2rem),292px)] overflow-hidden rounded-2xl border border-white/10 bg-[#0b1018]/96 py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+                className="absolute right-0 z-50 mt-2 w-[min(calc(100vw-2rem),304px)] overflow-hidden rounded-2xl border border-white/12 bg-[#101831]/96 py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl"
                 role="menu"
               >
                 <div className="border-b border-white/[0.06] px-3.5 py-2.5">
-                  <p className="snapzo-micro-label inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase text-zinc-500">
+                  <p className="snapzo-micro-label inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase text-zinc-400">
                     <Wallet className="h-3.5 w-3.5" />
                     Wallet
                   </p>
-                  <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-300" title={account.address}>
+                  <p
+                    className="mt-0.5 truncate font-mono text-[11px] text-zinc-200"
+                    title={account.address}
+                  >
                     {account.address}
                   </p>
                 </div>
@@ -136,25 +153,27 @@ export function WalletHeaderMenu() {
                   </div>
                 ) : (
                   <div className="px-3.5 py-2.5">
-                    <p className="snapzo-micro-label text-[10px] font-semibold uppercase text-zinc-500">Balances</p>
+                    <p className="snapzo-micro-label text-[10px] font-semibold uppercase text-zinc-400">
+                      Balances
+                    </p>
                     <dl className="mt-2 space-y-1.5 text-xs">
-                      <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
-                        <dt className="inline-flex items-center gap-1.5 text-zinc-500">
+                      <div className="flex justify-between gap-3 rounded-lg border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5">
+                        <dt className="inline-flex items-center gap-1.5 text-zinc-300">
                           <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#f7931a] text-black">
                             <Bitcoin className="h-2.5 w-2.5" strokeWidth={2.2} />
                           </span>
                           BTC (gas)
                         </dt>
-                        <dd className="font-mono text-zinc-100">
+                        <dd className="font-mono text-zinc-100 tabular-nums">
                           {native.isPending ? "…" : native.error ? "—" : `${btcFormatted ?? "0"}`}
                         </dd>
                       </div>
-                      <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
-                        <dt className="flex items-center gap-1.5 text-zinc-500">
+                      <div className="flex justify-between gap-3 rounded-lg border border-fuchsia-300/20 bg-fuchsia-500/[0.09] px-2.5 py-1.5">
+                        <dt className="flex items-center gap-1.5 text-zinc-200">
                           <MusdInlineIcon />
                           MUSD
                         </dt>
-                        <dd className="font-mono text-zinc-100">
+                        <dd className="font-mono text-zinc-100 tabular-nums">
                           {musdBalance.isPending
                             ? "…"
                             : musdBalance.error
@@ -162,12 +181,12 @@ export function WalletHeaderMenu() {
                               : (musdFormatted ?? "0")}
                         </dd>
                       </div>
-                      <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
-                        <dt className="flex items-center gap-1 text-zinc-500">
+                      <div className="flex justify-between gap-3 rounded-lg border border-violet-300/20 bg-violet-500/[0.09] px-2.5 py-1.5">
+                        <dt className="flex items-center gap-1 text-zinc-200">
                           <SnapInlineIcon decorative />
                           SNAP
                         </dt>
-                        <dd className="font-mono text-zinc-100">
+                        <dd className="font-mono text-zinc-100 tabular-nums">
                           {snapBalance.isPending
                             ? "…"
                             : snapBalance.error
@@ -175,12 +194,12 @@ export function WalletHeaderMenu() {
                               : (snapFormatted ?? "0")}
                         </dd>
                       </div>
-                      <div className="flex justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
-                        <dt className="flex items-center gap-1.5 text-zinc-500">
+                      <div className="flex justify-between gap-3 rounded-lg border border-cyan-300/20 bg-cyan-500/[0.08] px-2.5 py-1.5">
+                        <dt className="flex items-center gap-1.5 text-zinc-200">
                           <MezoInlineIcon decorative />
                           MEZO
                         </dt>
-                        <dd className="font-mono text-zinc-100">
+                        <dd className="font-mono text-zinc-100 tabular-nums">
                           {mezoBalance.isPending
                             ? "…"
                             : mezoBalance.error
@@ -189,14 +208,23 @@ export function WalletHeaderMenu() {
                         </dd>
                       </div>
                     </dl>
-                    <p className="mt-2 truncate font-mono text-[9px] text-zinc-600" title={MUSD_ADDRESS_MEZO_TESTNET}>
-                      {MUSD_ADDRESS_MEZO_TESTNET}
-                    </p>
+                    <div className="mt-2 rounded-lg border border-white/[0.08] bg-black/20 px-2.5 py-1.5">
+                      <p className="snapzo-micro-label text-[9px] font-semibold uppercase text-zinc-500">
+                        MUSD Contract
+                      </p>
+                      <p
+                        className="mt-0.5 truncate font-mono text-[10px] text-zinc-400"
+                        title={MUSD_ADDRESS_MEZO_TESTNET}
+                      >
+                        {MUSD_ADDRESS_MEZO_TESTNET}
+                      </p>
+                    </div>
                     <div className="mt-2 grid grid-cols-1 gap-2">
                       <Link
                         href="/swap"
                         onClick={close}
-                        className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white hover:bg-white/[0.08]"
+                        role="menuitem"
+                        className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-fuchsia-300/25 bg-fuchsia-500/12 py-2.5 text-xs font-semibold text-white hover:bg-fuchsia-500/20"
                       >
                         <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden />
                         Swap BTC ↔ MUSD
@@ -204,7 +232,8 @@ export function WalletHeaderMenu() {
                       <Link
                         href="/earn"
                         onClick={close}
-                        className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white hover:bg-white/[0.08]"
+                        role="menuitem"
+                        className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-violet-300/25 bg-violet-500/12 py-2.5 text-xs font-semibold text-white hover:bg-violet-500/20"
                       >
                         <PiggyBank className="h-3.5 w-3.5" aria-hidden />
                         Earn (MUSD vault)
@@ -213,7 +242,8 @@ export function WalletHeaderMenu() {
                         <Link
                           href="/admin/snapzo"
                           onClick={close}
-                          className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] py-2.5 text-xs font-semibold text-white hover:bg-white/[0.08]"
+                          role="menuitem"
+                          className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-500/10 py-2.5 text-xs font-semibold text-white hover:bg-cyan-500/18"
                         >
                           <Shield className="h-3.5 w-3.5" aria-hidden />
                           SnapZo hub admin

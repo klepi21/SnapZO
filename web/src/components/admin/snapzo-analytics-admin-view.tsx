@@ -176,7 +176,7 @@ export function SnapZoAnalyticsAdminView() {
       <div className="mb-5 flex items-start gap-3">
         <Link
           href="/admin/snapzo"
-          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-black/30 text-white transition hover:bg-white/10"
+          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.06] text-white transition hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10"
           aria-label="Back to SnapZo admin"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -193,23 +193,23 @@ export function SnapZoAnalyticsAdminView() {
       </div>
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-xl border border-white/[0.08] bg-zinc-900/55 px-3 py-2 text-xs">
+        <div className="rounded-xl border border-fuchsia-300/16 bg-fuchsia-500/[0.08] px-3 py-2 text-xs">
           <p className="text-zinc-500">Likes</p>
           <p className="text-lg font-semibold text-zinc-100">{summary?.likes ?? "…"}</p>
         </div>
-        <div className="rounded-xl border border-white/[0.08] bg-zinc-900/55 px-3 py-2 text-xs">
+        <div className="rounded-xl border border-violet-300/16 bg-violet-500/[0.08] px-3 py-2 text-xs">
           <p className="text-zinc-500">Replies</p>
           <p className="text-lg font-semibold text-zinc-100">{summary?.replies ?? "…"}</p>
         </div>
-        <div className="rounded-xl border border-white/[0.08] bg-zinc-900/55 px-3 py-2 text-xs">
+        <div className="rounded-xl border border-cyan-300/16 bg-cyan-500/[0.08] px-3 py-2 text-xs">
           <p className="text-zinc-500">Unlocks</p>
           <p className="text-lg font-semibold text-zinc-100">{summary?.unlocks ?? "…"}</p>
         </div>
-        <div className="rounded-xl border border-white/[0.08] bg-zinc-900/55 px-3 py-2 text-xs">
+        <div className="rounded-xl border border-emerald-300/16 bg-emerald-500/[0.08] px-3 py-2 text-xs">
           <p className="text-zinc-500">Users</p>
           <p className="text-lg font-semibold text-zinc-100">{summary?.users ?? "…"}</p>
         </div>
-        <div className="rounded-xl border border-white/[0.08] bg-zinc-900/55 px-3 py-2 text-xs">
+        <div className="rounded-xl border border-amber-300/16 bg-amber-500/[0.08] px-3 py-2 text-xs">
           <p className="text-zinc-500">Posts</p>
           <p className="text-lg font-semibold text-zinc-100">{summary?.posts ?? "…"}</p>
         </div>
@@ -235,7 +235,7 @@ export function SnapZoAnalyticsAdminView() {
         ))}
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-zinc-900/55">
+      <section className="overflow-hidden rounded-2xl border border-white/[0.1] bg-[#101831]/88 shadow-[0_14px_36px_rgba(0,0,0,0.3)]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs">
             <thead className="border-b border-white/[0.08] bg-black/25 text-zinc-400">

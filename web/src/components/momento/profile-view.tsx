@@ -180,7 +180,7 @@ export function ProfileView() {
               role="dialog"
               aria-modal="true"
               aria-labelledby={labelId}
-              className="mx-auto max-h-[min(92dvh,720px)] w-full max-w-[430px] overflow-hidden rounded-t-[22px] border border-white/10 border-b-0 bg-[#0b0f18] shadow-[0_-16px_56px_rgba(0,0,0,0.55)]"
+              className="mx-auto max-h-[min(92dvh,720px)] w-full max-w-[430px] overflow-hidden rounded-t-[24px] border border-white/10 border-b-0 bg-[#0f1528] shadow-[0_-16px_56px_rgba(0,0,0,0.55)]"
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
@@ -224,7 +224,7 @@ export function ProfileView() {
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full ring-2 ring-indigo-500/40 ring-offset-2 ring-offset-[#0b0f18]"
+                    className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full ring-2 ring-fuchsia-400/45 ring-offset-2 ring-offset-[#0f1528]"
                   >
                     {draft.avatarDataUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element -- data URL from user
@@ -281,7 +281,7 @@ export function ProfileView() {
                     setDraft((d) => ({ ...d, displayName: e.target.value }))
                   }
                   maxLength={64}
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-400/40 focus:ring-1 focus:ring-indigo-500/25"
+                  className="mt-2 w-full rounded-2xl border border-white/12 bg-[#090d1b]/90 px-4 py-3 text-sm text-white outline-none transition focus:border-fuchsia-300/40 focus:ring-1 focus:ring-fuchsia-300/20"
                   placeholder="Your name"
                   autoComplete="name"
                 />
@@ -292,7 +292,7 @@ export function ProfileView() {
                 >
                   Username
                 </label>
-                <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-zinc-950/80 px-3">
+                <div className="mt-2 flex items-center rounded-2xl border border-white/12 bg-[#090d1b]/90 px-3">
                   <span className="shrink-0 text-sm text-zinc-500">@</span>
                   <input
                     id="snapzo-edit-username"
@@ -330,7 +330,7 @@ export function ProfileView() {
                   rows={4}
                   maxLength={280}
                   placeholder="Tell people about you…"
-                  className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3 text-sm leading-relaxed text-white outline-none transition focus:border-indigo-400/40 focus:ring-1 focus:ring-indigo-500/25"
+                  className="mt-2 w-full resize-none rounded-2xl border border-white/12 bg-[#090d1b]/90 px-4 py-3 text-sm leading-relaxed text-white outline-none transition focus:border-fuchsia-300/40 focus:ring-1 focus:ring-fuchsia-300/20"
                 />
                 <p className="mt-1 text-right text-[11px] tabular-nums text-zinc-600">
                   {draft.bio.length} / 280
@@ -341,7 +341,7 @@ export function ProfileView() {
                 <button
                   type="button"
                   onClick={saveEdit}
-                  className="snapzo-pressable w-full rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-500/35 to-sky-500/25 py-3.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(99,102,241,0.18)] hover:border-indigo-300/55 hover:from-indigo-500/45"
+                  className="snapzo-pressable w-full rounded-2xl border border-fuchsia-300/45 bg-gradient-to-br from-fuchsia-500/28 to-violet-500/25 py-3.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(217,70,239,0.18)] hover:border-fuchsia-200/60 hover:from-fuchsia-500/40"
                 >
                   Save
                 </button>
@@ -367,7 +367,7 @@ export function ProfileView() {
     <div className="pb-28">
       {editModal}
 
-      <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950">
+      <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-[#2b1747] via-[#171a32] to-[#11172b]">
         <div className="absolute inset-0 bg-gradient-to-t from-[#060814] via-transparent to-black/30" />
         <Link
           href="/feed"
@@ -395,7 +395,7 @@ export function ProfileView() {
       </div>
 
       <div className="relative -mt-14 flex flex-col items-center px-4">
-        <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-full bg-[#060814] p-[3px] shadow-[0_0_0_3px_rgba(59,130,246,0.35),0_0_40px_rgba(59,130,246,0.25)]">
+        <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-full bg-[#060814] p-[3px] shadow-[0_0_0_3px_rgba(244,114,182,0.35),0_0_40px_rgba(168,85,247,0.24)]">
           <div className="relative h-full w-full overflow-hidden rounded-full">
             {hasProfileImage ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL from user
@@ -432,7 +432,7 @@ export function ProfileView() {
           </p>
         ) : null}
 
-        <div className="snapzo-card-compact mt-6 grid w-full max-w-sm grid-cols-3 gap-2 bg-[#0c1018] px-2 py-4">
+        <div className="snapzo-card-compact mt-6 grid w-full max-w-sm grid-cols-3 gap-2 bg-[#111a30]/85 px-2 py-4">
           <div className="text-center">
             <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
               Likes
@@ -465,7 +465,7 @@ export function ProfileView() {
           <button
             type="button"
             onClick={openEdit}
-            className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-full border border-sky-400/40 bg-gradient-to-r from-[#3b82f6] to-[#2563eb] py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20"
+            className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-full border border-fuchsia-300/40 bg-gradient-to-r from-[#ff2d90] to-[#7c3aed] py-3.5 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/25"
           >
             <UserPen className="h-4 w-4" />
             Edit profile
@@ -481,7 +481,7 @@ export function ProfileView() {
       </div>
 
       {posts.length === 0 ? (
-        <div className="snapzo-card-compact mx-4 mt-4 flex flex-col items-center justify-center border-dashed bg-[#0a0e17] px-6 py-10 text-center">
+        <div className="snapzo-card-compact mx-4 mt-4 flex flex-col items-center justify-center border-dashed bg-[#0f162a]/85 px-6 py-10 text-center">
           <p className="text-sm text-zinc-400">Share your first post to fill this space.</p>
         </div>
       ) : (

@@ -4,13 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  BadgeDollarSign,
   Camera,
   CheckCircle2,
   ChevronRight,
+  CircleDollarSign,
   Heart,
   MessageCircle,
   MoreHorizontal,
+  Smile,
   Sparkles,
+  Sprout,
   TrendingUp,
   Unlock,
 } from "lucide-react";
@@ -64,9 +68,9 @@ export function SplashScreen() {
   }, []);
 
   return (
-    <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col bg-[#05070d]">
+    <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col bg-[#070914]">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_78%_44%_at_50%_6%,rgba(56,189,248,0.34),transparent_62%),radial-gradient(ellipse_90%_52%_at_50%_56%,rgba(37,99,235,0.2),transparent_72%),linear-gradient(180deg,#0a1020_0%,#070b15_42%,#04050a_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_78%_44%_at_50%_6%,rgba(255,45,144,0.28),transparent_62%),radial-gradient(ellipse_90%_52%_at_50%_56%,rgba(124,58,237,0.2),transparent_72%),linear-gradient(180deg,#171229_0%,#0b1020_42%,#06080f_100%)]"
         aria-hidden
       />
       <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:24px_24px]" />
@@ -74,7 +78,7 @@ export function SplashScreen() {
       <div className="relative z-10 flex flex-1 flex-col px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
         <header className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#11182a]">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#11182a]">
               <Image
                 src="/snap-token-logo.png"
                 alt=""
@@ -82,43 +86,108 @@ export function SplashScreen() {
                 height={SNAP_LOGO_HEIGHT}
                 priority
                 className="h-full w-full object-contain p-1"
-                sizes="40px"
+                sizes="44px"
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight text-white">{APP_NAME}</p>
-              <p className="truncate text-[11px] text-zinc-500">Photo feed · Mezo testnet</p>
+              <p className="truncate text-lg font-bold tracking-tight text-white">
+                <span className="text-[#f4f5ff]">Snap</span>
+                <span className="bg-gradient-to-r from-[#ff2d90] to-[#a855f7] bg-clip-text text-transparent">
+                  Zo
+                </span>
+              </p>
+              <p className="truncate text-[11px] tracking-[0.22em] text-zinc-500">
+                SHARE. EARN. GROW.
+              </p>
             </div>
           </div>
-          <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-300/25 bg-sky-400/[0.1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-100">
+          <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-fuchsia-300/25 bg-fuchsia-500/[0.12] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-fuchsia-100">
             <Sparkles className="h-3 w-3" />
             SNAP
           </div>
         </header>
 
         <div className="mt-4 text-center">
+          <div className="mx-auto mb-2.5 flex w-fit items-center gap-2 rounded-2xl border border-white/12 bg-white/[0.05] px-2.5 py-2">
+            <div className="relative h-9 w-9 overflow-hidden rounded-lg border border-white/12 bg-white/[0.06]">
+              <Image
+                src="/snap-token-logo.png"
+                alt={`${APP_NAME} icon`}
+                fill
+                className="object-contain p-1"
+                sizes="36px"
+              />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold leading-none text-white">
+                <span className="text-[#f4f5ff]">Snap</span>
+                <span className="bg-gradient-to-r from-[#ff2d90] to-[#a855f7] bg-clip-text text-transparent">
+                  Zo
+                </span>
+              </p>
+              <p className="mt-1 text-[9px] font-semibold tracking-[0.2em] text-fuchsia-200/85">
+                WEB3 SOCIAL
+              </p>
+            </div>
+          </div>
           <div className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-medium text-zinc-400">
             <Camera className="h-3.5 w-3.5 text-zinc-300" />
             Photo-first · like Instagram
           </div>
           <h1 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-[-0.03em] text-white">
-            Your feed,{" "}
-            <span className="bg-gradient-to-r from-sky-200 to-indigo-300 bg-clip-text text-transparent">
-              powered by SNAP
+            Where moments{" "}
+            <span className="bg-gradient-to-r from-fuchsia-200 via-violet-200 to-sky-200 bg-clip-text text-transparent">
+              earn more.
             </span>
           </h1>
           <p className="mx-auto mt-3 max-w-[24rem] text-balance text-sm leading-relaxed text-zinc-300">
-            A photo-first social experience where creators are rewarded, and you earn real yield on
-            your assets.
+            Reward creators without extra spending while earning real yield on your money.
           </p>
           <Link
             href={startedHref}
-            className="snapzo-pressable mx-auto mt-4 inline-flex w-full max-w-[220px] items-center justify-center rounded-xl border border-sky-200/35 bg-gradient-to-r from-[#1ea8f1] via-[#2d77f5] to-[#6e34f3] px-4 py-2.5 text-lg font-medium text-white shadow-[0_14px_42px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.985]"
+            className="snapzo-pressable snapzo-hit-44 mx-auto mt-4 inline-flex w-full max-w-[220px] items-center justify-center rounded-xl border border-sky-200/35 bg-gradient-to-r from-[#1ea8f1] via-[#2d77f5] to-[#6e34f3] px-4 py-2.5 text-lg font-medium text-white shadow-[0_14px_42px_rgba(37,99,235,0.45),0_0_22px_rgba(56,189,248,0.28)] hover:brightness-110 active:scale-[0.985]"
           >
             Open feed
           </Link>
           <p className="mt-2 text-center text-[10px] text-zinc-600">Demo photos · not your uploads</p>
         </div>
+
+        <section
+          className="mt-3 grid grid-cols-1 gap-2"
+          aria-label="Mission and personality"
+        >
+          <div className="rounded-[16px] border border-white/[0.1] bg-[#111933]/80 px-3 py-2.5 shadow-[0_12px_24px_rgba(0,0,0,0.3)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200/80">
+              Our mission
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-200">
+              Empower creators, reward communities, and grow wealth together.
+            </p>
+          </div>
+          <div className="rounded-[16px] border border-white/[0.1] bg-[#111933]/80 px-3 py-2.5 shadow-[0_12px_24px_rgba(0,0,0,0.3)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200/80">
+              How you feel
+            </p>
+            <div className="mt-1.5 grid grid-cols-4 gap-1.5 text-[10px] text-zinc-300">
+              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
+                <Smile className="h-3.5 w-3.5 text-pink-300" />
+                Excited
+              </span>
+              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 text-sky-300" />
+                Confident
+              </span>
+              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
+                <BadgeDollarSign className="h-3.5 w-3.5 text-violet-300" />
+                Rewarded
+              </span>
+              <span className="inline-flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-1 py-1.5">
+                <Sprout className="h-3.5 w-3.5 text-emerald-300" />
+                Growing
+              </span>
+            </div>
+          </div>
+        </section>
 
         <section
           className="mt-4 overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#0a0f1a]/80 shadow-[0_14px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)]"
@@ -132,7 +201,7 @@ export function SplashScreen() {
               <div>
                 <p className="text-sm font-semibold text-zinc-100">Creators get rewarded</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-300">
-                  from micro-SNAP likes, unlocks & replies-real support without heavy spending.
+                  from micro-SNAP likes, unlocks, and replies without extra spend pressure.
                 </p>
               </div>
             </div>
@@ -143,7 +212,7 @@ export function SplashScreen() {
               <div>
                 <p className="text-sm font-semibold text-zinc-100">You still earn real yield</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-300">
-                  on your money in the Earn hub-stack MUSD, scroll the feed, stay on-chain.
+                  on your money in the Earn hub while treasury and creator pools keep compounding.
                 </p>
               </div>
             </div>
@@ -160,7 +229,8 @@ export function SplashScreen() {
             </p>
             <button
               type="button"
-              className="snapzo-pressable inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
+              className="snapzo-pressable snapzo-hit-44 inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300"
+              aria-label="View all stories"
             >
               View all
               <ChevronRight className="h-3.5 w-3.5" />
@@ -222,6 +292,10 @@ export function SplashScreen() {
               <span className="inline-flex items-center gap-1 rounded-lg bg-black/50 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
                 <MessageCircle className="h-3.5 w-3.5" />
                 128
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-lg bg-black/50 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                <CircleDollarSign className="h-3.5 w-3.5 text-emerald-300" />
+                Yield On
               </span>
             </div>
           </div>

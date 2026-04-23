@@ -1062,9 +1062,9 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <article className="snapzo-card-primary mx-4 mb-5 transition-transform duration-300 ease-out hover:-translate-y-0.5">
-      <div className="flex items-center gap-3 px-4 pb-3 pt-4">
-        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-indigo-400/35 ring-offset-1 ring-offset-[rgba(8,12,22,0.65)]">
+    <article className="snapzo-card-primary mx-4 mb-6 overflow-visible transition-transform duration-300 ease-out hover:-translate-y-0.5">
+      <div className="flex items-center gap-3 px-4 pb-3 pt-4.5">
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-fuchsia-300/40 ring-offset-1 ring-offset-[rgba(12,18,36,0.65)]">
           <Image
             src={post.avatarUrl ?? picsumAvatar(post.avatarSeed, 128)}
             alt=""
@@ -1074,15 +1074,15 @@ export function PostCard({ post }: PostCardProps) {
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold tracking-tight text-white">
+          <p className="truncate text-[15px] font-semibold tracking-tight text-white">
             {post.userName}
           </p>
-          <p className="text-xs text-zinc-500">{post.timeAgo}</p>
+          <p className="text-[11px] text-zinc-500">{post.timeAgo}</p>
         </div>
       </div>
 
       <div
-        className="relative mx-3 aspect-[9/16] touch-manipulation overflow-hidden rounded-[22px] bg-black ring-1 ring-white/[0.08]"
+        className="relative mx-3 aspect-[9/16] touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]"
         onDoubleClick={(e) => {
           e.preventDefault();
           handleMediaDoubleLike();
@@ -1108,14 +1108,14 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         )}
         {showLockOverlay ? (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/70 via-black/38 to-black/22 px-6 text-center">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/76 via-black/42 to-black/22 px-6 text-center">
             <Lock className="h-9 w-9 text-white/90" strokeWidth={1.5} aria-hidden />
-            <p className="text-sm font-semibold text-white">Hidden content</p>
+            <p className="text-sm font-semibold tracking-tight text-white">Hidden content</p>
             <button
               type="button"
               disabled={isBusy || unlockSnapWei === undefined}
               onClick={handleUnlock}
-              className="snapzo-pressable inline-flex items-center justify-center gap-2 rounded-2xl border border-indigo-400/36 bg-gradient-to-br from-indigo-500/24 to-sky-500/16 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_18px_rgba(99,102,241,0.16)] hover:border-indigo-300/55 hover:from-indigo-500/34 disabled:opacity-50"
+              className="snapzo-pressable inline-flex items-center justify-center gap-2 rounded-2xl border border-fuchsia-300/40 bg-gradient-to-br from-fuchsia-500/26 to-violet-500/20 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.18)] hover:border-fuchsia-200/60 hover:from-fuchsia-500/36 disabled:opacity-50"
             >
               <span className="inline-flex items-center gap-1">
                 Unlock ·
@@ -1134,7 +1134,7 @@ export function PostCard({ post }: PostCardProps) {
       </div>
 
       <div className="px-4 pb-5 pt-4">
-        <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="mb-2.5 flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-5">
             <button
               type="button"
@@ -1155,7 +1155,7 @@ export function PostCard({ post }: PostCardProps) {
                 className={`h-6 w-6 shrink-0 ${likedUi ? "fill-red-500 stroke-red-500 text-red-500" : ""}`}
                 strokeWidth={1.5}
               />
-              <span className="text-sm font-normal tabular-nums tracking-tight">
+              <span className="text-sm font-medium tabular-nums tracking-tight">
                 {likeCount}
               </span>
             </button>
@@ -1167,35 +1167,35 @@ export function PostCard({ post }: PostCardProps) {
               onClick={() => setCommentOpen(true)}
             >
               <MessageCircle className="h-6 w-6 shrink-0" strokeWidth={1.5} />
-              <span className="text-sm font-normal tabular-nums tracking-tight">
+              <span className="text-sm font-medium tabular-nums tracking-tight">
                 {commentCount}
               </span>
             </button>
-            <div className="inline-flex items-center gap-1 text-xs text-zinc-400">
-              <Lock className="h-3.5 w-3.5 text-zinc-500" strokeWidth={1.7} />
+            <div className="inline-flex items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[11px] text-zinc-300">
+              <Lock className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.7} />
               <span className="tabular-nums">{post.unlockCount ?? 0}</span>
             </div>
           </div>
           <div className="min-w-0 flex-1 overflow-hidden pt-0.5">
-            <div className="flex flex-wrap justify-end gap-1">
-              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] leading-none">
-                <span className="text-zinc-400">Like</span>
-                <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+            <div className="flex flex-wrap justify-end gap-1.5">
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-fuchsia-300/18 bg-fuchsia-400/[0.08] px-2.5 py-1 text-[10px] leading-none">
+                <span className="font-medium text-zinc-300">Like</span>
+                <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-100">
                   {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "0.01"}
                   <SnapInlineIcon decorative />
                 </span>
               </span>
-              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] leading-none">
-                <span className="text-zinc-400">Reply</span>
-                <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-violet-300/18 bg-violet-400/[0.08] px-2.5 py-1 text-[10px] leading-none">
+                <span className="font-medium text-zinc-300">Reply</span>
+                <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-100">
                   {replyStakeLabel}
                   <SnapInlineIcon decorative />
                 </span>
               </span>
               {isLockedPost ? (
-                <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] leading-none">
-                  <span className="text-zinc-400">Unlock</span>
-                  <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+                <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-cyan-300/18 bg-cyan-400/[0.08] px-2.5 py-1 text-[10px] leading-none">
+                  <span className="font-medium text-zinc-300">Unlock</span>
+                  <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-100">
                     {unlockSnapLabel}
                     <SnapInlineIcon decorative />
                   </span>
@@ -1206,7 +1206,7 @@ export function PostCard({ post }: PostCardProps) {
         </div>
 
         {recentLikers.length > 0 ? (
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2.5 flex items-center gap-2">
             <div className="flex shrink-0 -space-x-1.5 pl-0.5">
               {recentLikers.map((tip, i) => (
                 <div
@@ -1242,7 +1242,7 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         ) : null}
 
-        <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+        <p className="mt-3 text-[14px] leading-relaxed text-zinc-300">
           <span className="font-semibold text-white">{post.userName}</span>{" "}
           {post.caption}
         </p>
@@ -1260,7 +1260,7 @@ export function PostCard({ post }: PostCardProps) {
                 aria-modal="true"
                 aria-labelledby={labelId}
                 aria-describedby={commentSheetContextId}
-                className="mx-auto flex h-[min(88dvh,640px)] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[22px] border border-white/10 border-b-0 bg-[#0b0f18] shadow-[0_-16px_56px_rgba(0,0,0,0.55)]"
+                className="mx-auto flex h-[min(88dvh,640px)] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[24px] border border-white/10 border-b-0 bg-[#0f1528] shadow-[0_-16px_56px_rgba(0,0,0,0.55)]"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && !isBusy) {
@@ -1272,7 +1272,7 @@ export function PostCard({ post }: PostCardProps) {
                   <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-white/25" />
                   <div
                     id={commentSheetContextId}
-                    className="flex gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3"
+                    className="flex gap-3 rounded-2xl border border-white/[0.1] bg-white/[0.05] p-3"
                   >
                     {showLockOverlay ? (
                       <div
@@ -1316,10 +1316,7 @@ export function PostCard({ post }: PostCardProps) {
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3">
-                    <h2
-                      id={labelId}
-                      className="text-base font-semibold tracking-tight text-white"
-                    >
+                    <h2 id={labelId} className="text-base font-semibold tracking-tight text-white">
                       Comments{" "}
                       <span className="text-sm font-normal tabular-nums text-zinc-500">
                         ({comments.length})
@@ -1352,9 +1349,9 @@ export function PostCard({ post }: PostCardProps) {
                       </span>
                     </p>
                   ) : (
-                    <ul className="space-y-0.5 pb-3">
+                    <ul className="space-y-1 pb-3">
                       {comments.map((c) => (
-                        <li key={c.id} className="flex gap-3 py-3">
+                        <li key={c.id} className="flex gap-3 rounded-xl px-1 py-3">
                           <div className="mt-0.5 h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500/90 to-violet-600/80 ring-1 ring-white/15">
                             {c.requesterProfileImage ? (
                               <Image
@@ -1426,7 +1423,7 @@ export function PostCard({ post }: PostCardProps) {
                   )}
                 </div>
 
-                <div className="shrink-0 border-t border-white/[0.08] bg-[#0b0f18] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
+                <div className="shrink-0 border-t border-white/[0.08] bg-[#0f1528] px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2">
                   <p className="mb-2 flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-center text-[10px] font-medium tracking-wide text-zinc-500">
                     <span>{isOwnPost ? "Creator reply unlocks" : "Reply request escrows"}</span>
                     <span className="inline-flex items-center gap-0.5 text-zinc-200">
@@ -1465,7 +1462,7 @@ export function PostCard({ post }: PostCardProps) {
                           : "Add a comment…"
                       }
                       disabled={isBusy}
-                      className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[22px] border border-white/10 bg-zinc-950/80 px-4 py-2.5 text-sm leading-snug text-white placeholder:text-zinc-500 outline-none transition focus:border-white/20 focus:ring-1 focus:ring-white/15 disabled:opacity-50"
+                      className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[22px] border border-white/12 bg-[#090d1b]/90 px-4 py-2.5 text-sm leading-snug text-white placeholder:text-zinc-500 outline-none transition focus:border-fuchsia-300/35 focus:ring-1 focus:ring-fuchsia-300/20 disabled:opacity-50"
                     />
                     <button
                       type="button"

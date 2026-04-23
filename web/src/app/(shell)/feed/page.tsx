@@ -89,14 +89,14 @@ export default function FeedPage() {
   );
 
   return (
-    <main className="pb-24 pt-7">
+    <main className="pb-24 pt-8">
       {feedQuery.isError ? (
-        <p className="px-4 pb-3 text-sm text-zinc-500">
+        <p className="px-4 pb-3 text-sm text-zinc-400">
           Feed unavailable right now. Check backend connection.
         </p>
       ) : null}
       {!feedQuery.isLoading && posts.length === 0 ? (
-        <p className="px-4 pb-3 text-sm text-zinc-500">No posts yet.</p>
+        <p className="px-4 pb-3 text-sm text-zinc-400">No posts yet.</p>
       ) : null}
       {posts.map((post) => (
         <PostCard key={post.id} post={post} />

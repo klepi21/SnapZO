@@ -800,7 +800,7 @@ export function SnapZoHubEarnPanel() {
   const primaryAction = hubMode === "deposit" ? runHubDeposit : runHubWithdraw;
 
   const fieldShell =
-    "flex min-h-[52px] items-stretch gap-2 rounded-2xl border border-white/[0.12] bg-zinc-950/70 pl-4 pr-1.5 shadow-inner outline-none ring-offset-2 ring-offset-[#070b12] transition focus-within:border-emerald-500/45 focus-within:ring-2 focus-within:ring-emerald-500/25";
+    "flex min-h-[52px] items-stretch gap-2 rounded-2xl border border-white/[0.14] bg-[#090d1b]/90 pl-4 pr-1.5 shadow-inner outline-none ring-offset-2 ring-offset-[#070b12] transition focus-within:border-fuchsia-300/40 focus-within:ring-2 focus-within:ring-fuchsia-300/20";
   const inputClass =
     "min-w-0 flex-1 border-0 bg-transparent py-3 text-right font-mono text-lg tabular-nums tracking-tight text-white outline-none placeholder:text-zinc-600";
 
@@ -816,7 +816,7 @@ export function SnapZoHubEarnPanel() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 gap-y-1">
             <h2 className="text-lg font-semibold tracking-tight text-white">SnapZo pool</h2>
-            <span className="inline-flex items-center rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase leading-tight tracking-wide text-emerald-200/95">
+            <span className="inline-flex items-center rounded-md border border-fuchsia-300/35 bg-fuchsia-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase leading-tight tracking-wide text-fuchsia-100">
               Gasless
             </span>
             <HelpPopover label="How the pool works" size="sm">
@@ -842,7 +842,7 @@ export function SnapZoHubEarnPanel() {
           <button
             type="button"
             onClick={() => void addSnapToWallet()}
-            className="snapzo-pressable shrink-0 self-start rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-100 sm:self-auto"
+            className="snapzo-pressable shrink-0 self-start rounded-lg border border-violet-300/25 bg-violet-500/10 px-3 py-2 text-xs font-medium text-zinc-100 hover:border-violet-200/40 hover:bg-violet-500/20 sm:self-auto"
           >
             <span className="inline-flex items-center gap-0">
               <SnapInlineIcon decorative />
@@ -868,7 +868,7 @@ export function SnapZoHubEarnPanel() {
       ) : null}
 
       <div className="mb-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3 sm:gap-3">
-        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
+        <div className="rounded-xl border border-fuchsia-300/18 bg-fuchsia-500/[0.08] px-3 py-3 sm:px-4">
           <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
             <MusdInlineIcon className="shrink-0 rounded-full object-cover" />
             MUSD
@@ -879,7 +879,7 @@ export function SnapZoHubEarnPanel() {
               : "—"}
           </p>
         </div>
-        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
+        <div className="rounded-xl border border-violet-300/18 bg-violet-500/[0.08] px-3 py-3 sm:px-4">
           <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
             <SnapInlineIcon decorative />
             {"SNAP"}
@@ -890,7 +890,7 @@ export function SnapZoHubEarnPanel() {
               : "—"}
           </p>
         </div>
-        <div className="rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:px-4">
+        <div className="rounded-xl border border-cyan-300/18 bg-cyan-500/[0.08] px-3 py-3 sm:px-4">
           <div className="flex items-center justify-between gap-1">
             <p className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
               <MezoInlineIcon decorative />
@@ -913,7 +913,7 @@ export function SnapZoHubEarnPanel() {
         </div>
       </div>
 
-      <div className="mb-4 rounded-xl border border-white/[0.08] bg-black/35 px-3 py-2.5 sm:px-4">
+      <div className="mb-4 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2.5 sm:px-4">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
             Vault APR (Mezo API)
@@ -946,7 +946,7 @@ export function SnapZoHubEarnPanel() {
       </div>
 
       <div
-        className="mb-4 flex rounded-xl border border-white/[0.1] bg-black/45 p-1"
+        className="mb-4 flex rounded-xl border border-white/[0.12] bg-[#090d1b]/85 p-1"
         role="tablist"
         aria-label="Deposit or withdraw"
       >
@@ -956,7 +956,7 @@ export function SnapZoHubEarnPanel() {
           aria-selected={hubMode === "deposit"}
           className={`snapzo-pressable flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-semibold ${
             hubMode === "deposit"
-              ? "bg-emerald-500/20 text-emerald-100 shadow-sm"
+              ? "bg-fuchsia-500/22 text-fuchsia-100 shadow-sm"
               : "text-zinc-500 hover:text-zinc-300"
           }`}
           onClick={() => setHubMode("deposit")}
@@ -970,7 +970,7 @@ export function SnapZoHubEarnPanel() {
           aria-selected={hubMode === "withdraw"}
           className={`snapzo-pressable flex-1 rounded-lg py-2.5 text-sm font-semibold ${
             hubMode === "withdraw"
-              ? "bg-amber-500/20 text-amber-100 shadow-sm"
+              ? "bg-violet-500/22 text-violet-100 shadow-sm"
               : "text-zinc-500 hover:text-zinc-300"
           }`}
           onClick={() => setHubMode("withdraw")}
@@ -1119,8 +1119,8 @@ export function SnapZoHubEarnPanel() {
         }}
         className={`snapzo-pressable mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-40 ${
           hubMode === "deposit"
-            ? "bg-emerald-600 hover:bg-emerald-500"
-            : "border border-amber-400/35 bg-amber-600/90 hover:bg-amber-500"
+            ? "bg-gradient-to-r from-[#ff2d90] to-[#7c3aed] hover:brightness-110"
+            : "border border-violet-300/45 bg-violet-600/90 hover:bg-violet-500"
         }`}
       >
         {(busy || isWritePending || isSignPending) && isConnected && !wrongChain ? (

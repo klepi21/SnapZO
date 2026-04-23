@@ -19,7 +19,7 @@ export function EarnView() {
         <div className="flex items-start gap-3">
           <Link
             href="/feed"
-            className="snapzo-pressable mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-black/30 text-white shadow-sm backdrop-blur-md active:scale-95 hover:bg-white/10"
+            className="snapzo-pressable mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.06] text-white shadow-sm backdrop-blur-md active:scale-95 hover:border-fuchsia-300/35 hover:bg-fuchsia-500/10"
             aria-label="Back to feed"
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
@@ -67,21 +67,21 @@ export function EarnView() {
       <div className="mx-4 flex flex-col gap-4 sm:gap-5">
         {hubUi ? (
           <div className="space-y-2">
-            <p className="px-1 text-[11px] font-medium text-zinc-500">Pool actions settle through a relayer.</p>
+            <p className="px-1 text-[11px] font-medium text-zinc-400">Pool actions settle through a relayer.</p>
             <SnapZoHubEarnPanel />
           </div>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/60 px-4 py-6 text-center text-sm text-zinc-400">
+          <div className="snapzo-card-compact rounded-2xl px-4 py-6 text-center text-sm text-zinc-300">
             Hub UI is off for this build (
             <span className="font-mono text-zinc-500">NEXT_PUBLIC_SNAPZO_HUB_UI</span>).
           </div>
         )}
         <div className="space-y-2">
-          <p className="px-1 text-[11px] font-medium text-zinc-500">Creators claim indexed rewards in one tap.</p>
+          <p className="px-1 text-[11px] font-medium text-zinc-400">Creators claim indexed rewards in one tap.</p>
           <SnapZoRewardsClaimPanel />
         </div>
         <div className="space-y-2">
-          <p className="px-1 text-[11px] font-medium text-zinc-500">Live hub stats pulled from on-chain reads.</p>
+          <p className="px-1 text-[11px] font-medium text-zinc-400">Live hub stats pulled from on-chain reads.</p>
           <EarnVaultStats />
         </div>
       </div>
