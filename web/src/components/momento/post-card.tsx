@@ -1058,17 +1058,7 @@ export function PostCard({ post }: PostCardProps) {
         {showLockOverlay ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/70 via-black/38 to-black/22 px-6 text-center">
             <Lock className="h-9 w-9 text-white/90" strokeWidth={1.5} aria-hidden />
-            <div>
-              <p className="text-sm font-semibold text-white">Hidden content</p>
-              <p className="mt-2 max-w-[280px] text-xs leading-relaxed text-zinc-400">
-                Pay{" "}
-                <span className="inline-flex items-center gap-0 font-semibold text-violet-200">
-                  {unlockSnapLabel}
-                  <SnapInlineIcon decorative />
-                </span>{" "}
-                to unlock.
-              </p>
-            </div>
+            <p className="text-sm font-semibold text-white">Hidden content</p>
             <button
               type="button"
               disabled={isBusy || unlockSnapWei === undefined}
