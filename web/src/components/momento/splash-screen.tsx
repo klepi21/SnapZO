@@ -126,7 +126,7 @@ export function SplashScreen() {
         >
           <div className="grid grid-cols-2 gap-0">
             <div className="flex gap-2 p-3">
-              <div className="mt-0.5 rounded-xl border border-pink-300/30 bg-pink-500/[0.08] p-2">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-pink-300/30 bg-pink-500/[0.08]">
                 <Heart className="h-4 w-4 text-pink-400" strokeWidth={2} />
               </div>
               <div>
@@ -137,7 +137,7 @@ export function SplashScreen() {
               </div>
             </div>
             <div className="flex gap-2 border-l border-white/[0.08] p-3">
-              <div className="mt-0.5 rounded-xl border border-emerald-300/30 bg-emerald-500/[0.08] p-2">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-300/30 bg-emerald-500/[0.08]">
                 <TrendingUp className="h-4 w-4 text-emerald-400" strokeWidth={2} />
               </div>
               <div>
