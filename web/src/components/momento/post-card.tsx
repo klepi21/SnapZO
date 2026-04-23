@@ -105,6 +105,7 @@ interface PendingSocialReply {
 }
 
 const SNAPZO_SOCIAL_REDEPLOY_BLOCK = BigInt(12_538_413);
+const ZERO = BigInt(0);
 
 function unlockMusdWeiFromPost(post: FeedPost): bigint {
   const human = post.unlockPriceMusd;
@@ -642,6 +643,14 @@ export function PostCard({ post }: PostCardProps) {
 
   const isBusy = isWritePending || isSignPending || isConfirming || Boolean(pendingHash);
 
+  const showGetSnapToast = useCallback(() => {
+    toast({
+      title: "You need SNAP to continue",
+      subtitle: "Get SNAP first, then try like, reply, or unlock.",
+      link: { href: "/earn", label: "Get SNAP on Earn" },
+    });
+  }, [toast]);
+
   const likedUi = hasTipped || likePressed;
   const likeCount = dbTips.length + (likePressed ? 1 : 0);
   const commentCount = comments.length;
@@ -660,6 +669,10 @@ export function PostCard({ post }: PostCardProps) {
     }
     if (unlockSnapWei === undefined) {
       toast("Pricing unavailable right now. Retry in a moment.", "error");
+      return;
+    }
+    if (socialTokenBalance <= ZERO || socialTokenBalance < unlockSnapWei) {
+      showGetSnapToast();
       return;
     }
     try {
@@ -706,6 +719,10 @@ export function PostCard({ post }: PostCardProps) {
     }
     if (socialSnapTokenAddress === undefined) {
       toast("Social token address unavailable. Retry in a moment.", "error");
+      return;
+    }
+    if (socialTokenBalance <= ZERO || socialTokenBalance < likeTipAmount) {
+      showGetSnapToast();
       return;
     }
     setLikePressed(true);
@@ -789,6 +806,7 @@ export function PostCard({ post }: PostCardProps) {
     socialNonceRead.data,
     likeTipAmountRead.data,
     socialTokenBalance,
+    showGetSnapToast,
     allowanceValue,
     refetchAllowance,
     address,
@@ -902,15 +920,11 @@ export function PostCard({ post }: PostCardProps) {
       toast("Reply stake config unavailable. Retry in a moment.", "error");
       return;
     }
+    if (socialTokenBalance <= ZERO || socialTokenBalance < stake) {
+      showGetSnapToast();
+      return;
+    }
     try {
-      if (socialTokenBalance < stake) {
-        throw new Error(
-          `Insufficient SNAP for reply stake. Need ${formatUnits(
-            stake,
-            SNAP_DECIMALS
-          )} SNAP.`
-        );
-      }
       if (allowanceValue < stake) {
         toast("Approve SNAP for SnapZoSocial…");
         await writeContractAsync({
@@ -1100,27 +1114,33 @@ export function PostCard({ post }: PostCardProps) {
               </span>
             </button>
           </div>
-          <div className="max-w-[52%] overflow-x-auto pt-0.5 text-right text-[10px] font-normal tracking-wide text-zinc-500">
-            <div className="whitespace-nowrap">
-            <span className="text-zinc-400">Like</span>{" "}
-            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "0.01"}{" "}
-              <SnapInlineIcon decorative />
-            </span>
-            <span className="text-zinc-600"> · </span>
-            <span className="text-zinc-400">Reply</span>{" "}
-            <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-              {replyStakeLabel} <SnapInlineIcon decorative />
-            </span>
-            {isLockedPost ? (
-              <>
-                <span className="text-zinc-600"> · </span>
-                <span className="text-zinc-400">Unlock</span>{" "}
+          <div className="min-w-0 flex-1 pt-0.5 text-right text-[10px] font-normal tracking-wide text-zinc-500">
+            <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5">
+              <span className="inline-flex items-center gap-0.5">
+                <span className="text-zinc-400">Like</span>
                 <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
-                  {unlockSnapLabel} <SnapInlineIcon decorative />
+                  {tipSnapWei !== undefined ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS) : "0.01"}
+                  <SnapInlineIcon decorative />
                 </span>
-              </>
-            ) : null}
+              </span>
+              <span className="text-zinc-600">·</span>
+              <span className="inline-flex items-center gap-0.5">
+                <span className="text-zinc-400">Reply</span>
+                <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+                  {replyStakeLabel} <SnapInlineIcon decorative />
+                </span>
+              </span>
+              {isLockedPost ? (
+                <>
+                  <span className="text-zinc-600">·</span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <span className="text-zinc-400">Unlock</span>
+                    <span className="inline-flex items-center gap-0.5 font-medium text-zinc-200">
+                      {unlockSnapLabel} <SnapInlineIcon decorative />
+                    </span>
+                  </span>
+                </>
+              ) : null}
             </div>
           </div>
         </div>

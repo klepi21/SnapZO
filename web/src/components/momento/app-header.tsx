@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { APP_NAME } from "@/lib/brand";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
@@ -10,12 +11,20 @@ const iconGhost =
   "snapzo-pressable flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] p-0 text-zinc-300 hover:border-white/[0.14] hover:bg-white/[0.06] hover:text-white active:scale-95";
 
 export function AppHeader() {
-  const { native, snapBalance, snapFormatted } = useMezoBalancesReadout();
+  const { isConnected, native, snapBalance, snapFormatted } = useMezoBalancesReadout();
   const snapLabel = native.isPending || snapBalance.isPending
     ? "…"
     : native.error || snapBalance.error
       ? "—"
       : (snapFormatted ?? "0");
+  const isZeroSnap =
+    Boolean(isConnected) &&
+    !native.isPending &&
+    !snapBalance.isPending &&
+    !native.error &&
+    !snapBalance.error &&
+    snapBalance.data !== undefined &&
+    snapBalance.data <= BigInt(0);
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#080d16]/86 shadow-[0_12px_32px_rgba(0,0,0,0.24)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#080d16]/72">
@@ -24,12 +33,22 @@ export function AppHeader() {
           {APP_NAME}
         </h1>
         <div className="flex shrink-0 items-center gap-1.5">
-          <div className="inline-flex min-h-10 items-center gap-1 rounded-full border border-white/[0.12] bg-black/25 px-2.5 py-0.5 shadow-[0_8px_20px_rgba(0,0,0,0.24)]">
-            <SnapInlineIcon decorative />
-            <span className="font-mono text-[11px] font-medium text-zinc-100">
-              {snapLabel}
-            </span>
-          </div>
+          {isZeroSnap ? (
+            <Link
+              href="/earn"
+              className="snapzo-pressable inline-flex min-h-10 items-center gap-1 rounded-full border border-sky-300/35 bg-sky-400/10 px-2.5 py-0.5 text-[11px] font-semibold text-sky-100 shadow-[0_8px_20px_rgba(0,0,0,0.24)] hover:bg-sky-400/20"
+            >
+              <SnapInlineIcon decorative />
+              Get SNAP
+            </Link>
+          ) : (
+            <div className="inline-flex min-h-10 items-center gap-1 rounded-full border border-white/[0.12] bg-black/25 px-2.5 py-0.5 shadow-[0_8px_20px_rgba(0,0,0,0.24)]">
+              <SnapInlineIcon decorative />
+              <span className="font-mono text-[11px] font-medium text-zinc-100">
+                {snapLabel}
+              </span>
+            </div>
+          )}
           <button type="button" className={iconGhost} aria-label="Notifications">
             <Bell className="h-[20px] w-[20px]" strokeWidth={1.5} />
           </button>
