@@ -39,6 +39,7 @@ export interface UserPostItem {
   likeCount?: number;
   replyCount?: number;
   unlockCount?: number;
+  unlockEarnings?: number;
   createdAt: string;
 }
 

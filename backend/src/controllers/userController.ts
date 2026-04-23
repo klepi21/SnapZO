@@ -10,6 +10,8 @@ import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
 
+const SNAP_DECIMALS = 6;
+
 /**
  * GET /api/users — list users with optional search + pagination.
  * Query: ?limit=50&offset=0&search=<substring>
@@ -163,7 +165,7 @@ export async function getUser(req: Request, res: Response): Promise<void> {
     .lean();
 
   const postIds = posts.map((p) => p._id);
-  const [unlockRows, socialUnlockRows, likeRows, replyRows, socialReplyRows] =
+  const [unlockRows, socialUnlockRows, likeRows, replyRows, socialReplyRows, unlockAmountRows, socialUnlockAmountRows] =
     postIds.length > 0
       ? await Promise.all([
           Unlock.aggregate<{ _id: unknown; count: number }>([
@@ -186,17 +188,35 @@ export async function getUser(req: Request, res: Response): Promise<void> {
             { $match: { post: { $in: postIds } } },
             { $group: { _id: '$post', count: { $sum: 1 } } },
           ]),
+          Unlock.aggregate<{ _id: unknown; total: number }>([
+            { $match: { post: { $in: postIds } } },
+            { $group: { _id: '$post', total: { $sum: '$amount' } } },
+          ]),
+          SocialUnlock.find(
+            { post: { $in: postIds } },
+            { post: 1, amountWei: 1, _id: 0 },
+          ).lean(),
         ])
-      : [[], [], [], [], []];
+      : [[], [], [], [], [], [], []];
   const unlockCountMap = new Map<string, number>();
   const likeCountMap = new Map<string, number>();
   const replyCountMap = new Map<string, number>();
+  const unlockEarningsMap = new Map<string, number>();
   for (const row of unlockRows) {
     unlockCountMap.set(String(row._id), row.count);
   }
   for (const row of socialUnlockRows) {
     const k = String(row._id);
     unlockCountMap.set(k, (unlockCountMap.get(k) ?? 0) + row.count);
+  }
+  for (const row of unlockAmountRows) {
+    unlockEarningsMap.set(String(row._id), row.total);
+  }
+  for (const row of socialUnlockAmountRows) {
+    const k = String(row.post);
+    const wei = row.amountWei ? Number(row.amountWei) : 0;
+    const snapAmount = Number.isFinite(wei) ? wei / 10 ** SNAP_DECIMALS : 0;
+    unlockEarningsMap.set(k, (unlockEarningsMap.get(k) ?? 0) + snapAmount);
   }
   for (const row of likeRows) {
     likeCountMap.set(String(row._id), row.count);
@@ -224,6 +244,7 @@ export async function getUser(req: Request, res: Response): Promise<void> {
       likeCount: likeCountMap.get(String(p._id)) ?? 0,
       replyCount: replyCountMap.get(String(p._id)) ?? 0,
       unlockCount: unlockCountMap.get(String(p._id)) ?? 0,
+      unlockEarnings: unlockEarningsMap.get(String(p._id)) ?? 0,
       createdAt: p.createdAt,
     })),
   });

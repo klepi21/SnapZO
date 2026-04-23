@@ -360,7 +360,11 @@ export function ProfileView() {
   const headerTitle = profile.displayName || walletShort || "Unnamed";
   const totalLikes = posts.reduce((sum, post) => sum + Number(post.likeCount ?? 0), 0);
   const totalReplies = posts.reduce((sum, post) => sum + Number(post.replyCount ?? 0), 0);
-  const earningsSnap = posts.reduce((sum, post) => sum + Number(post.totalTips ?? 0), 0);
+  const earningsSnap = posts.reduce(
+    (sum, post) =>
+      sum + Number(post.totalTips ?? 0) + Number(post.unlockEarnings ?? 0),
+    0,
+  );
   const earningsSnapLabel = Number.isFinite(earningsSnap)
     ? earningsSnap.toFixed(4).replace(/\.?0+$/, "")
     : "0";
