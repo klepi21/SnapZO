@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import User from '../models/User';
 import Post from '../models/Post';
+import Unlock from '../models/Unlock';
+import SocialUnlock from '../models/SocialUnlock';
 import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
@@ -157,6 +159,29 @@ export async function getUser(req: Request, res: Response): Promise<void> {
     .limit(100)
     .lean();
 
+  const postIds = posts.map((p) => p._id);
+  const [unlockRows, socialUnlockRows] =
+    postIds.length > 0
+      ? await Promise.all([
+          Unlock.aggregate<{ _id: unknown; count: number }>([
+            { $match: { post: { $in: postIds } } },
+            { $group: { _id: '$post', count: { $sum: 1 } } },
+          ]),
+          SocialUnlock.aggregate<{ _id: unknown; count: number }>([
+            { $match: { post: { $in: postIds } } },
+            { $group: { _id: '$post', count: { $sum: 1 } } },
+          ]),
+        ])
+      : [[], []];
+  const unlockCountMap = new Map<string, number>();
+  for (const row of unlockRows) {
+    unlockCountMap.set(String(row._id), row.count);
+  }
+  for (const row of socialUnlockRows) {
+    const k = String(row._id);
+    unlockCountMap.set(k, (unlockCountMap.get(k) ?? 0) + row.count);
+  }
+
   res.json({
     user: user.toJSON(),
     posts: posts.map((p) => ({
@@ -169,6 +194,7 @@ export async function getUser(req: Request, res: Response): Promise<void> {
       unlockPrice: p.unlockPrice,
       blurImage: p.blurImage,
       totalTips: p.totalTips,
+      unlockCount: unlockCountMap.get(String(p._id)) ?? 0,
       createdAt: p.createdAt,
     })),
   });

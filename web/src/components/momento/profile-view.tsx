@@ -6,7 +6,6 @@ import { ChevronLeft, Settings, Share2, User as UserIcon, UserPen, X } from "luc
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAccount } from "wagmi";
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import {
   fetchUserProfileWithPosts,
@@ -506,8 +505,7 @@ export function ProfileView() {
                 )}
                 {post.isLocked ? (
                   <div className="absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-[10px] text-zinc-200">
-                    Locked · {post.unlockPrice}
-                    <MusdInlineIcon className="ml-1 inline" decorative />
+                    Locked · {post.unlockCount ?? 0} unlock{(post.unlockCount ?? 0) === 1 ? "" : "s"}
                   </div>
                 ) : null}
               </div>
