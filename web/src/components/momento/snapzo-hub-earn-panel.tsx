@@ -69,6 +69,17 @@ const DEADLINE_SECS = BigInt(3600);
 /** One full MUSD unit in wei — used for marginal `convertToShares` rate (same as deposit preview). */
 const ONE_MUSD_WEI = parseUnits("1", MUSD_DECIMALS);
 
+interface MezoVaultApiItem {
+  id: string;
+  apr?: number;
+  emissionsApr?: number;
+}
+
+interface MezoVaultsApiResponse {
+  success?: boolean;
+  data?: MezoVaultApiItem[];
+}
+
 /**
  * Mirrors `SnapZoHub._withdraw` MEZO leg:
  * gross = floor(earned × withdrawSnap ÷ balance). Fees are handled at indexing time.
@@ -110,6 +121,15 @@ function formatUnitsMax2dp(value: bigint | undefined, decimals: number): string 
     return intPart;
   }
   return `${intPart}.${fracTrim}`;
+}
+
+function normalizeApiAprToPercent(raw: number | undefined): number | undefined {
+  if (raw === undefined || !Number.isFinite(raw) || raw < 0) {
+    return undefined;
+  }
+  // Mezo API returns fixed-point integer APRs (e.g. 1062204 -> 10.62204%).
+  // Keep this centralized so we can adjust quickly if upstream format changes.
+  return raw / 100_000;
 }
 
 function formatTxError(e: unknown): string {
@@ -293,6 +313,31 @@ export function SnapZoHubEarnPanel() {
     staleTime: 30_000,
     gcTime: 300_000,
     retry: 3,
+    refetchOnWindowFocus: true,
+  });
+
+  const mezoVaultAprQuery = useQuery({
+    queryKey: ["mezoVaultApr", MEZO_MUSD_VAULT] as const,
+    queryFn: async () => {
+      const res = await fetch("/api/mezo/earn/vaults");
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Mezo vault API failed (${res.status}): ${text || res.statusText}`);
+      }
+      const payload = (await res.json()) as MezoVaultsApiResponse;
+      const row = payload.data?.find(
+        (v) => v.id?.toLowerCase() === MEZO_MUSD_VAULT.toLowerCase(),
+      );
+      if (!row) {
+        return { aprPct: undefined, emissionsAprPct: undefined };
+      }
+      return {
+        aprPct: normalizeApiAprToPercent(row.apr),
+        emissionsAprPct: normalizeApiAprToPercent(row.emissionsApr),
+      };
+    },
+    enabled: configured,
+    staleTime: 60_000,
     refetchOnWindowFocus: true,
   });
 
@@ -865,6 +910,38 @@ export function SnapZoHubEarnPanel() {
               : "—"}
           </p>
         </div>
+      </div>
+
+      <div className="mb-4 rounded-xl border border-white/[0.08] bg-black/35 px-3 py-2.5 sm:px-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            Vault APR (Mezo API)
+          </p>
+          <HelpPopover label="How APR is sourced" size="sm">
+            <p>
+              Read from{" "}
+              <span className="font-mono text-zinc-200">
+                https://api.testnet.mezo.org/earn/vaults
+              </span>{" "}
+              for the MUSD vault.
+            </p>
+            <p>
+              Includes a breakdown from Mezo's fields: base APR + emissions APR.
+            </p>
+          </HelpPopover>
+        </div>
+        <p className="mt-1 font-mono text-base font-semibold tabular-nums text-emerald-200/95">
+          {mezoVaultAprQuery.isPending
+            ? "Loading…"
+            : mezoVaultAprQuery.data?.aprPct !== undefined
+              ? `${mezoVaultAprQuery.data.aprPct.toFixed(2)}%`
+              : "N/A"}
+        </p>
+        {mezoVaultAprQuery.data?.emissionsAprPct !== undefined ? (
+          <p className="mt-1 text-[10px] text-zinc-500">
+            Emissions: {mezoVaultAprQuery.data.emissionsAprPct.toFixed(2)}%
+          </p>
+        ) : null}
       </div>
 
       <div
