@@ -66,7 +66,7 @@ interface PostCardProps {
   post: FeedPost;
 }
 
-/** Fixed MUSD-quoted like/reply; unlock uses per-post `unlockPriceMusd` (default 0.1). */
+/** Fixed MUSD-quoted like/reply; unlock now uses direct SNAP amount from post price. */
 const TIP_MUSD_WEI = parseUnits("0.01", MUSD_DECIMALS);
 const DEFAULT_UNLOCK_MUSD = 0.1;
 const SNAPZO_SOCIAL_TIP_TYPES = {
@@ -107,23 +107,17 @@ interface PendingSocialReply {
 const SNAPZO_SOCIAL_REDEPLOY_BLOCK = BigInt(12_538_413);
 const ZERO = BigInt(0);
 
-function unlockMusdWeiFromPost(post: FeedPost): bigint {
+function unlockSnapWeiFromPost(post: FeedPost): bigint {
   const human = post.unlockPriceMusd;
   if (human === undefined || !Number.isFinite(human) || human <= 0) {
-    return parseUnits(String(DEFAULT_UNLOCK_MUSD), MUSD_DECIMALS);
+    return parseUnits(String(DEFAULT_UNLOCK_MUSD), SNAP_DECIMALS);
   }
   const s = human.toFixed(12).replace(/\.?0+$/, "") || String(DEFAULT_UNLOCK_MUSD);
   try {
-    return parseUnits(s, MUSD_DECIMALS);
+    return parseUnits(s, SNAP_DECIMALS);
   } catch {
-    return parseUnits(String(DEFAULT_UNLOCK_MUSD), MUSD_DECIMALS);
+    return parseUnits(String(DEFAULT_UNLOCK_MUSD), SNAP_DECIMALS);
   }
-}
-
-function formatMusdHumanFromWei(wei: bigint): string {
-  return formatUnits(wei, MUSD_DECIMALS)
-    .replace(/(\.\d*?[1-9])0+$/, "$1")
-    .replace(/\.$/, "");
 }
 
 function formatUnitsMax2dp(value: bigint, decimals: number): string {
@@ -281,11 +275,7 @@ export function PostCard({ post }: PostCardProps) {
   const refetchAllowance = allowanceRead.refetch;
   const socialTokenBalance = socialTokenBalanceRead.data ?? BigInt(0);
 
-  const unlockMusdWei = useMemo(() => unlockMusdWeiFromPost(post), [post]);
-  const unlockMusdLabel = useMemo(
-    () => formatMusdHumanFromWei(unlockMusdWei),
-    [unlockMusdWei],
-  );
+  const unlockSnapWei = useMemo(() => unlockSnapWeiFromPost(post), [post]);
 
   const tipSnapWei = useMemo(() => {
     if (ta === undefined || ts === undefined || ta <= BigInt(0)) {
@@ -294,14 +284,6 @@ export function PostCard({ post }: PostCardProps) {
     const v = musdWeiToSnapBaseUnitsCeil(TIP_MUSD_WEI, ts, ta);
     return v > BigInt(0) ? v : undefined;
   }, [ta, ts]);
-
-  const unlockSnapWei = useMemo(() => {
-    if (ta === undefined || ts === undefined || ta <= BigInt(0)) {
-      return undefined;
-    }
-    const v = musdWeiToSnapBaseUnitsCeil(unlockMusdWei, ts, ta);
-    return v > BigInt(0) ? v : undefined;
-  }, [ta, ts, unlockMusdWei]);
 
   const replyStakeAmount = replyStakeAmountRead.data;
   const replyStakeLabel =
@@ -503,11 +485,7 @@ export function PostCard({ post }: PostCardProps) {
             amountWei: unlockSnapWei.toString(),
           }).catch(() => null);
         }
-        toast(
-          unlockSnapWei !== undefined
-            ? `Unlocked · ${unlockMusdLabel} MUSD (~${formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS)} SNAP)`
-            : "Unlocked.",
-        );
+        toast(unlockSnapWei !== undefined ? `Unlocked · ${unlockSnapLabel} SNAP` : "Unlocked.");
       } else if (pendingKind === "like") {
         setDbHasTipped(true);
         if (address && likeTipAmountRead.data !== undefined) {
@@ -599,7 +577,6 @@ export function PostCard({ post }: PostCardProps) {
     tipSnapWei,
     replyStakeLabel,
     unlockSnapWei,
-    unlockMusdLabel,
     likeTipAmountRead.data,
     toast,
   ]);
@@ -676,7 +653,7 @@ export function PostCard({ post }: PostCardProps) {
       return;
     }
     try {
-      toast(`Confirm unlock · ${unlockMusdLabel} MUSD (~${unlockSnapLabel} SNAP)…`);
+      toast(`Confirm unlock · ${unlockSnapLabel} SNAP…`);
       const hash = await writeContractAsync({
         address: SNAPZO_SNAP_TOKEN_ADDRESS,
         abi: erc20TransferAbi,
