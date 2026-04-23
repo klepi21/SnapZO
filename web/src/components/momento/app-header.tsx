@@ -30,19 +30,16 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-white/[0.12] bg-[#0f1530]/86 shadow-[0_12px_32px_rgba(0,0,0,0.28)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#0f1530]/72">
       <div className="flex min-h-11 items-center justify-between gap-3 px-4 pb-2 pt-[max(0.45rem,env(safe-area-inset-top))]">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-white/12 bg-white/[0.06]">
-            <Image
-              src="/snap-token-logo.png"
-              alt={`${APP_NAME} icon`}
-              fill
-              className="object-contain p-1"
-              sizes="32px"
-            />
-          </div>
-          <h1 className="font-snapzo-logo snapzo-title-tight min-w-0 truncate text-xl font-normal tracking-[0.04em] text-white drop-shadow-[0_1px_14px_rgba(0,0,0,0.45)] sm:text-2xl">
-            {APP_NAME}
-          </h1>
+        <div className="min-w-0">
+          <Image
+            src="/snapfull.png"
+            alt={`${APP_NAME} logo`}
+            width={260}
+            height={54}
+            priority
+            className="h-auto w-[170px] object-contain sm:w-[200px]"
+            sizes="(max-width: 640px) 170px, 200px"
+          />
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {isZeroSnap ? (

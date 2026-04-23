@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { Loader2 } from "lucide-react";
+import { Landmark, Loader2, Users, Wallet } from "lucide-react";
 
 import { HelpPopover } from "@/components/ui/help-popover";
 import {
@@ -785,6 +785,11 @@ export function SnapZoHubEarnPanel() {
 
   const amountIn = hubMode === "deposit" ? hubDepositIn : hubWithdrawIn;
   const setAmountIn = hubMode === "deposit" ? setHubDepositIn : setHubWithdrawIn;
+  const showStarterLayout =
+    isConnected &&
+    !wrongChain &&
+    snapBal.data !== undefined &&
+    snapBal.data <= ZERO;
   const onMax = () => {
     if (hubMode === "deposit") {
       if (musdBal.data !== undefined) {
@@ -863,6 +868,58 @@ export function SnapZoHubEarnPanel() {
             onClick={() => switchChain?.({ chainId: mezoTestnet.id })}
           >
             Switch network
+          </button>
+        </div>
+      ) : null}
+
+      {showStarterLayout ? (
+        <div className="mb-4 overflow-hidden rounded-[22px] border border-white/[0.12] bg-gradient-to-b from-[#141d37]/95 via-[#101831]/95 to-[#0c1226]/95 p-3.5 shadow-[0_14px_34px_rgba(0,0,0,0.34)]">
+          <div className="mb-2">
+            <p className="text-[17px] font-semibold leading-tight tracking-[-0.02em] text-white">
+              Earn Real Yield
+            </p>
+            <p className="mt-1 text-[13px] leading-snug text-zinc-300">
+              Grow your money while supporting creators.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/[0.1] bg-[#111b34]/85 px-3 py-2.5">
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+              Current APR
+            </p>
+            <p className="mt-1 font-mono text-[38px] font-semibold leading-none tracking-tight text-emerald-300">
+              {mezoVaultAprQuery.isPending
+                ? "…"
+                : mezoVaultAprQuery.data?.aprPct !== undefined
+                  ? `${mezoVaultAprQuery.data.aprPct.toFixed(2)}%`
+                  : "N/A"}
+            </p>
+            <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+              Your Balance
+            </p>
+            <p className="mt-0.5 font-mono text-[22px] font-semibold leading-none text-zinc-100">
+              {musdBal.data !== undefined ? formatUnitsMax2dp(musdBal.data, MUSD_DECIMALS) : "0"} MUSD
+            </p>
+          </div>
+          <div className="mt-2.5 grid grid-cols-3 gap-2 text-[10px] text-zinc-400">
+            <span className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/[0.09] bg-white/[0.03] px-1.5 py-1.5">
+              <Landmark className="h-3.5 w-3.5 text-zinc-300" />
+              Treasury
+            </span>
+            <span className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/[0.09] bg-white/[0.03] px-1.5 py-1.5">
+              <Users className="h-3.5 w-3.5 text-zinc-300" />
+              Creators
+            </span>
+            <span className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/[0.09] bg-white/[0.03] px-1.5 py-1.5">
+              <Wallet className="h-3.5 w-3.5 text-zinc-300" />
+              Community
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setHubMode("deposit")}
+            className="snapzo-pressable mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#ff2d90] to-[#f93f7d] px-4 text-sm font-semibold text-white hover:brightness-110"
+          >
+            Start Earning
           </button>
         </div>
       ) : null}
