@@ -347,16 +347,33 @@ export async function createStory(input: {
   mediaBase64: string;
   mediaName?: string;
   mediaMimeType?: string;
+  onProgress?: (percent: number) => void;
 }): Promise<void> {
-  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/stories`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+  const { onProgress, ...payload } = input;
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${getSnapzoApiBaseUrl()}/api/stories`, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.upload.onprogress = (event) => {
+      if (!onProgress || !event.lengthComputable) return;
+      const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      onProgress(percent);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve();
+        return;
+      }
+      reject(
+        new Error(
+          `createStory failed (${xhr.status}): ${xhr.responseText || xhr.statusText}`
+        )
+      );
+    };
+    xhr.onerror = () => reject(new Error("createStory failed: network error"));
+    xhr.send(JSON.stringify(payload));
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`createStory failed (${res.status}): ${text || res.statusText}`);
-  }
 }
 
 export async function markStorySeen(input: {

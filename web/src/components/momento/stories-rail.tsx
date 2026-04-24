@@ -37,6 +37,8 @@ export function StoriesRail() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [paused, setPaused] = useState(false);
   const [localSeen, setLocalSeen] = useState<Set<string>>(new Set());
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const pressStateRef = useRef<{ x: number; startedAt: number } | null>(null);
 
   const storiesQuery = useQuery({
     queryKey: ["stories-feed", address?.toLowerCase() ?? null],
@@ -54,10 +56,18 @@ export function StoriesRail() {
         mediaBase64: dataUrl,
         mediaName: file.name,
         mediaMimeType: file.type || "image/jpeg",
+        onProgress: setUploadProgress,
       });
     },
+    onMutate: () => {
+      setUploadProgress(0);
+    },
     onSuccess: async () => {
+      setUploadProgress(0);
       await queryClient.invalidateQueries({ queryKey: ["stories-feed"] });
+    },
+    onError: () => {
+      setUploadProgress(0);
     },
   });
 
@@ -166,6 +176,12 @@ export function StoriesRail() {
     setPaused(false);
   }
 
+  function formatHoursLeft(expiresAt: string): string {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    const hours = Math.max(0, Math.ceil(ms / (60 * 60 * 1000)));
+    return `${hours}h left`;
+  }
+
   return (
     <>
       <section className="px-3 pb-3">
@@ -180,8 +196,16 @@ export function StoriesRail() {
               <span className="text-2xl font-light text-fuchsia-300">+</span>
             </span>
             <span className="max-w-[72px] truncate text-[11px] text-zinc-300">
-              {uploadMutation.isPending ? "Uploading..." : "Your story"}
+              {uploadMutation.isPending ? "Uploading..." : "Add Story"}
             </span>
+            {uploadMutation.isPending ? (
+              <span className="h-1.5 w-14 overflow-hidden rounded-full bg-white/15">
+                <span
+                  className="block h-full bg-fuchsia-300 transition-[width] duration-150"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </span>
+            ) : null}
           </button>
 
           {groupsWithLocalSeen.map((group, idx) => {
@@ -245,27 +269,27 @@ export function StoriesRail() {
 
       {activeGroupIndex !== null && currentGroup && currentStory ? (
         <div className="fixed inset-0 z-[120] bg-black/95">
-          <button
-            type="button"
-            className="absolute left-0 top-0 h-full w-1/3"
-            onClick={goPrev}
-            onMouseDown={() => setPaused(true)}
-            onMouseUp={() => setPaused(false)}
-            onMouseLeave={() => setPaused(false)}
-            onTouchStart={() => setPaused(true)}
-            onTouchEnd={() => setPaused(false)}
-            aria-label="Previous story"
-          />
-          <button
-            type="button"
-            className="absolute right-0 top-0 h-full w-2/3"
-            onClick={goNext}
-            onMouseDown={() => setPaused(true)}
-            onMouseUp={() => setPaused(false)}
-            onMouseLeave={() => setPaused(false)}
-            onTouchStart={() => setPaused(true)}
-            onTouchEnd={() => setPaused(false)}
-            aria-label="Next story"
+          <div
+            className="absolute inset-0"
+            onPointerDown={(e) => {
+              pressStateRef.current = { x: e.clientX, startedAt: Date.now() };
+              setPaused(true);
+            }}
+            onPointerUp={(e) => {
+              const press = pressStateRef.current;
+              pressStateRef.current = null;
+              setPaused(false);
+              if (!press) return;
+              const heldMs = Date.now() - press.startedAt;
+              if (heldMs > 220) return;
+              const vw = window.innerWidth || 1;
+              if (e.clientX < vw * 0.35) goPrev();
+              else goNext();
+            }}
+            onPointerCancel={() => {
+              pressStateRef.current = null;
+              setPaused(false);
+            }}
           />
 
           <div className="absolute left-3 right-3 top-3 z-10 flex items-center justify-between">
@@ -290,6 +314,7 @@ export function StoriesRail() {
                   currentGroup.creatorUsername ||
                   shortWallet(currentGroup.creatorWallet)}
               </span>
+              <span className="text-xs text-zinc-300">{formatHoursLeft(currentStory.expiresAt)}</span>
             </div>
             <button
               type="button"
