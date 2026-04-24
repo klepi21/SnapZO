@@ -136,7 +136,14 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
     ? requireAddress(req.query.viewer, 'viewer').toLowerCase()
     : null;
 
-  const filter: Record<string, unknown> = { visibility: { $in: ['public', 'unlock'] } };
+  const filter: Record<string, unknown> = {
+    $or: [
+      { visibility: { $in: ['public', 'unlock'] } },
+      { visibility: { $exists: false } },
+      { visibility: null },
+      { visibility: '' },
+    ],
+  };
   if (cursor && !Number.isNaN(cursor.getTime())) {
     filter.createdAt = { $lt: cursor };
   }
