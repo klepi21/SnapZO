@@ -7,10 +7,9 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { ChevronLeft, ImagePlus, Loader2, Lock } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
-import { MusdInlineIcon } from "@/components/icons/musd-inline-icon";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
-import { getSnapzoApiBaseUrl } from "@/lib/snapzo-api";
+import { fetchOnlySnapsPlan, getSnapzoApiBaseUrl } from "@/lib/snapzo-api";
 import { APP_CREATOR_REVENUE_EXPLAINER } from "@/lib/brand";
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -99,9 +98,31 @@ export function CreatePostView() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
-  const [isLocked, setIsLocked] = useState(false);
+  const [visibility, setVisibility] = useState<"public" | "unlock" | "subscriber_only">("public");
   const [unlockSnap, setUnlockSnap] = useState("0.1");
+  const [hasOnlySnapsPlan, setHasOnlySnapsPlan] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const isLocked = visibility === "unlock";
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPlan() {
+      if (!address) {
+        if (!cancelled) setHasOnlySnapsPlan(false);
+        return;
+      }
+      const plan = await fetchOnlySnapsPlan(address).catch(() => null);
+      if (cancelled) return;
+      setHasOnlySnapsPlan(Boolean(plan?.monthlyPriceWei && plan.monthlyPriceWei !== "0"));
+      if (!plan?.monthlyPriceWei || plan.monthlyPriceWei === "0") {
+        setVisibility((current) => (current === "subscriber_only" ? "public" : current));
+      }
+    }
+    void loadPlan();
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   useEffect(() => {
     if (!file) {
@@ -152,6 +173,10 @@ export function CreatePostView() {
         return;
       }
     }
+    if (visibility === "subscriber_only" && !hasOnlySnapsPlan) {
+      toast("Set your OnlySnaps monthly price first in Profile > OnlySnaps.", "error");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -184,6 +209,7 @@ export function CreatePostView() {
           blurMediaMimeType,
           isLocked,
           unlockPrice: isLocked ? price : 0,
+          visibility,
         }),
       });
 
@@ -228,7 +254,7 @@ export function CreatePostView() {
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold tracking-tight text-white">New post</h1>
           <p className="text-xs font-normal text-zinc-500">
-            Photo, caption, optional paid unlock
+            Photo, caption, and audience visibility
           </p>
         </div>
       </div>
@@ -305,6 +331,42 @@ export function CreatePostView() {
         </div>
 
         <div className="px-4 py-4">
+          <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/[0.08] bg-black/15 p-1">
+            <button
+              type="button"
+              onClick={() => setVisibility("public")}
+              className={`snapzo-pressable rounded-xl px-2 py-2 text-xs font-semibold ${
+                visibility === "public"
+                  ? "border border-white/20 bg-white/10 text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Public
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisibility("unlock")}
+              className={`snapzo-pressable rounded-xl px-2 py-2 text-xs font-semibold ${
+                visibility === "unlock"
+                  ? "border border-cyan-300/35 bg-cyan-500/15 text-cyan-100"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Paid Unlock
+            </button>
+            <button
+              type="button"
+              disabled={!hasOnlySnapsPlan}
+              onClick={() => setVisibility("subscriber_only")}
+              className={`snapzo-pressable rounded-xl px-2 py-2 text-xs font-semibold ${
+                visibility === "subscriber_only"
+                  ? "border border-fuchsia-300/45 bg-fuchsia-500/18 text-fuchsia-100"
+                  : "text-zinc-400 hover:text-zinc-200"
+              } disabled:cursor-not-allowed disabled:opacity-45`}
+            >
+              OnlySnaps
+            </button>
+          </div>
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-black/15 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 ring-1 ring-indigo-400/25">
@@ -313,7 +375,7 @@ export function CreatePostView() {
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-white">Hidden until unlock</p>
                 <p className="text-xs font-normal leading-snug text-zinc-500">
-                  Followers pay the quoted MUSD value in SNAP once to reveal the full photo
+                  Followers pay once to unlock this post
                 </p>
               </div>
             </div>
@@ -323,7 +385,7 @@ export function CreatePostView() {
               aria-checked={isLocked}
               aria-label="Hidden until unlock"
               disabled={submitting}
-              onClick={() => setIsLocked((v) => !v)}
+              onClick={() => setVisibility((v) => (v === "unlock" ? "public" : "unlock"))}
               className={`relative h-8 w-[52px] shrink-0 rounded-full border transition ${
                 isLocked
                   ? "border-indigo-400/50 bg-gradient-to-r from-indigo-500 to-sky-600"
@@ -337,6 +399,14 @@ export function CreatePostView() {
               />
             </button>
           </div>
+
+          {visibility === "subscriber_only" ? (
+            <div className="mt-4 rounded-2xl border border-fuchsia-300/25 bg-fuchsia-500/[0.08] px-4 py-3">
+              <p className="text-xs leading-relaxed text-zinc-300">
+                This post is visible only to active OnlySnaps subscribers. Per-post unlock is disabled.
+              </p>
+            </div>
+          ) : null}
 
           {isLocked ? (
             <div className="mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">

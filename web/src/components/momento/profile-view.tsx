@@ -452,10 +452,14 @@ export function ProfileView() {
     ? earningsSnap.toFixed(4).replace(/\.?0+$/, "")
     : "0";
   const onlySnapsPosts = posts.filter((post) => post.visibility === "subscriber_only");
+  const hasOnlySnapsPlan = Boolean(
+    onlySnapsPlan?.monthlyPriceWei && onlySnapsPlan.monthlyPriceWei !== "0",
+  );
   const canViewOnlySnaps = isOwnProfile || Boolean(onlySnapsStatus?.isActive);
-  const onlySnapsPriceLabel = onlySnapsPlan?.monthlyPriceWei
-    ? Number(formatUnits(BigInt(onlySnapsPlan.monthlyPriceWei), 18)).toFixed(2)
-    : "1.00";
+  const onlySnapsPriceLabel =
+    hasOnlySnapsPlan && onlySnapsPlan?.monthlyPriceWei
+      ? Number(formatUnits(BigInt(onlySnapsPlan.monthlyPriceWei), 18)).toFixed(2)
+      : null;
 
   const handleSaveOnlySnapsPlan = useCallback(async () => {
     if (!isOwnProfile || !address) return;
@@ -610,7 +614,11 @@ export function ProfileView() {
       </div>
 
       <div className="mt-7 px-4">
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#0f1528]/75 p-1">
+        <div
+          className={`grid gap-2 rounded-2xl border border-white/10 bg-[#0f1528]/75 p-1 ${
+            hasOnlySnapsPlan || isOwnProfile ? "grid-cols-2" : "grid-cols-1"
+          }`}
+        >
           <button
             type="button"
             onClick={() => setActiveTab("posts")}
@@ -622,17 +630,19 @@ export function ProfileView() {
           >
             Posts
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("onlysnaps")}
-            className={`snapzo-pressable rounded-xl px-3 py-2 text-sm font-semibold transition ${
-              activeTab === "onlysnaps"
-                ? "border border-fuchsia-300/45 bg-gradient-to-r from-fuchsia-500/20 to-violet-500/20 text-white"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <span className="font-serif text-[17px] italic tracking-wide">OnlySnaps</span>
-          </button>
+          {hasOnlySnapsPlan || isOwnProfile ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab("onlysnaps")}
+              className={`snapzo-pressable rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                activeTab === "onlysnaps"
+                  ? "border border-fuchsia-300/45 bg-gradient-to-r from-fuchsia-500/20 to-violet-500/20 text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <span className="font-serif text-[17px] italic tracking-wide">OnlySnaps</span>
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -685,9 +695,15 @@ export function ProfileView() {
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-serif text-[24px] italic leading-none text-white">OnlySnaps</h3>
               <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-300/35 bg-fuchsia-500/10 px-2.5 py-1 text-xs font-semibold text-fuchsia-100">
-                {onlySnapsPriceLabel}
-                <SnapInlineIcon decorative />
-                / month
+                {onlySnapsPriceLabel ? (
+                  <>
+                    {onlySnapsPriceLabel}
+                    <SnapInlineIcon decorative />
+                    / month
+                  </>
+                ) : (
+                  "Plan not set"
+                )}
               </span>
             </div>
             <p className="mt-2 text-xs text-zinc-400">
@@ -714,7 +730,15 @@ export function ProfileView() {
             ) : null}
           </div>
 
-          {!canViewOnlySnaps ? (
+          {!isOwnProfile && !hasOnlySnapsPlan ? (
+            <section className="snapzo-card-compact flex flex-col items-center justify-center border-dashed bg-[#0f162a]/85 px-6 py-10 text-center">
+              <p className="text-sm text-zinc-400">
+                This creator has not enabled OnlySnaps yet.
+              </p>
+            </section>
+          ) : null}
+
+          {hasOnlySnapsPlan && !canViewOnlySnaps ? (
             <section className="snapzo-card-primary overflow-hidden">
               <div className="relative h-44 w-full bg-gradient-to-br from-fuchsia-500/15 via-violet-500/15 to-indigo-500/10">
                 <div className="absolute inset-0 backdrop-blur-[2px]" />
@@ -729,13 +753,13 @@ export function ProfileView() {
                     type="button"
                     className="snapzo-pressable mt-4 inline-flex items-center gap-1 rounded-full border border-fuchsia-300/45 bg-gradient-to-r from-fuchsia-500/35 to-violet-500/35 px-4 py-2 text-sm font-semibold text-white"
                   >
-                    Subscribe {onlySnapsPriceLabel}
+                    Subscribe {onlySnapsPriceLabel ?? ""}
                     <SnapInlineIcon decorative />
                   </button>
                 </div>
               </div>
             </section>
-          ) : (
+          ) : hasOnlySnapsPlan ? (
             <>
               <div className="px-1">
                 <p className="text-xs text-zinc-400">

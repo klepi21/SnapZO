@@ -9,6 +9,7 @@ import Tip from '../models/Tip';
 import Reply from '../models/Reply';
 import SocialReply from '../models/SocialReply';
 import SubscriptionAccess from '../models/SubscriptionAccess';
+import CreatorSubscriptionPlan from '../models/CreatorSubscriptionPlan';
 import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
@@ -72,6 +73,14 @@ export async function createPost(req: Request, res: Response): Promise<void> {
   }
   if (visibility === 'public' && price > 0) {
     throw badRequest('public posts cannot have unlockPrice');
+  }
+  if (visibility === 'subscriber_only') {
+    const creatorPlan = await CreatorSubscriptionPlan.findOne({ creatorWallet: wallet })
+      .select('monthlyPriceWei')
+      .lean();
+    if (!creatorPlan || creatorPlan.monthlyPriceWei === '0') {
+      throw badRequest('set OnlySnaps monthly price first before posting subscriber-only content');
+    }
   }
 
   const normalizedPrice = visibility === 'unlock' ? price : 0;
