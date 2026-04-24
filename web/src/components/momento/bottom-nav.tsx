@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { Home, PiggyBank, Plus, Search, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type NavItem =
   | { href: string; label: string; disabled: boolean; Icon: LucideIcon; isCreate?: false }
@@ -37,6 +38,16 @@ function IgCreateIcon({ active }: { active: boolean }) {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const [profileWallet, setProfileWallet] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const wallet = new URLSearchParams(window.location.search).get("wallet");
+    setProfileWallet(wallet);
+  }, [pathname]);
+  const profileHref =
+    pathname.startsWith("/profile") && profileWallet
+      ? `/profile?wallet=${profileWallet}`
+      : "/profile";
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50">
@@ -46,6 +57,7 @@ export function BottomNav() {
       >
         <ul className="grid h-[58px] w-full grid-cols-5 place-items-center gap-0.5 px-0.5">
           {items.map((item) => {
+            const targetHref = item.href === "/profile" ? profileHref : item.href;
             const active =
               !item.disabled &&
               (pathname === item.href || pathname.startsWith(`${item.href}/`));
@@ -115,7 +127,7 @@ export function BottomNav() {
                 className="flex h-full min-h-[48px] w-full items-center justify-center"
               >
                 <Link
-                  href={item.href}
+                  href={targetHref}
                   className="flex h-full w-full items-center justify-center"
                   aria-current={active ? "page" : undefined}
                   aria-label={item.label}

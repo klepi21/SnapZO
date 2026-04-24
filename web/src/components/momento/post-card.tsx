@@ -300,12 +300,6 @@ export function PostCard({ post }: PostCardProps) {
 
   const replyStakeAmount = replyStakeAmountRead.data;
   const likeTipAmount = likeTipAmountRead.data;
-  const likeSnapLabel =
-    likeTipAmount !== undefined
-      ? formatUnitsMax2dp(likeTipAmount, SNAP_DECIMALS)
-      : tipSnapWei !== undefined
-        ? formatUnitsMax2dp(tipSnapWei, SNAP_DECIMALS)
-        : "0.01";
   const replyStakeLabel =
     replyStakeAmount !== undefined
       ? formatUnitsMax2dp(replyStakeAmount, SNAP_DECIMALS)
@@ -379,7 +373,7 @@ export function PostCard({ post }: PostCardProps) {
   const mediaContainerClass = isSquareMedia
     ? "relative mx-3 aspect-square w-full touch-manipulation overflow-hidden rounded-[24px] ring-1 ring-white/[0.12]"
     : "relative mx-3 aspect-[9/16] w-full touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]";
-  const mediaObjectClass = isSquareMedia ? "object-cover" : "object-contain";
+  const mediaObjectClass = "object-contain";
   const socialPostId = useMemo(() => {
     const postIdDigest = keccak256(stringToBytes(post.id));
     return BigInt(`0x${postIdDigest.slice(2, 18)}`);
@@ -1199,7 +1193,7 @@ export function PostCard({ post }: PostCardProps) {
               Subscribe to unlock this creator's premium wall.
             </p>
             <Link
-              href={`/profile?wallet=${post.tipRecipient}`}
+              href={profileHref}
               className="snapzo-pressable inline-flex items-center justify-center rounded-2xl border border-fuchsia-300/45 bg-gradient-to-br from-fuchsia-500/28 to-violet-500/24 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.2)] hover:border-fuchsia-200/70 hover:from-fuchsia-500/38"
             >
               Subscribe on profile
@@ -1274,33 +1268,6 @@ export function PostCard({ post }: PostCardProps) {
             <div className="inline-flex items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.03] px-2 py-1 text-[11px] text-zinc-300">
               <Lock className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.7} />
               <span className="tabular-nums">{post.unlockCount ?? 0}</span>
-            </div>
-          </div>
-          <div className="min-w-0 flex-1 overflow-hidden pt-0.5">
-            <div className="flex flex-wrap justify-end gap-1.5">
-              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-fuchsia-300/18 bg-fuchsia-400/[0.08] px-2.5 py-1 text-[10px] leading-none">
-                <span className="font-medium text-zinc-300">Like</span>
-                <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-100">
-                  {likeSnapLabel}
-                  <SnapInlineIcon decorative />
-                </span>
-              </span>
-              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-violet-300/18 bg-violet-400/[0.08] px-2.5 py-1 text-[10px] leading-none">
-                <span className="font-medium text-zinc-300">Reply</span>
-                <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-100">
-                  {replyStakeLabel}
-                  <SnapInlineIcon decorative />
-                </span>
-              </span>
-              {isLockedPost ? (
-                <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-cyan-300/18 bg-cyan-400/[0.08] px-2.5 py-1 text-[10px] leading-none">
-                  <span className="font-medium text-zinc-300">Unlock</span>
-                  <span className="inline-flex items-center gap-0.5 font-semibold text-zinc-100">
-                    {unlockSnapLabel}
-                    <SnapInlineIcon decorative />
-                  </span>
-                </span>
-              ) : null}
             </div>
           </div>
         </div>
