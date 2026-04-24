@@ -56,6 +56,7 @@ function mapFeedItemToPost(item: FeedItem): FeedPost {
         : undefined,
     userName: name,
     userHandle: handle,
+    creatorHasOnlySnaps: Boolean(item.creatorHasOnlySnaps),
     avatarUrl,
     avatarSeed: hashSeed(`${item.creatorWallet}:avatar`, 100),
     timeAgo: createdAtToAgo(item.createdAt),

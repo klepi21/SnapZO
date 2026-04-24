@@ -136,7 +136,7 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
     ? requireAddress(req.query.viewer, 'viewer').toLowerCase()
     : null;
 
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = { visibility: { $in: ['public', 'unlock'] } };
   if (cursor && !Number.isNaN(cursor.getTime())) {
     filter.createdAt = { $lt: cursor };
   }
@@ -149,38 +149,19 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
 
   const postIds = posts.map((p) => p._id);
   const creatorWallets = [...new Set(posts.map((p) => p.creatorWallet.toLowerCase()))];
-  const subscriberOnlyCreators = [
-    ...new Set(
-      posts
-        .filter((p) => p.visibility === 'subscriber_only')
-        .map((p) => p.creatorWallet.toLowerCase())
-    ),
-  ];
-
   let unlockedSet = new Set<string>();
-  let activeOnlySnapsCreators = new Set<string>();
   if (viewer) {
-    const [unlocks, socialUnlocks, activeSubscriptions] = await Promise.all([
+    const [unlocks, socialUnlocks] = await Promise.all([
       Unlock.find({ post: { $in: postIds }, userWallet: viewer }).select('post').lean(),
       SocialUnlock.find({ post: { $in: postIds }, userWallet: viewer }).select('post').lean(),
-      subscriberOnlyCreators.length > 0
-        ? SubscriptionAccess.find({
-            subscriberWallet: viewer,
-            creatorWallet: { $in: subscriberOnlyCreators },
-            expiresAt: { $gt: new Date() },
-          })
-            .select('creatorWallet')
-            .lean()
-        : Promise.resolve([]),
     ]);
     unlockedSet = new Set([
       ...unlocks.map((u) => String(u.post)),
       ...socialUnlocks.map((u) => String(u.post)),
     ]);
-    activeOnlySnapsCreators = new Set(activeSubscriptions.map((s) => s.creatorWallet.toLowerCase()));
   }
 
-  const [tipCounts, replyCounts, socialReplyCounts, unlockCounts, socialUnlockCounts] =
+  const [tipCounts, replyCounts, socialReplyCounts, unlockCounts, socialUnlockCounts, creatorPlans] =
     await Promise.all([
     Tip.aggregate<{ _id: Types.ObjectId; count: number }>([
       { $match: { post: { $in: postIds } } },
@@ -202,6 +183,12 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       { $match: { post: { $in: postIds } } },
       { $group: { _id: '$post', count: { $sum: 1 } } },
     ]),
+    CreatorSubscriptionPlan.find({
+      creatorWallet: { $in: creatorWallets },
+      monthlyPriceWei: { $exists: true, $ne: '0' },
+    })
+      .select('creatorWallet')
+      .lean(),
   ]);
   const creators = await User.find({ walletAddress: { $in: creatorWallets } })
     .select('walletAddress displayName username profileImage')
@@ -213,19 +200,14 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
   const unlockMap = new Map(unlockCounts.map((u) => [String(u._id), u.count]));
   const socialUnlockMap = new Map(socialUnlockCounts.map((u) => [String(u._id), u.count]));
   const creatorMap = new Map(creators.map((u) => [u.walletAddress.toLowerCase(), u]));
+  const onlySnapsCreators = new Set(creatorPlans.map((p) => p.creatorWallet.toLowerCase()));
 
   const items = posts.map((p) => {
     const idStr = String(p._id);
     const isCreatorViewer = Boolean(
       viewer && p.creatorWallet.toLowerCase() === viewer.toLowerCase()
     );
-    const hasOnlySnapsAccess =
-      p.visibility !== 'subscriber_only' ||
-      isCreatorViewer ||
-      Boolean(viewer && activeOnlySnapsCreators.has(p.creatorWallet.toLowerCase()));
-    const unlockedByMe =
-      (p.visibility !== 'unlock' || !p.isLocked || isCreatorViewer || unlockedSet.has(idStr)) &&
-      hasOnlySnapsAccess;
+    const unlockedByMe = p.visibility !== 'unlock' || !p.isLocked || isCreatorViewer || unlockedSet.has(idStr);
     const creator = creatorMap.get(p.creatorWallet.toLowerCase());
     return {
       id: idStr,
@@ -243,7 +225,8 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       totalTips: p.totalTips,
       createdAt: p.createdAt,
       unlockedByMe,
-      subscriberOnlyLocked: p.visibility === 'subscriber_only' && !hasOnlySnapsAccess,
+      subscriberOnlyLocked: false,
+      creatorHasOnlySnaps: onlySnapsCreators.has(p.creatorWallet.toLowerCase()),
       tipCount: tipMap.get(idStr) ?? 0,
       replyCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
       commentCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),

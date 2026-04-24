@@ -56,6 +56,7 @@ function mapFeedItemToPost(item: FeedItem): FeedPost {
         : undefined,
     userName: name,
     userHandle: handle,
+    creatorHasOnlySnaps: Boolean(item.creatorHasOnlySnaps),
     avatarUrl,
     avatarSeed: hashSeed(`${item.creatorWallet}:avatar`, 100),
     timeAgo: createdAtToAgo(item.createdAt),
@@ -112,9 +113,18 @@ export default function OnlySnapsPage() {
   return (
     <main className="pb-24 pt-8">
       <div className="mb-4 px-4">
-        <h1 className="text-center text-xl font-semibold tracking-tight text-zinc-100">
-          OnlySnaps
-        </h1>
+        <div className="flex flex-col items-center gap-1.5">
+          <Image
+            src="/snapzo-logo-icon2.png"
+            alt="OnlySnaps"
+            width={26}
+            height={26}
+            className="h-6 w-6 object-contain"
+          />
+          <h1 className="text-center text-[28px] font-semibold italic tracking-tight text-zinc-100 [font-family:Georgia,Times,serif]">
+            OnlySnaps
+          </h1>
+        </div>
       </div>
       {!address ? (
         <div className="px-4 pb-3">

@@ -13,6 +13,7 @@ export interface FeedPost {
   socialPostId?: number;
   userName: string;
   userHandle: string;
+  creatorHasOnlySnaps?: boolean;
   avatarUrl?: string;
   avatarSeed: number;
   timeAgo: string;

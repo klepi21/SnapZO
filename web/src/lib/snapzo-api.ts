@@ -142,6 +142,7 @@ export interface FeedItem {
   creatorDisplayName?: string | null;
   creatorUsername?: string | null;
   creatorProfileImage?: string | null;
+  creatorHasOnlySnaps?: boolean;
 }
 
 export interface FeedResponse {

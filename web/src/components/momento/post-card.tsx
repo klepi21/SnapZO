@@ -1169,6 +1169,11 @@ export function PostCard({ post }: PostCardProps) {
           </Link>
           <p className="text-[11px] text-zinc-500">{post.timeAgo}</p>
         </div>
+        {post.creatorHasOnlySnaps ? (
+          <span className="inline-flex shrink-0 items-center rounded-full border border-fuchsia-300/40 bg-fuchsia-500/15 px-2 py-1 text-[10px] font-semibold tracking-tight text-fuchsia-100">
+            OnlySnaps
+          </span>
+        ) : null}
       </div>
 
       <div>
@@ -1323,10 +1328,17 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         ) : null}
 
-        <p className="mt-3 text-[14px] leading-relaxed text-zinc-300">
-          <span className="font-semibold text-white">{post.userName}</span>{" "}
-          {post.caption}
-        </p>
+        {showLockOverlay ? (
+          <p className="mt-3 text-[13px] leading-relaxed text-zinc-500">
+            <span className="font-semibold text-zinc-300">{post.userName}</span>{" "}
+            Unlock to view caption.
+          </p>
+        ) : (
+          <p className="mt-3 text-[14px] leading-relaxed text-zinc-300">
+            <span className="font-semibold text-white">{post.userName}</span>{" "}
+            {post.caption}
+          </p>
+        )}
       </div>
 
       {commentOpen && typeof document !== "undefined"
@@ -1392,7 +1404,7 @@ export function PostCard({ post }: PostCardProps) {
                         @{post.userHandle} · {post.timeAgo}
                       </p>
                       <p className="mt-1 line-clamp-2 text-xs leading-snug text-zinc-400">
-                        {post.caption}
+                        {showLockOverlay ? "Unlock to view caption." : post.caption}
                       </p>
                     </div>
                   </div>
