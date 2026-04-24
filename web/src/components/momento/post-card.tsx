@@ -384,10 +384,14 @@ export function PostCard({ post }: PostCardProps) {
   const src = displayImageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked && !isSubscriberOnlyLocked;
   const profileHref = `/profile?wallet=${(post.creatorWallet ?? post.tipRecipient).toLowerCase()}`;
-  const isSquareMedia = mediaRatio !== null && mediaRatio >= 0.95 && mediaRatio <= 1.05;
-  const mediaContainerClass = isSquareMedia
-    ? "relative mx-3 aspect-square w-full touch-manipulation overflow-hidden rounded-[24px] ring-1 ring-white/[0.12]"
-    : "relative mx-3 aspect-[9/16] w-full touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]";
+  const fallbackRatio =
+    post.imageWidth > 0 && post.imageHeight > 0
+      ? post.imageWidth / post.imageHeight
+      : 9 / 16;
+  const resolvedRatio = mediaRatio ?? fallbackRatio;
+  const clampedRatio = Math.min(1.8, Math.max(0.45, resolvedRatio));
+  const mediaContainerClass =
+    "relative mx-3 w-full touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]";
   const mediaObjectClass = "object-contain object-center";
   const socialPostId = useMemo(() => {
     const postIdDigest = keccak256(stringToBytes(post.id));
@@ -1170,6 +1174,7 @@ export function PostCard({ post }: PostCardProps) {
       <div>
       <div
         className={mediaContainerClass}
+        style={{ aspectRatio: String(clampedRatio) }}
         onDoubleClick={(e) => {
           e.preventDefault();
           handleMediaDoubleLike();

@@ -67,7 +67,14 @@ const config: AppConfig = {
       'SOCIAL_CONTRACT_ADDRESS',
       '0x30200f8ee05a34a3062CAbFe42c18f7b894239C4'
     ),
-    subscriptionsContractAddress: required('SUBSCRIPTIONS_CONTRACT_ADDRESS', ''),
+    // Accept multiple env aliases to avoid production misconfiguration across services.
+    subscriptionsContractAddress: required(
+      'SUBSCRIPTIONS_CONTRACT_ADDRESS',
+      required(
+        'SNAPZO_SUBSCRIPTIONS_CONTRACT_ADDRESS',
+        required('NEXT_PUBLIC_SNAPZO_SUBSCRIPTIONS_ADDRESS', '')
+      )
+    ),
     escrowAddress: required('ESCROW_WALLET_ADDRESS', ''),
     escrowPrivateKey: required('ESCROW_PRIVATE_KEY', ''),
     hubContractAddress: required('HUB_CONTRACT_ADDRESS', ''),

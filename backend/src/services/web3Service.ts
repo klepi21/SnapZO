@@ -247,7 +247,9 @@ export async function verifyOnlySnapsSubscribedEvent(
   init();
   if (!provider) throw new Error('web3 provider not configured');
   if (!config.chain.subscriptionsContractAddress) {
-    throw new Error('SUBSCRIPTIONS_CONTRACT_ADDRESS not configured');
+    throw new Error(
+      'Subscriptions contract not configured (set SUBSCRIPTIONS_CONTRACT_ADDRESS or SNAPZO_SUBSCRIPTIONS_CONTRACT_ADDRESS)'
+    );
   }
 
   const receipt = await provider.getTransactionReceipt(params.txHash);
