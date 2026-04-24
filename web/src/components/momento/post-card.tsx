@@ -391,7 +391,7 @@ export function PostCard({ post }: PostCardProps) {
   const resolvedRatio = mediaRatio ?? fallbackRatio;
   const clampedRatio = Math.min(1.8, Math.max(0.45, resolvedRatio));
   const mediaContainerClass =
-    "relative mx-3 w-full touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]";
+    "relative w-full touch-manipulation overflow-hidden bg-black ring-1 ring-white/[0.12]";
   const mediaObjectClass = "object-contain object-center";
   const socialPostId = useMemo(() => {
     const postIdDigest = keccak256(stringToBytes(post.id));
