@@ -805,7 +805,7 @@ export function ProfileView() {
                 </div>
               )}
             </>
-          )}
+          ) : null}
         </div>
       )}
     </div>

@@ -47,6 +47,7 @@ function mapFeedItemToPost(item: FeedItem): FeedPost {
 
   return {
     id: item.postId,
+    creatorWallet: item.creatorWallet,
     postObjectId: item.id,
     socialPostId:
       typeof item.socialPostId === "number" && Number.isFinite(item.socialPostId)

@@ -8,6 +8,7 @@ export function dummyTipRecipient(postId: string): Address {
 
 export interface FeedPost {
   id: string;
+  creatorWallet?: string;
   postObjectId?: string;
   socialPostId?: number;
   userName: string;

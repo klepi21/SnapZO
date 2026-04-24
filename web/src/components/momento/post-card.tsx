@@ -345,6 +345,7 @@ export function PostCard({ post }: PostCardProps) {
   const [dbReplies, setDbReplies] = useState<SocialReplyItem[]>([]);
   const [dbTips, setDbTips] = useState<TipItem[]>([]);
   const [displayImageUrl, setDisplayImageUrl] = useState(post.imageUrl);
+  const [mediaRatio, setMediaRatio] = useState<number | null>(null);
 
   const { isLoading: isConfirming, isSuccess, isError } =
     useWaitForTransactionReceipt({
@@ -367,9 +368,18 @@ export function PostCard({ post }: PostCardProps) {
   useEffect(() => {
     setDisplayImageUrl(post.imageUrl);
   }, [post.imageUrl, post.id]);
+  useEffect(() => {
+    setMediaRatio(null);
+  }, [post.id, post.imageUrl]);
 
   const src = displayImageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked && !isSubscriberOnlyLocked;
+  const profileHref = `/profile?wallet=${(post.creatorWallet ?? post.tipRecipient).toLowerCase()}`;
+  const isSquareMedia = mediaRatio !== null && mediaRatio >= 0.95 && mediaRatio <= 1.05;
+  const mediaContainerClass = isSquareMedia
+    ? "relative mx-3 aspect-square w-[78%] max-w-[300px] touch-manipulation overflow-hidden rounded-[24px] ring-1 ring-white/[0.12]"
+    : "relative mx-3 aspect-[9/16] w-full touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]";
+  const mediaObjectClass = isSquareMedia ? "object-cover" : "object-contain";
   const socialPostId = useMemo(() => {
     const postIdDigest = keccak256(stringToBytes(post.id));
     return BigInt(`0x${postIdDigest.slice(2, 18)}`);
@@ -1129,7 +1139,7 @@ export function PostCard({ post }: PostCardProps) {
   return (
     <article className="snapzo-card-primary mx-4 mb-6 overflow-visible transition-transform duration-300 ease-out hover:-translate-y-0.5">
       <div className="flex items-center gap-3 px-4 pb-3 pt-4.5">
-        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-fuchsia-300/40 ring-offset-1 ring-offset-[rgba(12,18,36,0.65)]">
+        <Link href={profileHref} className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full ring-1 ring-fuchsia-300/40 ring-offset-1 ring-offset-[rgba(12,18,36,0.65)]">
           <Image
             src={post.avatarUrl ?? picsumAvatar(post.avatarSeed, 128)}
             alt=""
@@ -1137,17 +1147,22 @@ export function PostCard({ post }: PostCardProps) {
             height={44}
             className="h-full w-full object-cover"
           />
-        </div>
+        </Link>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold tracking-tight text-white">
-            {post.userName}
-          </p>
+          <Link href={profileHref} className="block">
+            <p className="truncate text-[15px] font-semibold tracking-tight text-white hover:text-fuchsia-200">
+              {post.userName}
+            </p>
+          </Link>
           <p className="text-[11px] text-zinc-500">{post.timeAgo}</p>
         </div>
       </div>
 
       <div
-        className="relative mx-3 aspect-[9/16] touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]"
+        className={`flex ${isSquareMedia ? "justify-center" : ""}`}
+      >
+      <div
+        className={mediaContainerClass}
         onDoubleClick={(e) => {
           e.preventDefault();
           handleMediaDoubleLike();
@@ -1161,9 +1176,15 @@ export function PostCard({ post }: PostCardProps) {
             src={src}
             alt=""
             fill
-            className={`object-contain transition-[filter,transform] duration-500 ease-out ${
+            className={`${mediaObjectClass} transition-[filter,transform] duration-500 ease-out ${
               showLockOverlay ? "scale-[1.04] blur-2xl" : "blur-0"
             }`}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                setMediaRatio(img.naturalWidth / img.naturalHeight);
+              }
+            }}
             sizes="(max-width: 430px) 100vw, 382px"
             priority={post.id === "1"}
           />
@@ -1211,6 +1232,7 @@ export function PostCard({ post }: PostCardProps) {
             Locked for others
           </div>
         ) : null}
+      </div>
       </div>
 
       <div className="px-4 pb-5 pt-4">
