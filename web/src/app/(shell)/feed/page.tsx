@@ -7,7 +7,7 @@ import { useAccount } from "wagmi";
 import { PostCard } from "@/components/momento/post-card";
 import { StoriesRail } from "@/components/momento/stories-rail";
 import { dummyTipRecipient, type FeedPost } from "@/lib/dummy/social";
-import { fetchFeed, type FeedItem } from "@/lib/snapzo-api";
+import { fetchFeed, fetchOnlySnapsPlan, type FeedItem } from "@/lib/snapzo-api";
 import { ipfsGatewayUrl } from "@/lib/snapzo-profile-local";
 
 function shortWallet(wallet: string): string {
@@ -82,8 +82,30 @@ export default function FeedPage() {
   const { address } = useAccount();
   const feedQuery = useQuery({
     queryKey: ["feed", address?.toLowerCase() ?? null],
-    queryFn: ({ signal }) =>
-      fetchFeed({ viewer: address?.toLowerCase(), limit: 20 }, signal),
+    queryFn: async ({ signal }) => {
+      const raw = await fetchFeed({ viewer: address?.toLowerCase(), limit: 20 }, signal);
+      // Hard client guard: main feed must never show subscriber-only posts.
+      const filtered = raw.items.filter((item) => item.visibility !== "subscriber_only");
+      const creatorWallets = [...new Set(filtered.map((item) => item.creatorWallet.toLowerCase()))];
+      const plans = await Promise.all(
+        creatorWallets.map(async (wallet) => {
+          try {
+            const plan = await fetchOnlySnapsPlan(wallet, signal);
+            return [wallet, Boolean(plan.monthlyPriceWei && plan.monthlyPriceWei !== "0")] as const;
+          } catch {
+            return [wallet, false] as const;
+          }
+        })
+      );
+      const planMap = new Map(plans);
+      return {
+        ...raw,
+        items: filtered.map((item) => ({
+          ...item,
+          creatorHasOnlySnaps: planMap.get(item.creatorWallet.toLowerCase()) ?? false,
+        })),
+      };
+    },
     staleTime: 15_000,
     retry: 1,
   });
