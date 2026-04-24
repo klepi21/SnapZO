@@ -365,6 +365,21 @@ export function PostCard({ post }: PostCardProps) {
   useEffect(() => {
     setMediaRatio(null);
   }, [post.id, post.imageUrl]);
+  useEffect(() => {
+    if (!displayImageUrl) return;
+    let cancelled = false;
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        setMediaRatio(probe.naturalWidth / probe.naturalHeight);
+      }
+    };
+    probe.src = displayImageUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [displayImageUrl]);
 
   const src = displayImageUrl;
   const showLockOverlay = isLockedPost && !mediaUnlocked && !isSubscriberOnlyLocked;
@@ -373,7 +388,7 @@ export function PostCard({ post }: PostCardProps) {
   const mediaContainerClass = isSquareMedia
     ? "relative mx-3 aspect-square w-full touch-manipulation overflow-hidden rounded-[24px] ring-1 ring-white/[0.12]"
     : "relative mx-3 aspect-[9/16] w-full touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]";
-  const mediaObjectClass = "object-contain";
+  const mediaObjectClass = "object-contain object-center";
   const socialPostId = useMemo(() => {
     const postIdDigest = keccak256(stringToBytes(post.id));
     return BigInt(`0x${postIdDigest.slice(2, 18)}`);
@@ -1171,12 +1186,6 @@ export function PostCard({ post }: PostCardProps) {
             className={`${mediaObjectClass} transition-[filter,transform] duration-500 ease-out ${
               showLockOverlay ? "scale-[1.04] blur-2xl" : "blur-0"
             }`}
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                setMediaRatio(img.naturalWidth / img.naturalHeight);
-              }
-            }}
             sizes="(max-width: 430px) 100vw, 382px"
             priority={post.id === "1"}
           />
