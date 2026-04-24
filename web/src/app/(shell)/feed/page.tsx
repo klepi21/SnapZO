@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
 import { useAccount } from "wagmi";
 import { PostCard } from "@/components/momento/post-card";
+import { StoriesRail } from "@/components/momento/stories-rail";
 import { dummyTipRecipient, type FeedPost } from "@/lib/dummy/social";
 import { fetchFeed, type FeedItem } from "@/lib/snapzo-api";
 import { ipfsGatewayUrl } from "@/lib/snapzo-profile-local";
@@ -93,6 +94,7 @@ export default function FeedPage() {
 
   return (
     <main className="pb-24 pt-8">
+      <StoriesRail />
       {feedQuery.isError ? (
         <p className="px-4 pb-3 text-sm text-zinc-400">
           Feed unavailable right now. Check backend connection.

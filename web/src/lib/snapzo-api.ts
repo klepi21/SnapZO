@@ -66,6 +66,26 @@ export interface OnlySnapsStatusResponse {
   activeSubscribers: number;
 }
 
+export interface StoryFeedItem {
+  creatorWallet: string;
+  creatorDisplayName: string | null;
+  creatorUsername: string | null;
+  creatorProfileImage: string | null;
+  hasUnseen: boolean;
+  latestCreatedAt: string;
+  stories: Array<{
+    id: string;
+    ipfsHash: string;
+    createdAt: string;
+    expiresAt: string;
+    seen: boolean;
+  }>;
+}
+
+export interface StoriesFeedResponse {
+  items: StoryFeedItem[];
+}
+
 /**
  * Idempotent "login" — creates the user row on first call, returns the
  * existing user on subsequent calls. Never overwrites profile fields.
@@ -306,6 +326,52 @@ export async function fetchOnlySnapsFeed(
     );
   }
   return (await res.json()) as FeedResponse;
+}
+
+export async function fetchStoriesFeed(
+  params?: { viewerWallet?: string },
+  signal?: AbortSignal
+): Promise<StoriesFeedResponse> {
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/stories/feed`);
+  if (params?.viewerWallet) url.searchParams.set("viewerWallet", params.viewerWallet);
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`fetchStoriesFeed failed (${res.status}): ${text || res.statusText}`);
+  }
+  return (await res.json()) as StoriesFeedResponse;
+}
+
+export async function createStory(input: {
+  creatorWallet: string;
+  mediaBase64: string;
+  mediaName?: string;
+  mediaMimeType?: string;
+}): Promise<void> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/stories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`createStory failed (${res.status}): ${text || res.statusText}`);
+  }
+}
+
+export async function markStorySeen(input: {
+  viewerWallet: string;
+  storyId: string;
+}): Promise<void> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/stories/seen`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`markStorySeen failed (${res.status}): ${text || res.statusText}`);
+  }
 }
 
 export async function upsertOnlySnapsPlan(input: {

@@ -27,6 +27,7 @@ import socialReplyRoutes from './src/routes/socialReply';
 import socialUnlockRoutes from './src/routes/socialUnlock';
 import adminRoutes from './src/routes/admin';
 import onlySnapsRoutes from './src/routes/onlySnaps';
+import storiesRoutes from './src/routes/stories';
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -132,6 +133,7 @@ app.use('/api/social-reply', socialReplyRoutes);
 app.use('/api/social-unlock', socialUnlockRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/onlysnaps', onlySnapsRoutes);
+app.use('/api/stories', storiesRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/users', userRoutes);
 
