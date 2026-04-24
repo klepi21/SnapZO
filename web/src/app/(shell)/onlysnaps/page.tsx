@@ -6,7 +6,7 @@ import { getAddress } from "viem";
 import { useAccount } from "wagmi";
 import { PostCard } from "@/components/momento/post-card";
 import { dummyTipRecipient, type FeedPost } from "@/lib/dummy/social";
-import { fetchOnlySnapsFeed, type FeedItem } from "@/lib/snapzo-api";
+import { fetchFeed, fetchOnlySnapsFeed, type FeedItem } from "@/lib/snapzo-api";
 import { ipfsGatewayUrl } from "@/lib/snapzo-profile-local";
 
 function shortWallet(wallet: string): string {
@@ -80,8 +80,23 @@ export default function OnlySnapsPage() {
   const { address } = useAccount();
   const feedQuery = useQuery({
     queryKey: ["onlysnaps-feed", address?.toLowerCase() ?? null],
-    queryFn: ({ signal }) =>
-      fetchOnlySnapsFeed({ viewerWallet: address?.toLowerCase() ?? "", limit: 20 }, signal),
+    queryFn: async ({ signal }) => {
+      const viewerWallet = address?.toLowerCase() ?? "";
+      try {
+        return await fetchOnlySnapsFeed({ viewerWallet, limit: 20 }, signal);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        // Backward-compatible fallback while backend route rollout completes.
+        if (!message.includes("failed (404)")) throw error;
+        const legacyFeed = await fetchFeed({ viewer: viewerWallet, limit: 50 }, signal);
+        return {
+          items: legacyFeed.items.filter(
+            (item) => item.visibility === "subscriber_only" && Boolean(item.unlockedByMe)
+          ),
+          nextCursor: null,
+        };
+      }
+    },
     enabled: Boolean(address),
     staleTime: 15_000,
     retry: 1,
