@@ -377,7 +377,7 @@ export function PostCard({ post }: PostCardProps) {
   const profileHref = `/profile?wallet=${(post.creatorWallet ?? post.tipRecipient).toLowerCase()}`;
   const isSquareMedia = mediaRatio !== null && mediaRatio >= 0.95 && mediaRatio <= 1.05;
   const mediaContainerClass = isSquareMedia
-    ? "relative mx-3 aspect-square w-[78%] max-w-[300px] touch-manipulation overflow-hidden rounded-[24px] ring-1 ring-white/[0.12]"
+    ? "relative mx-3 aspect-square w-full touch-manipulation overflow-hidden rounded-[24px] ring-1 ring-white/[0.12]"
     : "relative mx-3 aspect-[9/16] w-full touch-manipulation overflow-hidden rounded-[24px] bg-black ring-1 ring-white/[0.12]";
   const mediaObjectClass = isSquareMedia ? "object-cover" : "object-contain";
   const socialPostId = useMemo(() => {
@@ -1158,9 +1158,7 @@ export function PostCard({ post }: PostCardProps) {
         </div>
       </div>
 
-      <div
-        className={`flex ${isSquareMedia ? "justify-center" : ""}`}
-      >
+      <div>
       <div
         className={mediaContainerClass}
         onDoubleClick={(e) => {

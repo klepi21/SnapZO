@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { ChevronLeft, Lock, Settings, Share2, User as UserIcon, UserPen, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { formatUnits, parseUnits } from "viem";
-import { useAccount } from "wagmi";
+import { formatUnits, isAddress, maxUint256, parseUnits } from "viem";
+import { useAccount, usePublicClient, useReadContract, useSignTypedData, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
 import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import {
   fetchOnlySnapsPlan,
+  recordOnlySnapsSubscription,
   fetchOnlySnapsStatus,
   fetchUserProfileWithPosts,
   upsertOnlySnapsPlan,
@@ -21,6 +22,16 @@ import {
   type UpdateProfilePayload,
   type UserPostItem,
 } from "@/lib/snapzo-api";
+import { mezoTestnet } from "@/lib/chains/mezo-testnet";
+import {
+  erc20AllowanceAbi,
+  erc20ApproveAbi,
+} from "@/lib/constants/mezo-dex";
+import {
+  isSnapZoSubscriptionsConfigured,
+  SNAPZO_SNAP_TOKEN_ADDRESS,
+  SNAPZO_SUBSCRIPTIONS_ADDRESS,
+} from "@/lib/constants/snapzo-hub";
 import {
   defaultSnapzoProfile,
   ipfsGatewayUrl,
@@ -77,7 +88,11 @@ export function ProfileView() {
   const labelId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
-  const { address } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const { signTypedDataAsync } = useSignTypedData();
+  const publicClient = usePublicClient({ chainId: mezoTestnet.id });
   const toast = useSnapzoToast();
   const targetWalletParam = searchParams.get("wallet");
   const targetWallet =
@@ -102,8 +117,25 @@ export function ProfileView() {
   const [onlySnapsLoading, setOnlySnapsLoading] = useState(false);
   const [planInputSnap, setPlanInputSnap] = useState("1.00");
   const [savingPlan, setSavingPlan] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [pendingTxHash, setPendingTxHash] = useState<`0x${string}` | undefined>();
 
   const [editOpen, setEditOpen] = useState(false);
+  const allowanceRead = useReadContract({
+    chainId: mezoTestnet.id,
+    address: SNAPZO_SNAP_TOKEN_ADDRESS,
+    abi: erc20AllowanceAbi,
+    functionName: "allowance",
+    args: address ? [address, SNAPZO_SUBSCRIPTIONS_ADDRESS] : undefined,
+    query: { enabled: Boolean(address && isSnapZoSubscriptionsConfigured()), staleTime: 10_000 },
+  });
+  const refetchAllowance = allowanceRead.refetch;
+  const { isLoading: isConfirmingTx, isSuccess: isTxConfirmed } = useWaitForTransactionReceipt({
+    hash: pendingTxHash,
+    chainId: mezoTestnet.id,
+    query: { enabled: Boolean(pendingTxHash) },
+  });
+
   const [draft, setDraft] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydrate profile from localStorage after mount (SSR-safe default) */
@@ -463,6 +495,19 @@ export function ProfileView() {
 
   const handleSaveOnlySnapsPlan = useCallback(async () => {
     if (!isOwnProfile || !address) return;
+    if (!isConnected) {
+      toast("Connect wallet first.", "error");
+      return;
+    }
+    if (chainId !== mezoTestnet.id) {
+      switchChain?.({ chainId: mezoTestnet.id });
+      toast("Switch to Mezo Testnet and retry.", "error");
+      return;
+    }
+    if (!isSnapZoSubscriptionsConfigured()) {
+      toast("Subscriptions contract not configured.", "error");
+      return;
+    }
     const parsed = Number.parseFloat(planInputSnap.replace(",", "."));
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast("Set monthly price above 0 SNAP.", "error");
@@ -471,18 +516,184 @@ export function ProfileView() {
     setSavingPlan(true);
     try {
       const monthlyPriceWei = parseUnits(parsed.toString(), 18).toString();
+      const hash = await writeContractAsync({
+        chainId: mezoTestnet.id,
+        address: SNAPZO_SUBSCRIPTIONS_ADDRESS,
+        abi: [
+          {
+            type: "function",
+            name: "setMonthlyPrice",
+            stateMutability: "nonpayable",
+            inputs: [{ name: "price", type: "uint256" }],
+            outputs: [],
+          },
+        ] as const,
+        functionName: "setMonthlyPrice",
+        args: [BigInt(monthlyPriceWei)],
+      });
+      setPendingTxHash(hash);
+      await publicClient?.waitForTransactionReceipt({ hash });
       const row = await upsertOnlySnapsPlan({
         creatorWallet: address,
         monthlyPriceWei,
+        txHash: hash,
       });
       setOnlySnapsPlan(row);
-      toast("OnlySnaps monthly price saved.");
+      toast("OnlySnaps monthly price set on-chain.");
     } catch (error) {
       toast(error instanceof Error ? error.message : "Could not save OnlySnaps plan.", "error");
     } finally {
       setSavingPlan(false);
+      setPendingTxHash(undefined);
     }
-  }, [address, isOwnProfile, planInputSnap, toast]);
+  }, [address, chainId, isConnected, isOwnProfile, planInputSnap, publicClient, switchChain, toast, writeContractAsync]);
+
+  const readFreshSubscriptionsNonce = useCallback(
+    async (user: `0x${string}`): Promise<bigint> => {
+      if (!publicClient) {
+        throw new Error("Subscriptions client unavailable.");
+      }
+      return publicClient.readContract({
+        address: SNAPZO_SUBSCRIPTIONS_ADDRESS,
+        abi: [
+          {
+            type: "function",
+            name: "nonces",
+            stateMutability: "view",
+            inputs: [{ name: "user", type: "address" }],
+            outputs: [{ type: "uint256" }],
+          },
+        ] as const,
+        functionName: "nonces",
+        args: [user],
+      });
+    },
+    [publicClient],
+  );
+
+  const handleSubscribeOnlySnaps = useCallback(async () => {
+    if (!address || !targetWallet || isOwnProfile) return;
+    if (!onlySnapsPlan?.monthlyPriceWei || onlySnapsPlan.monthlyPriceWei === "0") {
+      toast("Creator has not enabled OnlySnaps yet.", "error");
+      return;
+    }
+    if (!isConnected) {
+      toast("Connect wallet first.", "error");
+      return;
+    }
+    if (chainId !== mezoTestnet.id) {
+      switchChain?.({ chainId: mezoTestnet.id });
+      toast("Switch to Mezo Testnet and retry.", "error");
+      return;
+    }
+    if (!isSnapZoSubscriptionsConfigured() || !publicClient) {
+      toast("Subscriptions contract is not configured.", "error");
+      return;
+    }
+    if (!isAddress(targetWallet)) {
+      toast("Invalid creator wallet.", "error");
+      return;
+    }
+    const amountWei = BigInt(onlySnapsPlan.monthlyPriceWei);
+    setSubscribing(true);
+    try {
+      const allowance = allowanceRead.data ?? BigInt(0);
+      if (allowance < amountWei) {
+        const approveHash = await writeContractAsync({
+          chainId: mezoTestnet.id,
+          address: SNAPZO_SNAP_TOKEN_ADDRESS,
+          abi: erc20ApproveAbi,
+          functionName: "approve",
+          args: [SNAPZO_SUBSCRIPTIONS_ADDRESS, maxUint256],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        await refetchAllowance();
+      }
+
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
+      const signAndRelay = async (nonceValue: bigint) => {
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: "SnapZoSubscriptions",
+            version: "1",
+            chainId: mezoTestnet.id,
+            verifyingContract: SNAPZO_SUBSCRIPTIONS_ADDRESS,
+          },
+          types: {
+            Subscribe: [
+              { name: "subscriber", type: "address" },
+              { name: "creator", type: "address" },
+              { name: "amount", type: "uint256" },
+              { name: "nonce", type: "uint256" },
+              { name: "deadline", type: "uint256" },
+            ],
+          },
+          primaryType: "Subscribe",
+          message: {
+            subscriber: address as `0x${string}`,
+            creator: targetWallet as `0x${string}`,
+            amount: amountWei,
+            nonce: nonceValue,
+            deadline,
+          },
+        });
+        const res = await fetch("/api/snapzo/subscriptions/relay-subscribe", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            subscriber: address,
+            creator: targetWallet,
+            amount: String(amountWei),
+            nonce: String(nonceValue),
+            deadline: String(deadline),
+            signature,
+          }),
+        });
+        const payload = (await res.json().catch(() => ({}))) as {
+          hash?: `0x${string}`;
+          error?: string;
+          code?: string;
+          latestNonce?: string;
+        };
+        if (!res.ok || !payload.hash) {
+          const err = new Error(payload.error || "OnlySnaps relay failed") as Error & {
+            relayCode?: string;
+            relayLatestNonce?: string;
+          };
+          err.relayCode = payload.code;
+          err.relayLatestNonce = payload.latestNonce;
+          throw err;
+        }
+        return payload.hash;
+      };
+
+      const freshNonce = await readFreshSubscriptionsNonce(address as `0x${string}`);
+      const txHash = await signAndRelay(freshNonce).catch(async (error) => {
+        const err = error as Error & { relayCode?: string; relayLatestNonce?: string };
+        if (err.relayCode !== "BAD_NONCE") throw err;
+        const retryNonce = err.relayLatestNonce
+          ? BigInt(err.relayLatestNonce)
+          : await readFreshSubscriptionsNonce(address as `0x${string}`);
+        return signAndRelay(retryNonce);
+      });
+      setPendingTxHash(txHash);
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      await recordOnlySnapsSubscription({
+        creatorWallet: targetWallet,
+        subscriberWallet: address,
+        txHash,
+        expectedAmountWei: String(amountWei),
+      });
+      const refreshed = await fetchOnlySnapsStatus(targetWallet, address).catch(() => null);
+      if (refreshed) setOnlySnapsStatus(refreshed);
+      toast("OnlySnaps subscription active.");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Subscription failed.", "error");
+    } finally {
+      setSubscribing(false);
+      setPendingTxHash(undefined);
+    }
+  }, [address, allowanceRead.data, chainId, isConnected, isOwnProfile, onlySnapsPlan?.monthlyPriceWei, publicClient, readFreshSubscriptionsNonce, refetchAllowance, signTypedDataAsync, switchChain, targetWallet, toast, writeContractAsync]);
 
   return (
     <div className="pb-28">
@@ -751,9 +962,11 @@ export function ProfileView() {
                   </p>
                   <button
                     type="button"
+                    disabled={subscribing || isConfirmingTx}
+                    onClick={() => void handleSubscribeOnlySnaps()}
                     className="snapzo-pressable mt-4 inline-flex items-center gap-1 rounded-full border border-fuchsia-300/45 bg-gradient-to-r from-fuchsia-500/35 to-violet-500/35 px-4 py-2 text-sm font-semibold text-white"
                   >
-                    Subscribe {onlySnapsPriceLabel ?? ""}
+                    {subscribing || isConfirmingTx ? "Subscribing..." : `Subscribe ${onlySnapsPriceLabel ?? ""}`}
                     <SnapInlineIcon decorative />
                   </button>
                 </div>

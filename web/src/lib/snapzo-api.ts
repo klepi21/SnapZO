@@ -309,6 +309,44 @@ export async function upsertOnlySnapsPlan(input: {
   return (await res.json()) as OnlySnapsPlanResponse;
 }
 
+export async function recordOnlySnapsSubscription(input: {
+  creatorWallet: string;
+  subscriberWallet: string;
+  txHash: string;
+  expectedAmountWei?: string;
+}): Promise<{
+  creatorWallet: string;
+  subscriberWallet: string;
+  amountWei: string;
+  periodStart: number;
+  periodEnd: number;
+  expiresAt: string;
+  renewalsCount: number;
+  txHash: string;
+}> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/onlysnaps/subscription/record`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `recordOnlySnapsSubscription failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as {
+    creatorWallet: string;
+    subscriberWallet: string;
+    amountWei: string;
+    periodStart: number;
+    periodEnd: number;
+    expiresAt: string;
+    renewalsCount: number;
+    txHash: string;
+  };
+}
+
 export async function fetchFeed(
   params?: { viewer?: string; limit?: number; cursor?: string },
   signal?: AbortSignal,
