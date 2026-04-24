@@ -14,7 +14,7 @@ type NavItem =
 
 const items: NavItem[] = [
   { href: "/feed", label: "Home", disabled: false, Icon: Home },
-  { href: "/leaderboard", label: "Explore", disabled: false, Icon: Search },
+  { href: "/leaderboard", label: "Creators", disabled: false, Icon: Search },
   { href: "/create", label: "Create", disabled: false, isCreate: true },
   { href: "/earn", label: "Earn", disabled: false, Icon: PiggyBank },
   { href: "/profile", label: "Profile", disabled: false, Icon: UserRound },

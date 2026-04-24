@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAddress } from "viem";
@@ -106,23 +107,54 @@ export default function OnlySnapsPage() {
     () => (feedQuery.data?.items ?? []).map(mapFeedItemToPost),
     [feedQuery.data?.items]
   );
+  const showEmptyState = !feedQuery.isLoading && !feedQuery.isError && posts.length === 0;
 
   return (
     <main className="pb-24 pt-8">
+      <div className="mb-4 px-4">
+        <h1 className="text-center text-xl font-semibold tracking-tight text-zinc-100">
+          OnlySnaps
+        </h1>
+      </div>
       {!address ? (
-        <p className="px-4 pb-3 text-sm text-zinc-400">
-          Connect your wallet to view your OnlySnaps subscriptions feed.
-        </p>
+        <div className="px-4 pb-3">
+          <div className="mx-auto flex max-w-[360px] flex-col items-center rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-7 text-center">
+            <Image
+              src="/snapzo-logo-icon2.png"
+              alt="SnapZo"
+              width={48}
+              height={48}
+              className="mb-3 h-12 w-12 rounded-xl object-contain"
+            />
+            <p className="text-sm font-medium text-zinc-100">Your private creator feed</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+              Connect wallet to unlock OnlySnaps and see subscriber-only posts in one place.
+            </p>
+          </div>
+        </div>
       ) : null}
       {feedQuery.isError ? (
         <p className="px-4 pb-3 text-sm text-zinc-400">
           OnlySnaps feed unavailable right now. Check backend connection.
         </p>
       ) : null}
-      {!feedQuery.isLoading && address && posts.length === 0 ? (
-        <p className="px-4 pb-3 text-sm text-zinc-400">
-          No active subscriptions yet. Subscribe to creators from their profile.
-        </p>
+      {showEmptyState && address ? (
+        <div className="px-4 pb-3">
+          <div className="mx-auto flex max-w-[360px] flex-col items-center rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-7 text-center">
+            <Image
+              src="/snapzo-logo-icon2.png"
+              alt="SnapZo"
+              width={56}
+              height={56}
+              className="mb-3 h-14 w-14 rounded-xl object-contain"
+            />
+            <p className="text-sm font-medium text-zinc-100">No active subscriptions yet</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+              OnlySnaps is your premium stream. Subscribe from a creator profile and their locked
+              subscriber posts will appear here.
+            </p>
+          </div>
+        </div>
       ) : null}
       {posts.map((post) => (
         <PostCard key={post.id} post={post} />
