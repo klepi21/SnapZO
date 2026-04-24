@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { Home, PiggyBank, Plus, Search, UserRound } from "lucide-react";
@@ -8,6 +9,7 @@ import { useEffect, useState } from "react";
 
 type NavItem =
   | { href: string; label: string; disabled: boolean; Icon: LucideIcon; isCreate?: false }
+  | { href: "/onlysnaps"; label: string; disabled: boolean; iconSrc: string; isCreate?: false }
   | { href: "/create"; label: string; disabled: boolean; isCreate: true };
 
 const items: NavItem[] = [
@@ -16,6 +18,7 @@ const items: NavItem[] = [
   { href: "/create", label: "Create", disabled: false, isCreate: true },
   { href: "/earn", label: "Earn", disabled: false, Icon: PiggyBank },
   { href: "/profile", label: "Profile", disabled: false, Icon: UserRound },
+  { href: "/onlysnaps", label: "OnlySnaps", disabled: false, iconSrc: "/snapzo-logo-icon2.png" },
 ];
 
 function IgCreateIcon({ active }: { active: boolean }) {
@@ -55,7 +58,7 @@ export function BottomNav() {
         aria-label="Main navigation"
         className="pointer-events-auto mx-auto mb-[max(0.4rem,env(safe-area-inset-bottom,0px))] w-[calc(100%-1.2rem)] max-w-[390px] overflow-hidden rounded-[22px] border border-white/[0.12] bg-[#0a1024]/92 px-1.5 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.45)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#0a1024]/82"
       >
-        <ul className="grid h-[58px] w-full grid-cols-5 place-items-center gap-0.5 px-0.5">
+        <ul className="grid h-[58px] w-full grid-cols-6 place-items-center gap-0.5 px-0.5">
           {items.map((item) => {
             const targetHref = item.href === "/profile" ? profileHref : item.href;
             const active =
@@ -66,7 +69,18 @@ export function BottomNav() {
               "isCreate" in item && item.isCreate ? (
                 <IgCreateIcon active={active} />
               ) : (
-                (() => {
+                "iconSrc" in item ? (
+                  <Image
+                    src={item.iconSrc}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className={`h-[20px] w-[20px] shrink-0 transition-all ${
+                      active ? "scale-[1.02] opacity-100" : "opacity-80"
+                    }`}
+                  />
+                ) : (
+                  (() => {
                   const iconSize =
                     item.href === "/profile"
                       ? "h-[20px] w-[20px]"
@@ -86,7 +100,8 @@ export function BottomNav() {
                   fill={item.href === "/feed" && active ? "currentColor" : "none"}
                 />
                   );
-                })()
+                  })()
+                )
               );
 
             const hit = (

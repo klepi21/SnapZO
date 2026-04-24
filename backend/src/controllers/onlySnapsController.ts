@@ -1,6 +1,13 @@
 import type { Request, Response } from 'express';
 import CreatorSubscriptionPlan from '../models/CreatorSubscriptionPlan';
 import SubscriptionAccess from '../models/SubscriptionAccess';
+import Post from '../models/Post';
+import User from '../models/User';
+import Tip from '../models/Tip';
+import Reply from '../models/Reply';
+import SocialReply from '../models/SocialReply';
+import SocialUnlock from '../models/SocialUnlock';
+import Unlock from '../models/Unlock';
 import { badRequest, conflict } from '../utils/errors';
 import { requireAddress, requireTxHash } from '../utils/validation';
 import * as web3Service from '../services/web3Service';
@@ -135,4 +142,104 @@ export async function getOnlySnapsStatus(req: Request, res: Response): Promise<v
     isActive,
     activeSubscribers,
   });
+}
+
+export async function getOnlySnapsFeed(req: Request, res: Response): Promise<void> {
+  const viewerWallet = requireAddress(req.query.viewerWallet, 'viewerWallet').toLowerCase();
+  const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 100);
+  const cursorStr = req.query.cursor as string | undefined;
+  const cursor = cursorStr ? new Date(cursorStr) : null;
+  const now = new Date();
+
+  const activeSubs = await SubscriptionAccess.find({
+    subscriberWallet: viewerWallet,
+    expiresAt: { $gt: now },
+  })
+    .select('creatorWallet')
+    .lean();
+
+  const creatorWallets = [...new Set(activeSubs.map((s) => s.creatorWallet.toLowerCase()))];
+  if (creatorWallets.length === 0) {
+    res.json({ items: [], nextCursor: null });
+    return;
+  }
+
+  const filter: Record<string, unknown> = {
+    visibility: 'subscriber_only',
+    creatorWallet: { $in: creatorWallets },
+  };
+  if (cursor && !Number.isNaN(cursor.getTime())) {
+    filter.createdAt = { $lt: cursor };
+  }
+
+  const posts = await Post.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
+  if (posts.length === 0) {
+    res.json({ items: [], nextCursor: null });
+    return;
+  }
+
+  const postIds = posts.map((p) => p._id);
+  const [creators, tipCounts, replyCounts, socialReplyCounts, unlockCounts, socialUnlockCounts] =
+    await Promise.all([
+      User.find({ walletAddress: { $in: creatorWallets } })
+        .select('walletAddress displayName username profileImage')
+        .lean(),
+      Tip.aggregate<{ _id: string; count: number }>([
+        { $match: { post: { $in: postIds } } },
+        { $group: { _id: '$post', count: { $sum: 1 } } },
+      ]),
+      Reply.aggregate<{ _id: string; count: number }>([
+        { $match: { post: { $in: postIds } } },
+        { $group: { _id: '$post', count: { $sum: 1 } } },
+      ]),
+      SocialReply.aggregate<{ _id: string; count: number }>([
+        { $match: { post: { $in: postIds } } },
+        { $group: { _id: '$post', count: { $sum: 1 } } },
+      ]),
+      Unlock.aggregate<{ _id: string; count: number }>([
+        { $match: { post: { $in: postIds } } },
+        { $group: { _id: '$post', count: { $sum: 1 } } },
+      ]),
+      SocialUnlock.aggregate<{ _id: string; count: number }>([
+        { $match: { post: { $in: postIds } } },
+        { $group: { _id: '$post', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+  const creatorMap = new Map(creators.map((u) => [u.walletAddress.toLowerCase(), u]));
+  const tipMap = new Map(tipCounts.map((x) => [String(x._id), x.count]));
+  const replyMap = new Map(replyCounts.map((x) => [String(x._id), x.count]));
+  const socialReplyMap = new Map(socialReplyCounts.map((x) => [String(x._id), x.count]));
+  const unlockMap = new Map(unlockCounts.map((x) => [String(x._id), x.count]));
+  const socialUnlockMap = new Map(socialUnlockCounts.map((x) => [String(x._id), x.count]));
+
+  const items = posts.map((p) => {
+    const idStr = String(p._id);
+    const creator = creatorMap.get(p.creatorWallet.toLowerCase());
+    return {
+      id: idStr,
+      postId: p.postId,
+      creatorWallet: p.creatorWallet,
+      creatorDisplayName: creator?.displayName ?? null,
+      creatorUsername: creator?.username ?? null,
+      creatorProfileImage: creator?.profileImage ?? null,
+      content: p.content,
+      ipfsHash: p.ipfsHash,
+      visibility: p.visibility,
+      subscriberOnlyLocked: false,
+      isLocked: false,
+      unlockPrice: 0,
+      blurImage: p.blurImage,
+      totalTips: p.totalTips,
+      createdAt: p.createdAt,
+      unlockedByMe: true,
+      tipCount: tipMap.get(idStr) ?? 0,
+      replyCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
+      commentCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
+      unlockCount: (unlockMap.get(idStr) ?? 0) + (socialUnlockMap.get(idStr) ?? 0),
+    };
+  });
+
+  const nextCursor = posts.length === limit ? posts[posts.length - 1].createdAt : null;
+  res.json({ items, nextCursor });
 }

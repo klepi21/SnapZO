@@ -290,6 +290,24 @@ export async function fetchOnlySnapsStatus(
   return (await res.json()) as OnlySnapsStatusResponse;
 }
 
+export async function fetchOnlySnapsFeed(
+  params: { viewerWallet: string; limit?: number; cursor?: string },
+  signal?: AbortSignal
+): Promise<FeedResponse> {
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/onlysnaps/feed`);
+  url.searchParams.set("viewerWallet", params.viewerWallet);
+  if (params.limit) url.searchParams.set("limit", String(params.limit));
+  if (params.cursor) url.searchParams.set("cursor", params.cursor);
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `fetchOnlySnapsFeed failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as FeedResponse;
+}
+
 export async function upsertOnlySnapsPlan(input: {
   creatorWallet: string;
   monthlyPriceWei: string;
