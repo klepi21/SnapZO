@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Heart, Lock, MessageCircle, UserRound, X } from "lucide-react";
 import {
@@ -313,6 +314,9 @@ export function PostCard({ post }: PostCardProps) {
     unlockSnapWei !== undefined ? formatUnitsMax2dp(unlockSnapWei, SNAP_DECIMALS) : "…";
 
   const isLockedPost = Boolean(post.contentLocked);
+  const isSubscriberOnlyLocked = Boolean(
+    post.visibility === "subscriber_only" && post.subscriberOnlyLocked,
+  );
   const [optimisticUnlocked, setOptimisticUnlocked] = useState(false);
   const [dbHasTipped, setDbHasTipped] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
@@ -365,7 +369,7 @@ export function PostCard({ post }: PostCardProps) {
   }, [post.imageUrl, post.id]);
 
   const src = displayImageUrl;
-  const showLockOverlay = isLockedPost && !mediaUnlocked;
+  const showLockOverlay = isLockedPost && !mediaUnlocked && !isSubscriberOnlyLocked;
   const socialPostId = useMemo(() => {
     const postIdDigest = keccak256(stringToBytes(post.id));
     return BigInt(`0x${postIdDigest.slice(2, 18)}`);
@@ -1165,9 +1169,24 @@ export function PostCard({ post }: PostCardProps) {
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-xs text-zinc-500">
-            Media unavailable
+            {isSubscriberOnlyLocked ? "OnlySnaps subscribers only" : "Media unavailable"}
           </div>
         )}
+        {isSubscriberOnlyLocked ? (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/78 via-black/44 to-black/24 px-6 text-center">
+            <Lock className="h-9 w-9 text-fuchsia-100/90" strokeWidth={1.5} aria-hidden />
+            <p className="text-sm font-semibold tracking-tight text-white">OnlySnaps Locked</p>
+            <p className="max-w-[240px] text-xs leading-relaxed text-zinc-300">
+              Subscribe to unlock this creator's premium wall.
+            </p>
+            <Link
+              href={`/profile?wallet=${post.tipRecipient}`}
+              className="snapzo-pressable inline-flex items-center justify-center rounded-2xl border border-fuchsia-300/45 bg-gradient-to-br from-fuchsia-500/28 to-violet-500/24 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.2)] hover:border-fuchsia-200/70 hover:from-fuchsia-500/38"
+            >
+              Subscribe on profile
+            </Link>
+          </div>
+        ) : null}
         {showLockOverlay ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-black/76 via-black/42 to-black/22 px-6 text-center">
             <Lock className="h-9 w-9 text-white/90" strokeWidth={1.5} aria-hidden />

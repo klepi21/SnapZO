@@ -24,6 +24,8 @@ export interface FeedPost {
   unlockCount?: number;
   likedBySeeds: number[];
   caption: string;
+  visibility?: "public" | "unlock" | "subscriber_only";
+  subscriberOnlyLocked?: boolean;
   /** When true, media stays blurred until user confirms an on-chain unlock tx. */
   contentLocked?: boolean;
   unlockedByMe?: boolean;

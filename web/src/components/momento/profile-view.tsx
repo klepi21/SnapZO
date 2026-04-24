@@ -2,14 +2,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, Settings, Share2, User as UserIcon, UserPen, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ChevronLeft, Lock, Settings, Share2, User as UserIcon, UserPen, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { formatUnits, parseUnits } from "viem";
 import { useAccount } from "wagmi";
 import { SnapInlineIcon } from "@/components/icons/snap-inline-icon";
+import { useSnapzoToast } from "@/components/providers/snapzo-toast-provider";
 import {
+  fetchOnlySnapsPlan,
+  fetchOnlySnapsStatus,
   fetchUserProfileWithPosts,
+  upsertOnlySnapsPlan,
   updateProfile,
+  type OnlySnapsPlanResponse,
+  type OnlySnapsStatusResponse,
   type UpdateProfilePayload,
   type UserPostItem,
 } from "@/lib/snapzo-api";
@@ -68,11 +76,32 @@ function shortenAddress(addr?: string): string {
 export function ProfileView() {
   const labelId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
   const { address } = useAccount();
+  const toast = useSnapzoToast();
+  const targetWalletParam = searchParams.get("wallet");
+  const targetWallet =
+    targetWalletParam && /^0x[a-fA-F0-9]{40}$/.test(targetWalletParam)
+      ? targetWalletParam.toLowerCase()
+      : address?.toLowerCase();
+  const isOwnProfile = Boolean(address && targetWallet && address.toLowerCase() === targetWallet);
 
   const [profile, setProfile] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
+  const [remoteUser, setRemoteUser] = useState<{
+    displayName?: string | null;
+    username?: string | null;
+    bio?: string | null;
+    profileImage?: string | null;
+    walletAddress?: string;
+  } | null>(null);
   const [posts, setPosts] = useState<UserPostItem[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"posts" | "onlysnaps">("posts");
+  const [onlySnapsPlan, setOnlySnapsPlan] = useState<OnlySnapsPlanResponse | null>(null);
+  const [onlySnapsStatus, setOnlySnapsStatus] = useState<OnlySnapsStatusResponse | null>(null);
+  const [onlySnapsLoading, setOnlySnapsLoading] = useState(false);
+  const [planInputSnap, setPlanInputSnap] = useState("1.00");
+  const [savingPlan, setSavingPlan] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState<SnapzoProfileLocal>(defaultSnapzoProfile);
@@ -91,16 +120,22 @@ export function ProfileView() {
   useEffect(() => {
     let cancelled = false;
     async function loadMyPosts() {
-      if (!address) {
+      if (!targetWallet) {
         if (!cancelled) setPosts([]);
         return;
       }
       setPostsLoading(true);
       try {
-        const res = await fetchUserProfileWithPosts(address);
-        if (!cancelled) setPosts(res.posts ?? []);
+        const res = await fetchUserProfileWithPosts(targetWallet, address);
+        if (!cancelled) {
+          setPosts(res.posts ?? []);
+          setRemoteUser(res.user ?? null);
+        }
       } catch {
-        if (!cancelled) setPosts([]);
+        if (!cancelled) {
+          setPosts([]);
+          setRemoteUser(null);
+        }
       } finally {
         if (!cancelled) setPostsLoading(false);
       }
@@ -109,7 +144,50 @@ export function ProfileView() {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, targetWallet]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOnlySnapsData() {
+      if (!targetWallet) {
+        if (!cancelled) {
+          setOnlySnapsPlan(null);
+          setOnlySnapsStatus(null);
+        }
+        return;
+      }
+      setOnlySnapsLoading(true);
+      try {
+        const planPromise = fetchOnlySnapsPlan(targetWallet);
+        const statusPromise =
+          address && targetWallet
+            ? fetchOnlySnapsStatus(targetWallet, address)
+            : Promise.resolve(null);
+        const [plan, status] = await Promise.all([planPromise, statusPromise]);
+        if (!cancelled) {
+          setOnlySnapsPlan(plan);
+          setOnlySnapsStatus(status);
+          if (plan.monthlyPriceWei) {
+            const snapValue = Number(formatUnits(BigInt(plan.monthlyPriceWei), 18));
+            if (Number.isFinite(snapValue) && snapValue > 0) {
+              setPlanInputSnap(snapValue.toFixed(2));
+            }
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setOnlySnapsPlan(null);
+          setOnlySnapsStatus(null);
+        }
+      } finally {
+        if (!cancelled) setOnlySnapsLoading(false);
+      }
+    }
+    void loadOnlySnapsData();
+    return () => {
+      cancelled = true;
+    };
+  }, [address, targetWallet]);
 
   const openEdit = useCallback(() => {
     setDraft(readSnapzoProfile());
@@ -352,12 +430,16 @@ export function ProfileView() {
         )
       : null;
 
-  const walletShort = shortenAddress(address);
+  const walletShort = shortenAddress(targetWallet ?? address);
   const hasProfileImage = !!profile.avatarDataUrl;
-  const hasDisplayName = !!profile.displayName;
-  const hasUsername = !!profile.username;
-  const hasBio = !!profile.bio;
-  const headerTitle = profile.displayName || walletShort || "Unnamed";
+  const displayName = isOwnProfile ? profile.displayName : remoteUser?.displayName ?? "";
+  const username = isOwnProfile ? profile.username : remoteUser?.username ?? "";
+  const bio = isOwnProfile ? profile.bio : remoteUser?.bio ?? "";
+  const remoteAvatar = remoteUser?.profileImage ? ipfsGatewayUrl(remoteUser.profileImage) : null;
+  const hasDisplayName = !!displayName;
+  const hasUsername = !!username;
+  const hasBio = !!bio;
+  const headerTitle = displayName || walletShort || "Unnamed";
   const totalLikes = posts.reduce((sum, post) => sum + Number(post.likeCount ?? 0), 0);
   const totalReplies = posts.reduce((sum, post) => sum + Number(post.replyCount ?? 0), 0);
   const totalUnlocks = posts.reduce((sum, post) => sum + Number(post.unlockCount ?? 0), 0);
@@ -369,6 +451,34 @@ export function ProfileView() {
   const earningsSnapLabel = Number.isFinite(earningsSnap)
     ? earningsSnap.toFixed(4).replace(/\.?0+$/, "")
     : "0";
+  const onlySnapsPosts = posts.filter((post) => post.visibility === "subscriber_only");
+  const canViewOnlySnaps = isOwnProfile || Boolean(onlySnapsStatus?.isActive);
+  const onlySnapsPriceLabel = onlySnapsPlan?.monthlyPriceWei
+    ? Number(formatUnits(BigInt(onlySnapsPlan.monthlyPriceWei), 18)).toFixed(2)
+    : "1.00";
+
+  const handleSaveOnlySnapsPlan = useCallback(async () => {
+    if (!isOwnProfile || !address) return;
+    const parsed = Number.parseFloat(planInputSnap.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast("Set monthly price above 0 SNAP.", "error");
+      return;
+    }
+    setSavingPlan(true);
+    try {
+      const monthlyPriceWei = parseUnits(parsed.toString(), 18).toString();
+      const row = await upsertOnlySnapsPlan({
+        creatorWallet: address,
+        monthlyPriceWei,
+      });
+      setOnlySnapsPlan(row);
+      toast("OnlySnaps monthly price saved.");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not save OnlySnaps plan.", "error");
+    } finally {
+      setSavingPlan(false);
+    }
+  }, [address, isOwnProfile, planInputSnap, toast]);
 
   return (
     <div className="pb-28">
@@ -404,10 +514,19 @@ export function ProfileView() {
       <div className="relative -mt-14 flex flex-col items-center px-4">
         <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-full bg-[#060814] p-[3px] shadow-[0_0_0_3px_rgba(244,114,182,0.35),0_0_40px_rgba(168,85,247,0.24)]">
           <div className="relative h-full w-full overflow-hidden rounded-full">
-            {hasProfileImage ? (
+            {isOwnProfile && hasProfileImage ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL from user
               <img
                 src={profile.avatarDataUrl ?? undefined}
+                alt=""
+                width={104}
+                height={104}
+                className="h-full w-full object-cover"
+              />
+            ) : remoteAvatar ? (
+              // eslint-disable-next-line @next/next/no-img-element -- remote image URL from backend
+              <img
+                src={remoteAvatar}
                 alt=""
                 width={104}
                 height={104}
@@ -431,11 +550,11 @@ export function ProfileView() {
           {headerTitle}
         </h1>
         {hasUsername ? (
-          <p className="text-sm text-zinc-500">@{profile.username}</p>
+          <p className="text-sm text-zinc-500">@{username}</p>
         ) : null}
         {hasBio ? (
           <p className="mt-3 max-w-sm text-center text-sm leading-relaxed text-zinc-400">
-            {profile.bio}
+            {bio}
           </p>
         ) : null}
 
@@ -476,19 +595,50 @@ export function ProfileView() {
           </div>
         </div>
 
-        <div className="mt-5 w-full max-w-sm">
+        {isOwnProfile ? (
+          <div className="mt-5 w-full max-w-sm">
+            <button
+              type="button"
+              onClick={openEdit}
+              className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-full border border-fuchsia-300/40 bg-gradient-to-r from-[#ff2d90] to-[#7c3aed] py-3.5 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/25"
+            >
+              <UserPen className="h-4 w-4" />
+              Edit profile
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-7 px-4">
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#0f1528]/75 p-1">
           <button
             type="button"
-            onClick={openEdit}
-            className="snapzo-pressable flex w-full items-center justify-center gap-2 rounded-full border border-fuchsia-300/40 bg-gradient-to-r from-[#ff2d90] to-[#7c3aed] py-3.5 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/25"
+            onClick={() => setActiveTab("posts")}
+            className={`snapzo-pressable rounded-xl px-3 py-2 text-sm font-semibold transition ${
+              activeTab === "posts"
+                ? "border border-white/15 bg-white/10 text-white"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
           >
-            <UserPen className="h-4 w-4" />
-            Edit profile
+            Posts
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("onlysnaps")}
+            className={`snapzo-pressable rounded-xl px-3 py-2 text-sm font-semibold transition ${
+              activeTab === "onlysnaps"
+                ? "border border-fuchsia-300/45 bg-gradient-to-r from-fuchsia-500/20 to-violet-500/20 text-white"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <span className="font-serif text-[17px] italic tracking-wide">OnlySnaps</span>
           </button>
         </div>
       </div>
 
-      <div className="mt-8 px-4">
+      {activeTab === "posts" ? (
+        <>
+      <div className="mt-5 px-4">
         <h2 className="text-sm font-semibold tracking-tight text-white">Posts</h2>
         <p className="mt-0.5 text-xs text-zinc-500">
           {postsLoading ? "Loading posts…" : `${posts.length} post${posts.length === 1 ? "" : "s"}`}
@@ -526,6 +676,112 @@ export function ProfileView() {
               </div>
             );
           })}
+        </div>
+      )}
+        </>
+      ) : (
+        <div className="mx-4 mt-5 space-y-4">
+          <div className="snapzo-card-primary p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-serif text-[24px] italic leading-none text-white">OnlySnaps</h3>
+              <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-300/35 bg-fuchsia-500/10 px-2.5 py-1 text-xs font-semibold text-fuchsia-100">
+                {onlySnapsPriceLabel}
+                <SnapInlineIcon decorative />
+                / month
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-zinc-400">
+              Subscriber-only wall. Monthly access, manual renewal, no grace period.
+            </p>
+            {isOwnProfile ? (
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-2">
+                <input
+                  value={planInputSnap}
+                  onChange={(e) => setPlanInputSnap(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none"
+                  placeholder="1.00"
+                  inputMode="decimal"
+                />
+                <button
+                  type="button"
+                  disabled={savingPlan}
+                  onClick={() => void handleSaveOnlySnapsPlan()}
+                  className="snapzo-pressable rounded-lg border border-fuchsia-300/45 bg-fuchsia-500/20 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {savingPlan ? "Saving..." : "Save price"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {!canViewOnlySnaps ? (
+            <section className="snapzo-card-primary overflow-hidden">
+              <div className="relative h-44 w-full bg-gradient-to-br from-fuchsia-500/15 via-violet-500/15 to-indigo-500/10">
+                <div className="absolute inset-0 backdrop-blur-[2px]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,45,144,0.3),transparent_55%),radial-gradient(circle_at_80%_80%,rgba(124,58,237,0.26),transparent_60%)]" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+                  <Lock className="h-8 w-8 text-fuchsia-200/90" />
+                  <h4 className="mt-3 font-serif text-[28px] italic text-white">OnlySnaps Locked</h4>
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-200/85">
+                    Subscribe to unlock the private wall for 30 days.
+                  </p>
+                  <button
+                    type="button"
+                    className="snapzo-pressable mt-4 inline-flex items-center gap-1 rounded-full border border-fuchsia-300/45 bg-gradient-to-r from-fuchsia-500/35 to-violet-500/35 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Subscribe {onlySnapsPriceLabel}
+                    <SnapInlineIcon decorative />
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <>
+              <div className="px-1">
+                <p className="text-xs text-zinc-400">
+                  {onlySnapsLoading
+                    ? "Loading OnlySnaps wall..."
+                    : `${onlySnapsPosts.length} subscriber post${onlySnapsPosts.length === 1 ? "" : "s"}`}
+                </p>
+                {!isOwnProfile && onlySnapsStatus?.expiresAt ? (
+                  <p className="mt-1 text-[11px] text-emerald-300">
+                    Active until {new Date(onlySnapsStatus.expiresAt).toLocaleString()}
+                  </p>
+                ) : null}
+              </div>
+              {onlySnapsPosts.length === 0 ? (
+                <div className="snapzo-card-compact flex flex-col items-center justify-center border-dashed bg-[#0f162a]/85 px-6 py-10 text-center">
+                  <p className="text-sm text-zinc-400">No OnlySnaps posts yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {onlySnapsPosts.map((post) => {
+                    const cid = post.ipfsHash || post.blurImage;
+                    const src = cid ? ipfsGatewayUrl(cid) : null;
+                    return (
+                      <div
+                        key={post.id}
+                        className="relative aspect-square overflow-hidden rounded-xl border border-fuchsia-300/20 bg-black"
+                        title={post.content ?? ""}
+                      >
+                        {src ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- remote user media
+                          <img src={src} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] text-zinc-500">
+                            No media
+                          </div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-1 text-[10px] font-medium text-fuchsia-100">
+                          OnlySnaps
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

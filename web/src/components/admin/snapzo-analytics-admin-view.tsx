@@ -14,6 +14,7 @@ import Image from "next/image";
 
 const TABLES: Array<{ key: AdminActivityTable; label: string }> = [
   { key: "activity", label: "Latest Activity" },
+  { key: "subscriptions", label: "OnlySnaps Subs" },
   { key: "likes", label: "Likes" },
   { key: "replies", label: "Replies" },
   { key: "unlocks", label: "Unlocks" },
@@ -32,6 +33,14 @@ function formatDate(value: unknown): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString();
+}
+
+function formatSnapWei(value: unknown): string {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return "-";
+  const raw = value.padStart(19, "0");
+  const intPart = raw.slice(0, -18).replace(/^0+/, "") || "0";
+  const frac = raw.slice(-18).slice(0, 2).replace(/0+$/, "");
+  return frac ? `${intPart}.${frac}` : intPart;
 }
 
 export function SnapZoAnalyticsAdminView() {
@@ -101,6 +110,19 @@ export function SnapZoAnalyticsAdminView() {
         </tr>
       ));
 
+    if (table === "subscriptions")
+      return items.map((raw) => (
+        <tr key={asString(raw.id)} className="border-b border-white/[0.06]">
+          <td className="px-3 py-2 text-zinc-200">{formatDate(raw.updatedAt ?? raw.expiresAt)}</td>
+          <td className="px-3 py-2 text-zinc-100">{asString(raw.creatorLabel)}</td>
+          <td className="px-3 py-2 text-zinc-300">{asString(raw.subscriberLabel)}</td>
+          <td className="px-3 py-2 text-zinc-300">{asString(raw.isActive) === "true" ? "Active" : "Expired"}</td>
+          <td className="px-3 py-2 text-zinc-300">{formatDate(raw.expiresAt)}</td>
+          <td className="px-3 py-2 text-zinc-300">{formatSnapWei(raw.monthlyPriceWei)}</td>
+          <td className="px-3 py-2 text-zinc-300">{asString(raw.renewalsCount)}</td>
+        </tr>
+      ));
+
     if (table === "posts")
       return items.map((raw) => (
         <tr key={asString(raw.id)} className="border-b border-white/[0.06]">
@@ -166,6 +188,8 @@ export function SnapZoAnalyticsAdminView() {
     if (table === "likes") return ["At", "Liker", "Post", "Amount", "Tx"];
     if (table === "replies") return ["At", "Requester", "Creator", "Status", "Comment"];
     if (table === "unlocks") return ["At", "User", "Post", "Source", "Tx"];
+    if (table === "subscriptions")
+      return ["Updated", "Creator", "Subscriber", "Status", "Expires", "Price (SNAP)", "Renewals"];
     if (table === "posts") return ["At", "Post", "Creator", "Likes", "Replies", "Unlocks", "Visibility", "Actions"];
     if (table === "users") return ["User", "Wallet", "Posts", "Likes", "Replies", "Unlocks"];
     return ["At", "Type", "User", "Post", "Summary"];
@@ -192,7 +216,7 @@ export function SnapZoAnalyticsAdminView() {
         </div>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-8">
         <div className="rounded-xl border border-fuchsia-300/16 bg-fuchsia-500/[0.08] px-3 py-2 text-xs">
           <p className="text-zinc-500">Likes</p>
           <p className="text-lg font-semibold text-zinc-100">{summary?.likes ?? "…"}</p>
@@ -212,6 +236,18 @@ export function SnapZoAnalyticsAdminView() {
         <div className="rounded-xl border border-amber-300/16 bg-amber-500/[0.08] px-3 py-2 text-xs">
           <p className="text-zinc-500">Posts</p>
           <p className="text-lg font-semibold text-zinc-100">{summary?.posts ?? "…"}</p>
+        </div>
+        <div className="rounded-xl border border-pink-300/16 bg-pink-500/[0.08] px-3 py-2 text-xs">
+          <p className="text-zinc-500">OnlySnaps plans</p>
+          <p className="text-lg font-semibold text-zinc-100">{summary?.onlySnapsPlans ?? "…"}</p>
+        </div>
+        <div className="rounded-xl border border-indigo-300/16 bg-indigo-500/[0.08] px-3 py-2 text-xs">
+          <p className="text-zinc-500">OnlySnaps active</p>
+          <p className="text-lg font-semibold text-zinc-100">{summary?.onlySnapsActive ?? "…"}</p>
+        </div>
+        <div className="rounded-xl border border-sky-300/16 bg-sky-500/[0.08] px-3 py-2 text-xs">
+          <p className="text-zinc-500">OnlySnaps records</p>
+          <p className="text-lg font-semibold text-zinc-100">{summary?.onlySnapsRecords ?? "…"}</p>
         </div>
       </div>
 

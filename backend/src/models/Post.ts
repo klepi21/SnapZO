@@ -6,6 +6,7 @@ export interface IPost {
   creatorWallet: string;
   content?: string;
   ipfsHash?: string;
+  visibility: 'public' | 'unlock' | 'subscriber_only';
   isLocked: boolean;
   unlockPrice: number;
   blurImage?: string;
@@ -35,6 +36,12 @@ const postSchema = new Schema<IPost>(
     },
     content: { type: String, default: '', maxlength: 5_000 },
     ipfsHash: { type: String, trim: true },
+    visibility: {
+      type: String,
+      enum: ['public', 'unlock', 'subscriber_only'],
+      default: 'unlock',
+      index: true,
+    },
     isLocked: { type: Boolean, default: true, index: true },
     unlockPrice: { type: Number, default: 0, min: 0 },
     blurImage: { type: String, trim: true },

@@ -25,6 +25,7 @@ export interface ChainConfig {
   musdAddress: string;
   musdDecimals: number;
   socialContractAddress: string;
+  subscriptionsContractAddress: string;
   escrowAddress: string;
   escrowPrivateKey: string;
   hubContractAddress: string;
@@ -66,6 +67,7 @@ const config: AppConfig = {
       'SOCIAL_CONTRACT_ADDRESS',
       '0x30200f8ee05a34a3062CAbFe42c18f7b894239C4'
     ),
+    subscriptionsContractAddress: required('SUBSCRIPTIONS_CONTRACT_ADDRESS', ''),
     escrowAddress: required('ESCROW_WALLET_ADDRESS', ''),
     escrowPrivateKey: required('ESCROW_PRIVATE_KEY', ''),
     hubContractAddress: required('HUB_CONTRACT_ADDRESS', ''),

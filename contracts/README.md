@@ -80,6 +80,31 @@ forge script script/DeploySnapZoSocial.s.sol:DeploySnapZoSocial \
 
 Users must **`approve(SNAP → SnapZoSocial proxy)`** before relayers can execute `tipWithSig` / `unlockWithSig` / `replyDepositWithSig`.
 
+### Deploy `SnapZoSubscriptions` (OnlySnaps)
+
+```bash
+export PRIVATE_KEY=0xYOUR_KEY_HERE
+export SNAP_TOKEN=0x26410f213EA670B9D24c7F7a8c7b8Ab1Ecdc0B0E
+# optional: defaults to deployer wallet if RELAYER is not set
+# export RELAYER=0x...
+
+forge script script/DeploySnapZoSubscriptions.s.sol:DeploySnapZoSubscriptions \
+  --rpc-url https://rpc.test.mezo.org \
+  --broadcast \
+  --contracts script
+```
+
+### Deployed `SnapZoSubscriptions` (Mezo testnet, chain 31611 — 2026-04-23)
+
+| Role | Address |
+|------|---------|
+| **Subscriptions (proxy — use this in backend env)** | `0xEF1E367fC508AcEfCF9F099AeCcE01cE6601eA5F` |
+| **Implementation** | `0x298a944B045C37E2A3d48B09aF431a6BBF14Fd29` |
+
+- Proxy deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x3a84fbb7611ce4b6f139e06b8fd0fecc9a280351daa5aa86040d6c344ab15654)  
+- Impl deploy tx: [explorer](https://explorer.test.mezo.org/tx/0x8ef75db73d0edd2a43659e3b1326fe2da9e6dca0ffb46c981be293b02b3448ea)  
+- Block: **12511519**
+
 **Deploy right now (checklist)**
 
 1. **Remove any real key from git** — if you pasted a live `PRIVATE_KEY` into this repo, **rotate that key** (generate a new deployer wallet) and treat the old one as leaked. Never commit keys; use `export` in the terminal or a **gitignored** `contracts/.env` (see `.gitignore`).

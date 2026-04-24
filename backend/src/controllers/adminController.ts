@@ -6,9 +6,18 @@ import SocialUnlock from '../models/SocialUnlock';
 import Tip from '../models/Tip';
 import Unlock from '../models/Unlock';
 import User from '../models/User';
+import CreatorSubscriptionPlan from '../models/CreatorSubscriptionPlan';
+import SubscriptionAccess from '../models/SubscriptionAccess';
 import { badRequest } from '../utils/errors';
 
-type AdminTableKey = 'likes' | 'replies' | 'unlocks' | 'users' | 'activity' | 'posts';
+type AdminTableKey =
+  | 'likes'
+  | 'replies'
+  | 'unlocks'
+  | 'users'
+  | 'activity'
+  | 'posts'
+  | 'subscriptions';
 
 interface PaginationResult<T> {
   items: T[];
@@ -266,6 +275,7 @@ async function getPostsPage(skip: number, pageSize: number): Promise<PaginationR
         id,
         postId: post.postId,
         createdAt: post.createdAt,
+        visibility: post.visibility,
         isLocked: post.isLocked,
         unlockPrice: post.unlockPrice,
         totalTipsAmount: post.totalTips,
@@ -331,6 +341,7 @@ async function getActivityPage(page: number, pageSize: number): Promise<Paginati
       postObjectId: String(post._id),
       txHash: null,
       summary: post.isLocked ? 'Created locked post' : 'Created post',
+      visibility: post.visibility,
     })),
   ].sort((a, b) => {
     const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -359,9 +370,61 @@ async function getActivityPage(page: number, pageSize: number): Promise<Paginati
   };
 }
 
+async function getSubscriptionsPage(
+  skip: number,
+  pageSize: number
+): Promise<PaginationResult<Record<string, unknown>>> {
+  const now = new Date();
+  const [rows, total, plans] = await Promise.all([
+    SubscriptionAccess.find().sort({ updatedAt: -1, createdAt: -1 }).skip(skip).limit(pageSize).lean(),
+    SubscriptionAccess.countDocuments(),
+    CreatorSubscriptionPlan.find().select('creatorWallet monthlyPriceWei').lean(),
+  ]);
+  const wallets = [
+    ...new Set(rows.flatMap((r) => [r.creatorWallet.toLowerCase(), r.subscriberWallet.toLowerCase()])),
+  ];
+  const users = await User.find({ walletAddress: { $in: wallets } })
+    .select('walletAddress displayName username')
+    .lean();
+  const userMap = new Map(users.map((u) => [u.walletAddress.toLowerCase(), u]));
+  const planMap = new Map(plans.map((p) => [p.creatorWallet.toLowerCase(), p.monthlyPriceWei]));
+  return {
+    total,
+    items: rows.map((row) => {
+      const creator = userMap.get(row.creatorWallet.toLowerCase());
+      const subscriber = userMap.get(row.subscriberWallet.toLowerCase());
+      return {
+        id: String(row._id),
+        creatorWallet: row.creatorWallet,
+        creatorLabel: creator?.displayName || creator?.username || shortWallet(row.creatorWallet),
+        subscriberWallet: row.subscriberWallet,
+        subscriberLabel:
+          subscriber?.displayName || subscriber?.username || shortWallet(row.subscriberWallet),
+        expiresAt: row.expiresAt,
+        isActive: row.expiresAt > now,
+        renewalsCount: row.renewalsCount ?? 0,
+        currentPeriodStart: row.currentPeriodStart ?? null,
+        currentPeriodEnd: row.currentPeriodEnd ?? null,
+        latestAmountWei: row.latestAmountWei ?? null,
+        monthlyPriceWei: planMap.get(row.creatorWallet.toLowerCase()) ?? null,
+        latestTxHash: row.latestTxHash ?? null,
+        updatedAt: row.updatedAt ?? null,
+      };
+    }),
+  };
+}
+
 export async function getAdminActivityTable(req: Request, res: Response): Promise<void> {
   const table = String(req.query.table ?? 'activity') as AdminTableKey;
-  const allowed: AdminTableKey[] = ['likes', 'replies', 'unlocks', 'users', 'activity', 'posts'];
+  const allowed: AdminTableKey[] = [
+    'likes',
+    'replies',
+    'unlocks',
+    'users',
+    'activity',
+    'posts',
+    'subscriptions',
+  ];
   if (!allowed.includes(table)) {
     throw badRequest(`table must be one of: ${allowed.join(', ')}`);
   }
@@ -380,16 +443,30 @@ export async function getAdminActivityTable(req: Request, res: Response): Promis
     result = await getUsersPage(skip, pageSize);
   } else if (table === 'posts') {
     result = await getPostsPage(skip, pageSize);
+  } else if (table === 'subscriptions') {
+    result = await getSubscriptionsPage(skip, pageSize);
   } else {
     result = await getActivityPage(page, pageSize);
   }
 
-  const [tipsCount, repliesCount, unlocksCount, usersCount, postsCount] = await Promise.all([
+  const [
+    tipsCount,
+    repliesCount,
+    unlocksCount,
+    usersCount,
+    postsCount,
+    onlySnapsPlansCount,
+    onlySnapsActiveCount,
+    onlySnapsRecordsCount,
+  ] = await Promise.all([
     Tip.countDocuments(),
     SocialReply.countDocuments(),
     SocialUnlock.countDocuments(),
     User.countDocuments(),
     Post.countDocuments(),
+    CreatorSubscriptionPlan.countDocuments(),
+    SubscriptionAccess.countDocuments({ expiresAt: { $gt: new Date() } }),
+    SubscriptionAccess.countDocuments(),
   ]);
 
   res.json({
@@ -404,6 +481,9 @@ export async function getAdminActivityTable(req: Request, res: Response): Promis
       unlocks: unlocksCount,
       users: usersCount,
       posts: postsCount,
+      onlySnapsPlans: onlySnapsPlansCount,
+      onlySnapsActive: onlySnapsActiveCount,
+      onlySnapsRecords: onlySnapsRecordsCount,
     },
     items: result.items,
   });

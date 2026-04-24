@@ -66,6 +66,8 @@ function mapFeedItemToPost(item: FeedItem): FeedPost {
     unlockCount: item.unlockCount ?? 0,
     likedBySeeds: [13, 27, 39],
     caption: item.content?.trim() || "Untitled post",
+    visibility: item.visibility,
+    subscriberOnlyLocked: item.subscriberOnlyLocked,
     contentLocked: item.isLocked,
     unlockedByMe: item.unlockedByMe,
     unlockPriceMusd: item.unlockPrice,

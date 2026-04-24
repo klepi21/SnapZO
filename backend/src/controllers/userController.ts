@@ -6,6 +6,7 @@ import SocialUnlock from '../models/SocialUnlock';
 import Tip from '../models/Tip';
 import Reply from '../models/Reply';
 import SocialReply from '../models/SocialReply';
+import SubscriptionAccess from '../models/SubscriptionAccess';
 import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
@@ -173,6 +174,9 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
  */
 export async function getUser(req: Request, res: Response): Promise<void> {
   const wallet = requireAddress(req.params.wallet, 'wallet').toLowerCase();
+  const viewer = req.query.viewer
+    ? requireAddress(req.query.viewer, 'viewer').toLowerCase()
+    : null;
 
   let user = await User.findOne({ walletAddress: wallet });
   if (!user) {
@@ -183,6 +187,17 @@ export async function getUser(req: Request, res: Response): Promise<void> {
     .sort({ createdAt: -1 })
     .limit(100)
     .lean();
+  const viewerIsOwner = Boolean(viewer && viewer === wallet);
+  const hasActiveOnlySnapsAccess =
+    viewerIsOwner ||
+    Boolean(
+      viewer &&
+        (await SubscriptionAccess.exists({
+          creatorWallet: wallet,
+          subscriberWallet: viewer,
+          expiresAt: { $gt: new Date() },
+        }))
+    );
 
   const postIds = posts.map((p) => p._id);
   const [unlockRows, socialUnlockRows, likeRows, replyRows, socialReplyRows, socialUnlockAmountRows] =
@@ -253,7 +268,12 @@ export async function getUser(req: Request, res: Response): Promise<void> {
       postId: p.postId,
       creatorWallet: p.creatorWallet,
       content: p.content,
-      ipfsHash: p.ipfsHash,
+      ipfsHash:
+        p.visibility === 'subscriber_only' && !hasActiveOnlySnapsAccess
+          ? undefined
+          : p.ipfsHash,
+      visibility: p.visibility,
+      subscriberOnlyLocked: p.visibility === 'subscriber_only' && !hasActiveOnlySnapsAccess,
       isLocked: p.isLocked,
       unlockPrice: p.unlockPrice,
       blurImage: p.blurImage,

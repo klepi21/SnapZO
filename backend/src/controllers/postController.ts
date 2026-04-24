@@ -8,6 +8,7 @@ import SocialUnlock from '../models/SocialUnlock';
 import Tip from '../models/Tip';
 import Reply from '../models/Reply';
 import SocialReply from '../models/SocialReply';
+import SubscriptionAccess from '../models/SubscriptionAccess';
 import * as ipfsService from '../services/ipfsService';
 import { badRequest, notFound } from '../utils/errors';
 import { requireAddress } from '../utils/validation';
@@ -22,6 +23,7 @@ interface CreatePostBody {
   blurMediaName?: string;
   blurMediaMimeType?: string;
   isLocked?: boolean;
+  visibility?: 'public' | 'unlock' | 'subscriber_only';
   unlockPrice?: number | string;
   postId?: string;
 }
@@ -36,22 +38,43 @@ export async function createPost(req: Request, res: Response): Promise<void> {
 
   const wallet = requireAddress(body.creatorWallet, 'creatorWallet').toLowerCase();
   const content = body.content ?? '';
-  const isLocked = body.isLocked ?? true;
+  const requestedVisibility = body.visibility;
+  const requestedIsLocked = body.isLocked;
 
   if (typeof content !== 'string') {
     throw badRequest('content must be a string');
   }
-  if (typeof isLocked !== 'boolean') {
+  if (requestedIsLocked !== undefined && typeof requestedIsLocked !== 'boolean') {
     throw badRequest('isLocked must be a boolean');
   }
+  if (
+    requestedVisibility !== undefined &&
+    requestedVisibility !== 'public' &&
+    requestedVisibility !== 'unlock' &&
+    requestedVisibility !== 'subscriber_only'
+  ) {
+    throw badRequest('visibility must be one of: public, unlock, subscriber_only');
+  }
+
+  const visibility =
+    requestedVisibility ?? (requestedIsLocked === true ? 'unlock' : 'public');
+  const isLocked = visibility === 'unlock';
 
   const price = Number(body.unlockPrice ?? 0);
   if (!Number.isFinite(price) || price < 0) {
     throw badRequest('unlockPrice must be a non-negative number');
   }
-  if (isLocked && price <= 0) {
+  if (visibility === 'unlock' && price <= 0) {
     throw badRequest('locked posts require unlockPrice > 0');
   }
+  if (visibility === 'subscriber_only' && price > 0) {
+    throw badRequest('subscriber_only posts cannot have unlockPrice');
+  }
+  if (visibility === 'public' && price > 0) {
+    throw badRequest('public posts cannot have unlockPrice');
+  }
+
+  const normalizedPrice = visibility === 'unlock' ? price : 0;
 
   let ipfsHash: string | undefined;
   if (body.mediaBase64) {
@@ -84,8 +107,9 @@ export async function createPost(req: Request, res: Response): Promise<void> {
     content,
     ipfsHash,
     blurImage: blurHash,
+    visibility,
     isLocked,
-    unlockPrice: price,
+    unlockPrice: normalizedPrice,
   });
 
   res.status(201).json(post.toJSON());
@@ -116,17 +140,35 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
 
   const postIds = posts.map((p) => p._id);
   const creatorWallets = [...new Set(posts.map((p) => p.creatorWallet.toLowerCase()))];
+  const subscriberOnlyCreators = [
+    ...new Set(
+      posts
+        .filter((p) => p.visibility === 'subscriber_only')
+        .map((p) => p.creatorWallet.toLowerCase())
+    ),
+  ];
 
   let unlockedSet = new Set<string>();
+  let activeOnlySnapsCreators = new Set<string>();
   if (viewer) {
-    const [unlocks, socialUnlocks] = await Promise.all([
+    const [unlocks, socialUnlocks, activeSubscriptions] = await Promise.all([
       Unlock.find({ post: { $in: postIds }, userWallet: viewer }).select('post').lean(),
       SocialUnlock.find({ post: { $in: postIds }, userWallet: viewer }).select('post').lean(),
+      subscriberOnlyCreators.length > 0
+        ? SubscriptionAccess.find({
+            subscriberWallet: viewer,
+            creatorWallet: { $in: subscriberOnlyCreators },
+            expiresAt: { $gt: new Date() },
+          })
+            .select('creatorWallet')
+            .lean()
+        : Promise.resolve([]),
     ]);
     unlockedSet = new Set([
       ...unlocks.map((u) => String(u.post)),
       ...socialUnlocks.map((u) => String(u.post)),
     ]);
+    activeOnlySnapsCreators = new Set(activeSubscriptions.map((s) => s.creatorWallet.toLowerCase()));
   }
 
   const [tipCounts, replyCounts, socialReplyCounts, unlockCounts, socialUnlockCounts] =
@@ -168,7 +210,13 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
     const isCreatorViewer = Boolean(
       viewer && p.creatorWallet.toLowerCase() === viewer.toLowerCase()
     );
-    const unlockedByMe = !p.isLocked || isCreatorViewer || unlockedSet.has(idStr);
+    const hasOnlySnapsAccess =
+      p.visibility !== 'subscriber_only' ||
+      isCreatorViewer ||
+      Boolean(viewer && activeOnlySnapsCreators.has(p.creatorWallet.toLowerCase()));
+    const unlockedByMe =
+      (p.visibility !== 'unlock' || !p.isLocked || isCreatorViewer || unlockedSet.has(idStr)) &&
+      hasOnlySnapsAccess;
     const creator = creatorMap.get(p.creatorWallet.toLowerCase());
     return {
       id: idStr,
@@ -178,6 +226,7 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       creatorUsername: creator?.username ?? null,
       creatorProfileImage: creator?.profileImage ?? null,
       content: p.content,
+      visibility: p.visibility,
       ipfsHash: unlockedByMe ? p.ipfsHash : undefined,
       isLocked: p.isLocked,
       unlockPrice: p.unlockPrice,
@@ -185,6 +234,7 @@ export async function getFeed(req: Request, res: Response): Promise<void> {
       totalTips: p.totalTips,
       createdAt: p.createdAt,
       unlockedByMe,
+      subscriberOnlyLocked: p.visibility === 'subscriber_only' && !hasOnlySnapsAccess,
       tipCount: tipMap.get(idStr) ?? 0,
       replyCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
       commentCount: (replyMap.get(idStr) ?? 0) + (socialReplyMap.get(idStr) ?? 0),
@@ -207,6 +257,27 @@ export async function getPost(req: Request, res: Response): Promise<void> {
     : null;
 
   let unlockedByMe = !post.isLocked;
+  let hasOnlySnapsAccess = post.visibility !== 'subscriber_only';
+  const isCreatorViewer = Boolean(
+    viewer && post.creatorWallet.toLowerCase() === viewer.toLowerCase()
+  );
+  if (post.visibility === 'subscriber_only') {
+    if (isCreatorViewer) {
+      hasOnlySnapsAccess = true;
+    } else if (viewer) {
+      const activeSub = await SubscriptionAccess.exists({
+        creatorWallet: post.creatorWallet.toLowerCase(),
+        subscriberWallet: viewer,
+        expiresAt: { $gt: new Date() },
+      });
+      hasOnlySnapsAccess = Boolean(activeSub);
+    } else {
+      hasOnlySnapsAccess = false;
+    }
+  }
+  if (post.visibility !== 'unlock') {
+    unlockedByMe = hasOnlySnapsAccess;
+  }
   if (viewer && post.isLocked) {
     const [u, su] = await Promise.all([
       Unlock.exists({ post: post._id, userWallet: viewer }),
@@ -226,6 +297,7 @@ export async function getPost(req: Request, res: Response): Promise<void> {
     creatorUsername: creator?.username ?? null,
     creatorProfileImage: creator?.profileImage ?? null,
     content: post.content,
+    visibility: post.visibility,
     ipfsHash: unlockedByMe ? post.ipfsHash : undefined,
     isLocked: post.isLocked,
     unlockPrice: post.unlockPrice,
@@ -233,5 +305,6 @@ export async function getPost(req: Request, res: Response): Promise<void> {
     totalTips: post.totalTips,
     createdAt: post.createdAt,
     unlockedByMe,
+    subscriberOnlyLocked: post.visibility === 'subscriber_only' && !hasOnlySnapsAccess,
   });
 }

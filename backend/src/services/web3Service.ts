@@ -41,6 +41,8 @@ const HUB_ABI = [
 
 const TRANSFER_TOPIC = ethers.id('Transfer(address,address,uint256)');
 const SOCIAL_TIP_TOPIC = ethers.id('Tip(address,address,uint256,uint256,address)');
+const ONLYSNAPS_SUBSCRIBED_TOPIC =
+  ethers.id('Subscribed(address,address,uint256,uint48,uint48,address)');
 
 let provider: JsonRpcProvider | null = null;
 let escrowWallet: Wallet | null = null;
@@ -71,6 +73,21 @@ export interface VerifySocialTipParams {
   txHash: string;
   tipper: string;
   creator: string;
+}
+
+export interface VerifyOnlySnapsSubscribedParams {
+  txHash: string;
+  subscriber: string;
+  creator: string;
+  expectedAmountWei?: string;
+}
+
+export interface VerifyOnlySnapsSubscribedResult {
+  subscriber: string;
+  creator: string;
+  amountWei: string;
+  periodStart: number;
+  periodEnd: number;
 }
 
 /** Initialize the provider + signer + contracts. Idempotent. */
@@ -223,6 +240,62 @@ export async function verifySocialTipEvent(params: VerifySocialTipParams): Promi
   }
 }
 
+/** Verify OnlySnaps Subscribed event and return canonical period bounds from chain log. */
+export async function verifyOnlySnapsSubscribedEvent(
+  params: VerifyOnlySnapsSubscribedParams
+): Promise<VerifyOnlySnapsSubscribedResult> {
+  init();
+  if (!provider) throw new Error('web3 provider not configured');
+  if (!config.chain.subscriptionsContractAddress) {
+    throw new Error('SUBSCRIPTIONS_CONTRACT_ADDRESS not configured');
+  }
+
+  const receipt = await provider.getTransactionReceipt(params.txHash);
+  if (!receipt) throw new Error(`Transaction ${params.txHash} not found`);
+  if (receipt.status !== 1) throw new Error(`Transaction ${params.txHash} failed on-chain`);
+
+  const subAddrLc = config.chain.subscriptionsContractAddress.toLowerCase();
+  const subscriberLc = params.subscriber.toLowerCase();
+  const creatorLc = params.creator.toLowerCase();
+
+  const log = receipt.logs.find((entry) => {
+    if (entry.address.toLowerCase() !== subAddrLc) return false;
+    if (!entry.topics || entry.topics[0] !== ONLYSNAPS_SUBSCRIBED_TOPIC || entry.topics.length < 3) return false;
+    const decodedSubscriber = ethers.getAddress('0x' + entry.topics[1].slice(26)).toLowerCase();
+    const decodedCreator = ethers.getAddress('0x' + entry.topics[2].slice(26)).toLowerCase();
+    return decodedSubscriber === subscriberLc && decodedCreator === creatorLc;
+  });
+  if (!log) {
+    throw new Error(
+      `No matching OnlySnaps Subscribed event found in tx ${params.txHash} for subscriber ${params.subscriber} creator ${params.creator}`
+    );
+  }
+
+  const encoded = log.data.startsWith('0x') ? log.data.slice(2) : log.data;
+  if (encoded.length < 64 * 4) {
+    throw new Error(`Malformed Subscribed event data in tx ${params.txHash}`);
+  }
+  const amountWei = BigInt('0x' + encoded.slice(0, 64)).toString();
+  const periodStart = Number(BigInt('0x' + encoded.slice(64, 128)));
+  const periodEnd = Number(BigInt('0x' + encoded.slice(128, 192)));
+  if (!Number.isFinite(periodStart) || !Number.isFinite(periodEnd)) {
+    throw new Error(`Invalid period bounds in Subscribed event for tx ${params.txHash}`);
+  }
+  if (params.expectedAmountWei && amountWei !== params.expectedAmountWei) {
+    throw new Error(
+      `Subscribed event amount mismatch in tx ${params.txHash} (expected ${params.expectedAmountWei}, got ${amountWei})`
+    );
+  }
+
+  return {
+    subscriber: subscriberLc,
+    creator: creatorLc,
+    amountWei,
+    periodStart,
+    periodEnd,
+  };
+}
+
 /**
  * Send an MUSD refund from the escrow wallet to a user.
  * @returns the refund tx hash
@@ -349,6 +422,7 @@ export default {
   getEscrowAddress,
   verifyMusdTransfer,
   verifySocialTipEvent,
+  verifyOnlySnapsSubscribedEvent,
   sendMusdRefund,
   startListeners,
   stopListeners,

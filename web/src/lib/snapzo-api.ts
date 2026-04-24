@@ -32,6 +32,8 @@ export interface UserPostItem {
   creatorWallet: string;
   content?: string;
   ipfsHash?: string;
+  visibility?: "public" | "unlock" | "subscriber_only";
+  subscriberOnlyLocked?: boolean;
   isLocked: boolean;
   unlockPrice: number;
   blurImage?: string;
@@ -46,6 +48,22 @@ export interface UserPostItem {
 export interface UserProfileWithPostsResponse {
   user: SnapzoBackendUser;
   posts: UserPostItem[];
+}
+
+export interface OnlySnapsPlanResponse {
+  creatorWallet: string;
+  monthlyPriceWei: string | null;
+  updatedAt: string | null;
+  updatedTxHash: string | null;
+}
+
+export interface OnlySnapsStatusResponse {
+  creatorWallet: string;
+  viewerWallet: string;
+  monthlyPriceWei: string | null;
+  expiresAt: string | null;
+  isActive: boolean;
+  activeSubscribers: number;
 }
 
 /**
@@ -88,6 +106,8 @@ export interface FeedItem {
   creatorWallet: string;
   content?: string;
   ipfsHash?: string;
+  visibility?: "public" | "unlock" | "subscriber_only";
+  subscriberOnlyLocked?: boolean;
   isLocked: boolean;
   unlockPrice: number;
   blurImage?: string;
@@ -115,6 +135,8 @@ export interface PostDetailResponse {
   creatorWallet: string;
   content?: string;
   ipfsHash?: string;
+  visibility?: "public" | "unlock" | "subscriber_only";
+  subscriberOnlyLocked?: boolean;
   isLocked: boolean;
   unlockPrice: number;
   blurImage?: string;
@@ -159,7 +181,14 @@ export interface TipItem {
   tipperProfileImage?: string | null;
 }
 
-export type AdminActivityTable = "likes" | "replies" | "unlocks" | "users" | "activity" | "posts";
+export type AdminActivityTable =
+  | "likes"
+  | "replies"
+  | "unlocks"
+  | "users"
+  | "activity"
+  | "posts"
+  | "subscriptions";
 
 export interface AdminActivityResponse {
   table: AdminActivityTable;
@@ -173,6 +202,9 @@ export interface AdminActivityResponse {
     unlocks: number;
     users: number;
     posts: number;
+    onlySnapsPlans?: number;
+    onlySnapsActive?: number;
+    onlySnapsRecords?: number;
   };
   items: Array<Record<string, unknown>>;
 }
@@ -206,9 +238,14 @@ export async function updateProfile(
 
 export async function fetchUserProfileWithPosts(
   walletAddress: string,
+  viewerWallet?: string,
   signal?: AbortSignal
 ): Promise<UserProfileWithPostsResponse> {
-  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/user/${walletAddress}`, { signal });
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/user/${walletAddress}`);
+  if (viewerWallet) {
+    url.searchParams.set("viewer", viewerWallet);
+  }
+  const res = await fetch(url.toString(), { signal });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
@@ -216,6 +253,60 @@ export async function fetchUserProfileWithPosts(
     );
   }
   return (await res.json()) as UserProfileWithPostsResponse;
+}
+
+export async function fetchOnlySnapsPlan(
+  creatorWallet: string,
+  signal?: AbortSignal,
+): Promise<OnlySnapsPlanResponse> {
+  const res = await fetch(
+    `${getSnapzoApiBaseUrl()}/api/onlysnaps/plan/${creatorWallet}`,
+    { signal },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `fetchOnlySnapsPlan failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as OnlySnapsPlanResponse;
+}
+
+export async function fetchOnlySnapsStatus(
+  creatorWallet: string,
+  viewerWallet: string,
+  signal?: AbortSignal,
+): Promise<OnlySnapsStatusResponse> {
+  const url = new URL(`${getSnapzoApiBaseUrl()}/api/onlysnaps/status`);
+  url.searchParams.set("creatorWallet", creatorWallet);
+  url.searchParams.set("viewerWallet", viewerWallet);
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `fetchOnlySnapsStatus failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as OnlySnapsStatusResponse;
+}
+
+export async function upsertOnlySnapsPlan(input: {
+  creatorWallet: string;
+  monthlyPriceWei: string;
+  txHash?: string;
+}): Promise<OnlySnapsPlanResponse> {
+  const res = await fetch(`${getSnapzoApiBaseUrl()}/api/onlysnaps/plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `upsertOnlySnapsPlan failed (${res.status}): ${text || res.statusText}`
+    );
+  }
+  return (await res.json()) as OnlySnapsPlanResponse;
 }
 
 export async function fetchFeed(
