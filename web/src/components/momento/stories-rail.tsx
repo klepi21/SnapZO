@@ -270,7 +270,7 @@ export function StoriesRail() {
       {activeGroupIndex !== null && currentGroup && currentStory ? (
         <div className="fixed inset-0 z-[120] bg-black/95">
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 z-20"
             onPointerDown={(e) => {
               pressStateRef.current = { x: e.clientX, startedAt: Date.now() };
               setPaused(true);
@@ -292,54 +292,73 @@ export function StoriesRail() {
             }}
           />
 
-          <div className="absolute left-3 right-3 top-3 z-10 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {currentGroup.creatorProfileImage ? (
-                <Image
-                  src={ipfsGatewayUrl(currentGroup.creatorProfileImage) ?? ""}
-                  alt=""
-                  width={28}
-                  height={28}
-                  className="h-7 w-7 rounded-full object-cover ring-1 ring-white/30"
-                />
-              ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-zinc-200">
-                  {(currentGroup.creatorDisplayName || currentGroup.creatorUsername || "S")
-                    .slice(0, 1)
-                    .toUpperCase()}
-                </span>
-              )}
-              <span className="text-sm font-medium text-white">
-                {currentGroup.creatorDisplayName ||
-                  currentGroup.creatorUsername ||
-                  shortWallet(currentGroup.creatorWallet)}
-              </span>
-              <span className="text-xs text-zinc-300">{formatHoursLeft(currentStory.expiresAt)}</span>
+          <div className="absolute left-3 right-3 top-3 z-30">
+            <div className="mb-2 flex items-center gap-1.5">
+              {currentGroup.stories.map((story, idx) => {
+                const widthPct =
+                  idx < activeStoryIndex
+                    ? 100
+                    : idx > activeStoryIndex
+                      ? 0
+                      : Math.min(100, (elapsedMs / STORY_DURATION_MS) * 100);
+                return (
+                  <span
+                    key={story.id}
+                    className="h-1 flex-1 overflow-hidden rounded-full bg-white/25"
+                  >
+                    <span
+                      className="block h-full bg-white transition-[width] duration-75"
+                      style={{ width: `${widthPct}%` }}
+                    />
+                  </span>
+                );
+              })}
             </div>
-            <button
-              type="button"
-              className="rounded-full bg-black/40 p-1.5 text-zinc-200"
-              onClick={() => setActiveGroupIndex(null)}
-              aria-label="Close stories"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {currentGroup.creatorProfileImage ? (
+                  <Image
+                    src={ipfsGatewayUrl(currentGroup.creatorProfileImage) ?? ""}
+                    alt=""
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 rounded-full object-cover ring-1 ring-white/30"
+                  />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-zinc-200">
+                    {(currentGroup.creatorDisplayName || currentGroup.creatorUsername || "S")
+                      .slice(0, 1)
+                      .toUpperCase()}
+                  </span>
+                )}
+                <span className="text-sm font-medium text-white">
+                  {currentGroup.creatorDisplayName ||
+                    currentGroup.creatorUsername ||
+                    shortWallet(currentGroup.creatorWallet)}
+                </span>
+                <span className="text-xs text-zinc-300">
+                  {activeStoryIndex + 1}/{currentGroup.stories.length} ·{" "}
+                  {formatHoursLeft(currentStory.expiresAt)}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="rounded-full bg-black/40 p-1.5 text-zinc-200"
+                onClick={() => setActiveGroupIndex(null)}
+                aria-label="Close stories"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="relative flex h-full w-full items-center justify-center px-4 py-14">
+          <div className="relative z-10 flex h-full w-full items-center justify-center px-4 py-14">
             <Image
               src={ipfsGatewayUrl(currentStory.ipfsHash) ?? ""}
               alt=""
               fill
               className="object-contain"
               priority
-            />
-          </div>
-
-          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/10">
-            <div
-              className="h-full bg-white transition-[width] duration-75"
-              style={{ width: `${Math.min(100, (elapsedMs / STORY_DURATION_MS) * 100)}%` }}
             />
           </div>
         </div>
